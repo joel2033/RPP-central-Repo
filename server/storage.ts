@@ -10,6 +10,8 @@ import {
   productionNotifications,
   calendarEvents,
   businessSettings,
+  googleCalendarIntegrations,
+  calendarSyncLogs,
   type User,
   type UpsertUser,
   type Client,
@@ -32,6 +34,10 @@ import {
   type InsertCalendarEvent,
   type BusinessSettings,
   type InsertBusinessSettings,
+  type GoogleCalendarIntegration,
+  type InsertGoogleCalendarIntegration,
+  type CalendarSyncLog,
+  type InsertCalendarSyncLog,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, count } from "drizzle-orm";
@@ -109,6 +115,17 @@ export interface IStorage {
   // Business Settings
   getBusinessSettings(licenseeId: string): Promise<BusinessSettings | undefined>;
   upsertBusinessSettings(settings: InsertBusinessSettings): Promise<BusinessSettings>;
+  
+  // Google Calendar Integration
+  getGoogleCalendarIntegration(userId: string): Promise<GoogleCalendarIntegration | undefined>;
+  createGoogleCalendarIntegration(integration: InsertGoogleCalendarIntegration): Promise<GoogleCalendarIntegration>;
+  updateGoogleCalendarIntegration(id: number, integration: Partial<InsertGoogleCalendarIntegration>): Promise<GoogleCalendarIntegration>;
+  deleteGoogleCalendarIntegration(userId: string): Promise<void>;
+  
+  // Calendar Sync Logs
+  createCalendarSyncLog(log: InsertCalendarSyncLog): Promise<CalendarSyncLog>;
+  getCalendarSyncLogByEventId(eventId: string): Promise<CalendarSyncLog | undefined>;
+  getCalendarEventByGoogleId(googleEventId: string): Promise<CalendarEvent | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -696,6 +713,77 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return created;
     }
+  }
+
+  // Google Calendar Integration
+  async getGoogleCalendarIntegration(userId: string): Promise<GoogleCalendarIntegration | undefined> {
+    const [integration] = await db
+      .select()
+      .from(googleCalendarIntegrations)
+      .where(and(
+        eq(googleCalendarIntegrations.userId, userId),
+        eq(googleCalendarIntegrations.isActive, true)
+      ));
+    return integration;
+  }
+
+  async createGoogleCalendarIntegration(integration: InsertGoogleCalendarIntegration): Promise<GoogleCalendarIntegration> {
+    const [newIntegration] = await db
+      .insert(googleCalendarIntegrations)
+      .values(integration)
+      .returning();
+    return newIntegration;
+  }
+
+  async updateGoogleCalendarIntegration(id: number, integration: Partial<InsertGoogleCalendarIntegration>): Promise<GoogleCalendarIntegration> {
+    const [updated] = await db
+      .update(googleCalendarIntegrations)
+      .set({ ...integration, updatedAt: new Date() })
+      .where(eq(googleCalendarIntegrations.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteGoogleCalendarIntegration(userId: string): Promise<void> {
+    await db
+      .update(googleCalendarIntegrations)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(googleCalendarIntegrations.userId, userId));
+  }
+
+  // Calendar Sync Logs
+  async createCalendarSyncLog(log: InsertCalendarSyncLog): Promise<CalendarSyncLog> {
+    const [newLog] = await db
+      .insert(calendarSyncLogs)
+      .values(log)
+      .returning();
+    return newLog;
+  }
+
+  async getCalendarSyncLogByEventId(eventId: string): Promise<CalendarSyncLog | undefined> {
+    const [log] = await db
+      .select()
+      .from(calendarSyncLogs)
+      .where(eq(calendarSyncLogs.eventId, eventId))
+      .orderBy(desc(calendarSyncLogs.syncedAt))
+      .limit(1);
+    return log;
+  }
+
+  async getCalendarEventByGoogleId(googleEventId: string): Promise<CalendarEvent | undefined> {
+    const [log] = await db
+      .select()
+      .from(calendarSyncLogs)
+      .where(eq(calendarSyncLogs.googleEventId, googleEventId));
+    
+    if (!log || !log.eventId) return undefined;
+    
+    const [event] = await db
+      .select()
+      .from(calendarEvents)
+      .where(eq(calendarEvents.id, parseInt(log.eventId)));
+    
+    return event;
   }
 }
 

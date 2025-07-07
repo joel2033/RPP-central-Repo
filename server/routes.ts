@@ -10,12 +10,14 @@ import {
   insertProductionFileSchema,
   insertProductionNotificationSchema,
   insertCalendarEventSchema,
-  insertBusinessSettingsSchema
+  insertBusinessSettingsSchema,
+  insertGoogleCalendarIntegrationSchema
 } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import { fileStorage } from "./fileStorage";
 import { requireEditor, requireAdmin } from "./middleware/roleAuth";
+import { googleCalendarService } from "./googleCalendar";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -600,6 +602,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating business settings:", error);
       res.status(400).json({ message: "Failed to update business settings" });
+    }
+  });
+
+  // Google Calendar OAuth routes
+  app.get('/api/auth/google', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const authUrl = googleCalendarService.generateAuthUrl(userId);
+      res.redirect(authUrl);
+    } catch (error) {
+      console.error("Error generating Google auth URL:", error);
+      res.status(500).json({ message: "Failed to initiate Google Calendar authorization" });
+    }
+  });
+
+  app.get('/api/auth/google/callback', async (req: any, res) => {
+    try {
+      const { code, state } = req.query;
+      const userId = state; // userId was passed as state parameter
+
+      if (!code || !userId) {
+        return res.status(400).json({ message: "Missing authorization code or user ID" });
+      }
+
+      // Exchange code for tokens
+      const tokens = await googleCalendarService.exchangeCodeForTokens(code);
+
+      // Store integration
+      const integrationData = insertGoogleCalendarIntegrationSchema.parse({
+        userId,
+        googleCalendarId: 'primary', // Default to primary calendar
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        tokenExpiry: tokens.expiry,
+        isActive: true,
+        syncDirection: 'both'
+      });
+
+      await storage.createGoogleCalendarIntegration(integrationData);
+
+      // Redirect back to calendar page with success
+      res.redirect('/calendar?google_connected=true');
+    } catch (error) {
+      console.error("Error handling Google auth callback:", error);
+      res.redirect('/calendar?google_error=true');
+    }
+  });
+
+  // Google Calendar integration management
+  app.get('/api/google-calendar/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const integration = await storage.getGoogleCalendarIntegration(userId);
+      
+      res.json({
+        connected: !!integration,
+        lastSync: integration?.lastSyncAt,
+        syncDirection: integration?.syncDirection
+      });
+    } catch (error) {
+      console.error("Error getting Google Calendar status:", error);
+      res.status(500).json({ message: "Failed to get Google Calendar status" });
+    }
+  });
+
+  app.delete('/api/google-calendar/disconnect', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await storage.deleteGoogleCalendarIntegration(userId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error disconnecting Google Calendar:", error);
+      res.status(500).json({ message: "Failed to disconnect Google Calendar" });
+    }
+  });
+
+  app.post('/api/google-calendar/sync', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const integration = await storage.getGoogleCalendarIntegration(userId);
+      
+      if (!integration) {
+        return res.status(404).json({ message: "Google Calendar not connected" });
+      }
+
+      // Trigger inbound sync
+      await googleCalendarService.syncInboundEvents(integration);
+      
+      res.json({ message: "Sync completed successfully" });
+    } catch (error) {
+      console.error("Error syncing Google Calendar:", error);
+      res.status(500).json({ message: "Failed to sync Google Calendar" });
     }
   });
 

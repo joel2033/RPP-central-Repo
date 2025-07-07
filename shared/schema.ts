@@ -205,6 +205,33 @@ export const businessSettings = pgTable("business_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Google Calendar Integration table
+export const googleCalendarIntegrations = pgTable("google_calendar_integrations", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  googleCalendarId: varchar("google_calendar_id").notNull(),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  tokenExpiry: timestamp("token_expiry").notNull(),
+  isActive: boolean("is_active").default(true),
+  lastSyncAt: timestamp("last_sync_at"),
+  syncDirection: varchar("sync_direction", { length: 20 }).default("both"), // inbound, outbound, both
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Calendar Sync Log table (for tracking sync events)
+export const calendarSyncLogs = pgTable("calendar_sync_logs", {
+  id: serial("id").primaryKey(),
+  integrationId: integer("integration_id").notNull().references(() => googleCalendarIntegrations.id),
+  eventId: varchar("event_id"), // Our internal event ID
+  googleEventId: varchar("google_event_id"), // Google's event ID
+  syncType: varchar("sync_type", { length: 20 }).notNull(), // push, pull, update, delete
+  status: varchar("status", { length: 20 }).notNull(), // success, error, pending
+  errorMessage: text("error_message"),
+  syncedAt: timestamp("synced_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   bookings: many(bookings),
@@ -336,6 +363,21 @@ export const businessSettingsRelations = relations(businessSettings, ({ one }) =
   }),
 }));
 
+export const googleCalendarIntegrationsRelations = relations(googleCalendarIntegrations, ({ one, many }) => ({
+  user: one(users, {
+    fields: [googleCalendarIntegrations.userId],
+    references: [users.id],
+  }),
+  syncLogs: many(calendarSyncLogs),
+}));
+
+export const calendarSyncLogsRelations = relations(calendarSyncLogs, ({ one }) => ({
+  integration: one(googleCalendarIntegrations, {
+    fields: [calendarSyncLogs.integrationId],
+    references: [googleCalendarIntegrations.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   id: true,
@@ -403,6 +445,17 @@ export const insertBusinessSettingsSchema = createInsertSchema(businessSettings)
   updatedAt: true,
 });
 
+export const insertGoogleCalendarIntegrationSchema = createInsertSchema(googleCalendarIntegrations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCalendarSyncLogSchema = createInsertSchema(calendarSyncLogs).omit({
+  id: true,
+  syncedAt: true,
+});
+
 // Types
 export type UpsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -430,3 +483,7 @@ export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;
 export type CalendarEvent = typeof calendarEvents.$inferSelect;
 export type InsertBusinessSettings = z.infer<typeof insertBusinessSettingsSchema>;
 export type BusinessSettings = typeof businessSettings.$inferSelect;
+export type InsertGoogleCalendarIntegration = z.infer<typeof insertGoogleCalendarIntegrationSchema>;
+export type GoogleCalendarIntegration = typeof googleCalendarIntegrations.$inferSelect;
+export type InsertCalendarSyncLog = z.infer<typeof insertCalendarSyncLogSchema>;
+export type CalendarSyncLog = typeof calendarSyncLogs.$inferSelect;

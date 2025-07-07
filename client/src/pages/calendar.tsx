@@ -76,6 +76,12 @@ export default function Calendar() {
     photographerId: "",
   });
   
+  const [googleCalendarStatus, setGoogleCalendarStatus] = useState({
+    connected: false,
+    lastSync: null,
+    syncDirection: 'both'
+  });
+  
   // Filters
   const [visibleEventTypes, setVisibleEventTypes] = useState({
     job: true,
@@ -120,6 +126,14 @@ export default function Calendar() {
   const { data: businessSettings } = useQuery({
     queryKey: ["/api/business-settings"],
     enabled: isAuthenticated,
+  });
+
+  const { data: googleStatus } = useQuery({
+    queryKey: ["/api/google-calendar/status"],
+    enabled: isAuthenticated,
+    onSuccess: (data) => {
+      setGoogleCalendarStatus(data);
+    }
   });
 
   const createEventMutation = useMutation({
@@ -202,6 +216,49 @@ export default function Calendar() {
       toast({
         title: "Error",
         description: "Failed to delete event",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const syncGoogleCalendarMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/google-calendar/sync");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/google-calendar/status"] });
+      toast({
+        title: "Success",
+        description: "Google Calendar synced successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: "Failed to sync Google Calendar",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const disconnectGoogleCalendarMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("DELETE", "/api/google-calendar/disconnect");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/google-calendar/status"] });
+      toast({
+        title: "Success",
+        description: "Google Calendar disconnected",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: "Failed to disconnect Google Calendar",
         variant: "destructive",
       });
     },
@@ -399,6 +456,61 @@ export default function Calendar() {
                       </div>
                     </div>
                   ))}
+                </CardContent>
+              </Card>
+
+              {/* Google Calendar Integration */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">
+                    Google Calendar
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {googleCalendarStatus.connected ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center text-sm text-green-600">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mr-2" />
+                        Connected
+                      </div>
+                      {googleCalendarStatus.lastSync && (
+                        <p className="text-xs text-slate-500">
+                          Last sync: {new Date(googleCalendarStatus.lastSync).toLocaleString()}
+                        </p>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => syncGoogleCalendarMutation.mutate()}
+                        disabled={syncGoogleCalendarMutation.isPending}
+                      >
+                        {syncGoogleCalendarMutation.isPending ? "Syncing..." : "Sync Now"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full text-red-600"
+                        onClick={() => disconnectGoogleCalendarMutation.mutate()}
+                      >
+                        Disconnect
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center text-sm text-slate-500">
+                        <div className="w-2 h-2 bg-slate-300 rounded-full mr-2" />
+                        Not connected
+                      </div>
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        onClick={() => window.location.href = '/api/auth/google'}
+                      >
+                        Connect Google Calendar
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
