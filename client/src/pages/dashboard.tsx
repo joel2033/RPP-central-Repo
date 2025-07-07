@@ -43,22 +43,24 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 flex">
       <Sidebar />
-      <div className="lg:ml-64">
+      <div className="flex-1 ml-64">
         <TopBar title="Dashboard" />
-        <main className="p-6">
-          <StatsCards />
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
-            <div className="lg:col-span-2">
-              <RecentBookings />
+        <main className="p-6 bg-slate-50">
+          <div className="max-w-7xl mx-auto">
+            <StatsCards />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+              <div className="lg:col-span-2">
+                <RecentBookings />
+              </div>
+              <div>
+                <QuickActions />
+              </div>
             </div>
-            <div>
-              <QuickActions />
-            </div>
+            <ServicesOverview />
+            <UpcomingJobs />
           </div>
-          <ServicesOverview />
-          <UpcomingJobs />
         </main>
       </div>
     </div>

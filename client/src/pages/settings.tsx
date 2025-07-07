@@ -35,11 +35,12 @@ export default function Settings() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 flex">
       <Sidebar />
-      <div className="lg:ml-64">
+      <div className="flex-1 ml-64">
         <TopBar title="Settings" />
-        <main className="p-6">
+        <main className="p-6 bg-slate-50">
+          <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-slate-900">Settings</h2>
@@ -168,6 +169,7 @@ export default function Settings() {
               </div>
             </CardContent>
           </Card>
+          </div>
         </main>
       </div>
     </div>

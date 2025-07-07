@@ -27,7 +27,7 @@ export default function Sidebar() {
   const { user } = useAuth();
 
   return (
-    <div className="fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0">
+    <div className="fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg border-r border-slate-200">
       {/* Logo */}
       <div className="flex items-center justify-center h-16 bg-brand-blue">
         <h1 className="text-xl font-bold text-white">RealEstate Media Pro</h1>
@@ -41,8 +41,8 @@ export default function Sidebar() {
               {user?.firstName?.[0] || user?.email?.[0]?.toUpperCase() || "U"}
             </span>
           </div>
-          <div>
-            <p className="text-sm font-medium text-slate-900">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-slate-900 truncate">
               {user?.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : user?.email || "User"}
             </p>
             <p className="text-xs text-slate-500 capitalize">{user?.role || "User"}</p>
@@ -51,16 +51,16 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="mt-4 px-4 space-y-2">
+      <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
         {navigation.map((item) => {
           const Icon = item.icon;
           const isActive = location === item.href;
           
           return (
             <Link key={item.name} href={item.href}>
-              <a
+              <div
                 className={cn(
-                  "flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors",
+                  "flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer",
                   isActive
                     ? "text-white bg-brand-blue"
                     : "text-slate-700 hover:bg-slate-100"
@@ -68,17 +68,17 @@ export default function Sidebar() {
               >
                 <Icon className="h-5 w-5 mr-3" />
                 {item.name}
-              </a>
+              </div>
             </Link>
           );
         })}
       </nav>
 
-      {/* Sign Out */}
-      <div className="absolute bottom-4 left-4 right-4">
+      {/* Sign Out - Fixed at bottom */}
+      <div className="p-4 border-t border-slate-200">
         <button
           onClick={() => window.location.href = "/api/logout"}
-          className="flex items-center w-full px-4 py-2 text-sm font-medium text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
+          className="flex items-center w-full px-3 py-2 text-sm font-medium text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
         >
           <LogOut className="h-5 w-5 mr-3" />
           Sign Out

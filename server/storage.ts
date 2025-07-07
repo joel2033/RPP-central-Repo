@@ -130,7 +130,7 @@ export class DatabaseStorage implements IStorage {
 
   // Booking operations
   async getBookings(licenseeId: string): Promise<(Booking & { client: Client; photographer: User | null })[]> {
-    return await db
+    const results = await db
       .select({
         id: bookings.id,
         clientId: bookings.clientId,
@@ -149,10 +149,12 @@ export class DatabaseStorage implements IStorage {
         photographer: users,
       })
       .from(bookings)
-      .leftJoin(clients, eq(bookings.clientId, clients.id))
+      .innerJoin(clients, eq(bookings.clientId, clients.id))
       .leftJoin(users, eq(bookings.photographerId, users.id))
       .where(eq(bookings.licenseeId, licenseeId))
       .orderBy(desc(bookings.scheduledDate));
+    
+    return results as (Booking & { client: Client; photographer: User | null })[];
   }
 
   async getBooking(id: number, licenseeId: string): Promise<(Booking & { client: Client; photographer: User | null }) | undefined> {
@@ -175,10 +177,10 @@ export class DatabaseStorage implements IStorage {
         photographer: users,
       })
       .from(bookings)
-      .leftJoin(clients, eq(bookings.clientId, clients.id))
+      .innerJoin(clients, eq(bookings.clientId, clients.id))
       .leftJoin(users, eq(bookings.photographerId, users.id))
       .where(and(eq(bookings.id, id), eq(bookings.licenseeId, licenseeId)));
-    return booking;
+    return booking as (Booking & { client: Client; photographer: User | null }) | undefined;
   }
 
   async createBooking(booking: InsertBooking): Promise<Booking> {

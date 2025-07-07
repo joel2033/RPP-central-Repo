@@ -35,11 +35,12 @@ export default function Reports() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 flex">
       <Sidebar />
-      <div className="lg:ml-64">
+      <div className="flex-1 ml-64">
         <TopBar title="Reports" />
-        <main className="p-6">
+        <main className="p-6 bg-slate-50">
+          <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -171,6 +172,7 @@ export default function Reports() {
                 </div>
               </CardContent>
             </Card>
+          </div>
           </div>
         </main>
       </div>

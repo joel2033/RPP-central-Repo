@@ -92,7 +92,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
         scheduledTime: booking.scheduledTime || "",
         services: booking.services,
         status: booking.status || "pending",
-        photographerId: booking.photographerId || "",
+        photographerId: booking.photographerId || "none",
         notes: booking.notes || "",
         price: booking.price || "",
       });
@@ -104,7 +104,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
         scheduledTime: "",
         services: [],
         status: "pending",
-        photographerId: "",
+        photographerId: "none",
         notes: "",
         price: "",
       });
@@ -116,7 +116,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
       const bookingData = {
         ...data,
         price: data.price ? data.price.toString() : null,
-        photographerId: data.photographerId || null,
+        photographerId: data.photographerId && data.photographerId !== "none" ? data.photographerId : null,
       };
       const response = await apiRequest("POST", "/api/bookings", bookingData);
       return response.json();
@@ -156,7 +156,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
       const bookingData = {
         ...data,
         price: data.price ? data.price.toString() : null,
-        photographerId: data.photographerId || null,
+        photographerId: data.photographerId && data.photographerId !== "none" ? data.photographerId : null,
       };
       const response = await apiRequest("PUT", `/api/bookings/${booking!.id}`, bookingData);
       return response.json();
@@ -391,7 +391,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">No photographer assigned</SelectItem>
+                      <SelectItem value="none">No photographer assigned</SelectItem>
                       {photographers?.map((photographer) => (
                         <SelectItem key={photographer.id} value={photographer.id}>
                           {photographer.firstName} {photographer.lastName}
