@@ -11,6 +11,7 @@ import Clients from "@/pages/clients";
 import Bookings from "@/pages/bookings";
 import Jobs from "@/pages/jobs";
 import Production from "@/pages/production";
+import UploadToEditor from "@/pages/upload-to-editor";
 import EditorDashboard from "@/pages/editor-dashboard";
 import QaReview from "@/pages/qa-review";
 import Delivery from "@/pages/delivery";
@@ -31,6 +32,7 @@ function Router() {
           <Route path="/bookings" component={Bookings} />
           <Route path="/jobs" component={Jobs} />
           <Route path="/production" component={Production} />
+          <Route path="/upload-to-editor" component={UploadToEditor} />
           <Route path="/editor" component={EditorDashboard} />
           <Route path="/qa-review" component={QaReview} />
           <Route path="/delivery" component={Delivery} />
