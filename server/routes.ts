@@ -2,7 +2,14 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertClientSchema, insertBookingSchema, insertCommunicationSchema } from "@shared/schema";
+import { 
+  insertClientSchema, 
+  insertBookingSchema, 
+  insertCommunicationSchema,
+  insertJobCardSchema,
+  insertProductionFileSchema,
+  insertProductionNotificationSchema 
+} from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -229,6 +236,169 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching photographers:", error);
       res.status(500).json({ message: "Failed to fetch photographers" });
+    }
+  });
+
+  // Editors
+  app.get('/api/editors', isAuthenticated, async (req: any, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      const editors = await storage.getEditors(licenseeId);
+      res.json(editors);
+    } catch (error) {
+      console.error("Error fetching editors:", error);
+      res.status(500).json({ message: "Failed to fetch editors" });
+    }
+  });
+
+  // Job Cards routes
+  app.get('/api/job-cards', isAuthenticated, async (req: any, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      const { status, editorId } = req.query;
+      
+      let jobCards;
+      if (status) {
+        jobCards = await storage.getJobCardsByStatus(status as string, licenseeId);
+      } else if (editorId) {
+        jobCards = await storage.getJobCardsByEditor(editorId as string, licenseeId);
+      } else {
+        jobCards = await storage.getJobCards(licenseeId);
+      }
+      
+      res.json(jobCards);
+    } catch (error) {
+      console.error("Error fetching job cards:", error);
+      res.status(500).json({ message: "Failed to fetch job cards" });
+    }
+  });
+
+  app.get('/api/job-cards/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      const jobCardId = parseInt(req.params.id);
+      const jobCard = await storage.getJobCard(jobCardId, licenseeId);
+      if (!jobCard) {
+        return res.status(404).json({ message: "Job card not found" });
+      }
+      res.json(jobCard);
+    } catch (error) {
+      console.error("Error fetching job card:", error);
+      res.status(500).json({ message: "Failed to fetch job card" });
+    }
+  });
+
+  app.put('/api/job-cards/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      const jobCardId = parseInt(req.params.id);
+      const updateData = req.body;
+      
+      // Handle status updates with automatic timestamp setting
+      if (updateData.status) {
+        if (updateData.status === 'in_progress' && !updateData.assignedAt) {
+          updateData.assignedAt = new Date();
+        }
+        if (updateData.status === 'delivered' && !updateData.deliveredAt) {
+          updateData.deliveredAt = new Date();
+        }
+        if (['ready_for_qa', 'editing'].includes(updateData.status) && !updateData.completedAt) {
+          updateData.completedAt = new Date();
+        }
+      }
+      
+      const jobCard = await storage.updateJobCard(jobCardId, updateData, licenseeId);
+      
+      // Create notification for status changes
+      if (updateData.status && updateData.editorId) {
+        const notificationData = insertProductionNotificationSchema.parse({
+          jobCardId,
+          recipientId: updateData.editorId,
+          type: 'assignment',
+          message: `Job card ${jobCard.jobId} has been assigned to you`,
+        });
+        await storage.createNotification(notificationData);
+      }
+      
+      res.json(jobCard);
+    } catch (error) {
+      console.error("Error updating job card:", error);
+      res.status(400).json({ message: "Failed to update job card" });
+    }
+  });
+
+  // Production Files routes
+  app.get('/api/job-cards/:id/files', isAuthenticated, async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const { mediaType, serviceCategory } = req.query;
+      
+      let files;
+      if (mediaType) {
+        files = await storage.getProductionFilesByType(
+          jobCardId, 
+          mediaType as string, 
+          serviceCategory as string
+        );
+      } else {
+        files = await storage.getProductionFiles(jobCardId);
+      }
+      
+      res.json(files);
+    } catch (error) {
+      console.error("Error fetching production files:", error);
+      res.status(500).json({ message: "Failed to fetch production files" });
+    }
+  });
+
+  app.post('/api/job-cards/:id/files', isAuthenticated, async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      const fileData = insertProductionFileSchema.parse({
+        ...req.body,
+        jobCardId,
+        uploadedBy: userId,
+      });
+      const file = await storage.createProductionFile(fileData);
+      res.status(201).json(file);
+    } catch (error) {
+      console.error("Error creating production file:", error);
+      res.status(400).json({ message: "Failed to create production file" });
+    }
+  });
+
+  app.delete('/api/production-files/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const fileId = parseInt(req.params.id);
+      await storage.deleteProductionFile(fileId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting production file:", error);
+      res.status(500).json({ message: "Failed to delete production file" });
+    }
+  });
+
+  // Notifications routes
+  app.get('/api/notifications', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const notifications = await storage.getNotifications(userId);
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  app.put('/api/notifications/:id/read', isAuthenticated, async (req: any, res) => {
+    try {
+      const notificationId = parseInt(req.params.id);
+      await storage.markNotificationAsRead(notificationId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      res.status(500).json({ message: "Failed to mark notification as read" });
     }
   });
 

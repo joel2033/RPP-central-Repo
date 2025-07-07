@@ -5,6 +5,9 @@ import {
   mediaFiles,
   qaChecklists,
   communications,
+  jobCards,
+  productionFiles,
+  productionNotifications,
   type User,
   type UpsertUser,
   type Client,
@@ -17,6 +20,12 @@ import {
   type InsertQaChecklist,
   type Communication,
   type InsertCommunication,
+  type JobCard,
+  type InsertJobCard,
+  type ProductionFile,
+  type InsertProductionFile,
+  type ProductionNotification,
+  type InsertProductionNotification,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, count } from "drizzle-orm";
@@ -62,8 +71,28 @@ export interface IStorage {
     monthlyRevenue: number;
   }>;
   
-  // Photographers
+  // Photographers and Editors
   getPhotographers(licenseeId: string): Promise<User[]>;
+  getEditors(licenseeId: string): Promise<User[]>;
+  
+  // Production workflow operations
+  getJobCards(licenseeId: string): Promise<(JobCard & { client: Client; photographer: User | null; editor: User | null })[]>;
+  getJobCard(id: number, licenseeId: string): Promise<(JobCard & { client: Client; photographer: User | null; editor: User | null }) | undefined>;
+  createJobCard(jobCard: InsertJobCard): Promise<JobCard>;
+  updateJobCard(id: number, jobCard: Partial<InsertJobCard>, licenseeId: string): Promise<JobCard>;
+  getJobCardsByEditor(editorId: string, licenseeId: string): Promise<(JobCard & { client: Client; photographer: User | null })[]>;
+  getJobCardsByStatus(status: string, licenseeId: string): Promise<(JobCard & { client: Client; photographer: User | null; editor: User | null })[]>;
+  
+  // Production files operations
+  getProductionFiles(jobCardId: number): Promise<ProductionFile[]>;
+  createProductionFile(file: InsertProductionFile): Promise<ProductionFile>;
+  deleteProductionFile(id: number): Promise<void>;
+  getProductionFilesByType(jobCardId: number, mediaType: string, serviceCategory?: string): Promise<ProductionFile[]>;
+  
+  // Notifications
+  getNotifications(userId: string): Promise<ProductionNotification[]>;
+  createNotification(notification: InsertProductionNotification): Promise<ProductionNotification>;
+  markNotificationAsRead(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -188,6 +217,30 @@ export class DatabaseStorage implements IStorage {
       .insert(bookings)
       .values(booking)
       .returning();
+    
+    // Auto-generate job card when booking is created
+    const jobCardData: InsertJobCard = {
+      bookingId: newBooking.id,
+      clientId: newBooking.clientId,
+      photographerId: newBooking.photographerId,
+      requestedServices: newBooking.services,
+      status: "unassigned",
+      licenseeId: newBooking.licenseeId,
+    };
+
+    // Get client editing preferences to auto-fill notes
+    const client = await db
+      .select()
+      .from(clients)
+      .where(eq(clients.id, newBooking.clientId))
+      .limit(1);
+
+    if (client[0]?.editingPreferences) {
+      jobCardData.editingNotes = JSON.stringify(client[0].editingPreferences);
+    }
+
+    await this.createJobCard(jobCardData);
+    
     return newBooking;
   }
 
@@ -329,6 +382,238 @@ export class DatabaseStorage implements IStorage {
         eq(users.role, 'photographer')
       ))
       .orderBy(users.firstName);
+  }
+
+  async getEditors(licenseeId: string): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(and(
+        eq(users.licenseeId, licenseeId),
+        eq(users.role, 'editor')
+      ))
+      .orderBy(users.firstName);
+  }
+
+  // Production workflow operations
+  async getJobCards(licenseeId: string): Promise<(JobCard & { client: Client; photographer: User | null; editor: User | null })[]> {
+    const results = await db
+      .select({
+        jobCard: jobCards,
+        client: clients,
+        photographer: users,
+        editor: {
+          id: sql`editor.id`,
+          email: sql`editor.email`,
+          firstName: sql`editor.first_name`,
+          lastName: sql`editor.last_name`,
+          profileImageUrl: sql`editor.profile_image_url`,
+          role: sql`editor.role`,
+          licenseeId: sql`editor.licensee_id`,
+          createdAt: sql`editor.created_at`,
+          updatedAt: sql`editor.updated_at`,
+        }
+      })
+      .from(jobCards)
+      .leftJoin(clients, eq(jobCards.clientId, clients.id))
+      .leftJoin(users, eq(jobCards.photographerId, users.id))
+      .leftJoin(sql`users AS editor`, sql`${jobCards.editorId} = editor.id`)
+      .where(eq(jobCards.licenseeId, licenseeId))
+      .orderBy(desc(jobCards.createdAt));
+
+    return results.map(result => ({
+      ...result.jobCard,
+      client: result.client!,
+      photographer: result.photographer,
+      editor: result.editor.id ? result.editor as User : null,
+    }));
+  }
+
+  async getJobCard(id: number, licenseeId: string): Promise<(JobCard & { client: Client; photographer: User | null; editor: User | null }) | undefined> {
+    const result = await db
+      .select({
+        jobCard: jobCards,
+        client: clients,
+        photographer: users,
+        editor: {
+          id: sql`editor.id`,
+          email: sql`editor.email`,
+          firstName: sql`editor.first_name`,
+          lastName: sql`editor.last_name`,
+          profileImageUrl: sql`editor.profile_image_url`,
+          role: sql`editor.role`,
+          licenseeId: sql`editor.licensee_id`,
+          createdAt: sql`editor.created_at`,
+          updatedAt: sql`editor.updated_at`,
+        }
+      })
+      .from(jobCards)
+      .leftJoin(clients, eq(jobCards.clientId, clients.id))
+      .leftJoin(users, eq(jobCards.photographerId, users.id))
+      .leftJoin(sql`users AS editor`, sql`${jobCards.editorId} = editor.id`)
+      .where(and(eq(jobCards.id, id), eq(jobCards.licenseeId, licenseeId)))
+      .limit(1);
+
+    if (!result[0]) return undefined;
+
+    return {
+      ...result[0].jobCard,
+      client: result[0].client!,
+      photographer: result[0].photographer,
+      editor: result[0].editor.id ? result[0].editor as User : null,
+    };
+  }
+
+  async createJobCard(jobCard: InsertJobCard): Promise<JobCard> {
+    // Generate unique job ID
+    const jobId = `JOB-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+    
+    const [newJobCard] = await db
+      .insert(jobCards)
+      .values({ ...jobCard, jobId })
+      .returning();
+    
+    return newJobCard;
+  }
+
+  async updateJobCard(id: number, jobCard: Partial<InsertJobCard>, licenseeId: string): Promise<JobCard> {
+    const [updatedJobCard] = await db
+      .update(jobCards)
+      .set({ ...jobCard, updatedAt: new Date() })
+      .where(and(eq(jobCards.id, id), eq(jobCards.licenseeId, licenseeId)))
+      .returning();
+    
+    return updatedJobCard;
+  }
+
+  async getJobCardsByEditor(editorId: string, licenseeId: string): Promise<(JobCard & { client: Client; photographer: User | null })[]> {
+    const results = await db
+      .select({
+        jobCard: jobCards,
+        client: clients,
+        photographer: users,
+      })
+      .from(jobCards)
+      .leftJoin(clients, eq(jobCards.clientId, clients.id))
+      .leftJoin(users, eq(jobCards.photographerId, users.id))
+      .where(and(
+        eq(jobCards.editorId, editorId), 
+        eq(jobCards.licenseeId, licenseeId)
+      ))
+      .orderBy(desc(jobCards.createdAt));
+
+    return results.map(result => ({
+      ...result.jobCard,
+      client: result.client!,
+      photographer: result.photographer,
+    }));
+  }
+
+  async getJobCardsByStatus(status: string, licenseeId: string): Promise<(JobCard & { client: Client; photographer: User | null; editor: User | null })[]> {
+    const results = await db
+      .select({
+        jobCard: jobCards,
+        client: clients,
+        photographer: users,
+        editor: {
+          id: sql`editor.id`,
+          email: sql`editor.email`,
+          firstName: sql`editor.first_name`,
+          lastName: sql`editor.last_name`,
+          profileImageUrl: sql`editor.profile_image_url`,
+          role: sql`editor.role`,
+          licenseeId: sql`editor.licensee_id`,
+          createdAt: sql`editor.created_at`,
+          updatedAt: sql`editor.updated_at`,
+        }
+      })
+      .from(jobCards)
+      .leftJoin(clients, eq(jobCards.clientId, clients.id))
+      .leftJoin(users, eq(jobCards.photographerId, users.id))
+      .leftJoin(sql`users AS editor`, sql`${jobCards.editorId} = editor.id`)
+      .where(and(
+        sql`${jobCards.status} = ${status}`, 
+        eq(jobCards.licenseeId, licenseeId)
+      ))
+      .orderBy(desc(jobCards.createdAt));
+
+    return results.map(result => ({
+      ...result.jobCard,
+      client: result.client!,
+      photographer: result.photographer,
+      editor: result.editor.id ? result.editor as User : null,
+    }));
+  }
+
+  // Production files operations
+  async getProductionFiles(jobCardId: number): Promise<ProductionFile[]> {
+    return await db
+      .select()
+      .from(productionFiles)
+      .where(and(
+        eq(productionFiles.jobCardId, jobCardId),
+        eq(productionFiles.isActive, true)
+      ))
+      .orderBy(desc(productionFiles.uploadedAt));
+  }
+
+  async createProductionFile(file: InsertProductionFile): Promise<ProductionFile> {
+    const [newFile] = await db
+      .insert(productionFiles)
+      .values(file)
+      .returning();
+    
+    return newFile;
+  }
+
+  async deleteProductionFile(id: number): Promise<void> {
+    await db
+      .update(productionFiles)
+      .set({ isActive: false })
+      .where(eq(productionFiles.id, id));
+  }
+
+  async getProductionFilesByType(jobCardId: number, mediaType: string, serviceCategory?: string): Promise<ProductionFile[]> {
+    const conditions = [
+      eq(productionFiles.jobCardId, jobCardId),
+      sql`${productionFiles.mediaType} = ${mediaType}`,
+      eq(productionFiles.isActive, true)
+    ];
+    
+    if (serviceCategory) {
+      conditions.push(sql`${productionFiles.serviceCategory} = ${serviceCategory}`);
+    }
+
+    return await db
+      .select()
+      .from(productionFiles)
+      .where(and(...conditions))
+      .orderBy(desc(productionFiles.uploadedAt));
+  }
+
+  // Notifications
+  async getNotifications(userId: string): Promise<ProductionNotification[]> {
+    return await db
+      .select()
+      .from(productionNotifications)
+      .where(eq(productionNotifications.recipientId, userId))
+      .orderBy(desc(productionNotifications.createdAt));
+  }
+
+  async createNotification(notification: InsertProductionNotification): Promise<ProductionNotification> {
+    const [newNotification] = await db
+      .insert(productionNotifications)
+      .values(notification)
+      .returning();
+    
+    return newNotification;
+  }
+
+  async markNotificationAsRead(id: number): Promise<void> {
+    await db
+      .update(productionNotifications)
+      .set({ isRead: true })
+      .where(eq(productionNotifications.id, id));
   }
 }
 
