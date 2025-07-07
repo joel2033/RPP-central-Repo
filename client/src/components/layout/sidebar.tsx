@@ -141,10 +141,10 @@ export default function Sidebar() {
               <Link key={item.name} href={item.href}>
                 <button
                   className={cn(
-                    "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                    "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors hover:bg-slate-50",
                     isActive(item.href)
                       ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700"
-                      : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                      : "text-slate-700 hover:text-slate-900"
                   )}
                 >
                   <Icon className="mr-3 h-5 w-5" />
@@ -164,7 +164,10 @@ export default function Sidebar() {
             return (
               <div key={section.name} className="mt-4">
                 <button
-                  onClick={() => toggleSection(section.name)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleSection(section.name);
+                  }}
                   className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 rounded-md transition-colors"
                 >
                   <div className="flex items-center">
@@ -185,11 +188,15 @@ export default function Sidebar() {
                       return (
                         <Link key={item.name} href={item.href}>
                           <button
+                            onClick={(e) => {
+                              // Don't propagate click to parent section toggle
+                              e.stopPropagation();
+                            }}
                             className={cn(
-                              "w-full flex items-center px-3 py-2 text-sm rounded-md transition-colors",
+                              "w-full flex items-center px-3 py-2 text-sm rounded-md transition-colors hover:bg-slate-50",
                               isActive(item.href)
                                 ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700"
-                                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                : "text-slate-600 hover:text-slate-900"
                             )}
                           >
                             <ItemIcon className="mr-3 h-4 w-4" />
@@ -212,10 +219,10 @@ export default function Sidebar() {
                 <Link key={item.name} href={item.href}>
                   <button
                     className={cn(
-                      "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                      "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors hover:bg-slate-50",
                       isActive(item.href)
                         ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700"
-                        : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                        : "text-slate-700 hover:text-slate-900"
                     )}
                   >
                     <Icon className="mr-3 h-5 w-5" />

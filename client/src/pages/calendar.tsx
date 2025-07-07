@@ -131,10 +131,21 @@ export default function Calendar() {
   const { data: googleStatus } = useQuery({
     queryKey: ["/api/google-calendar/status"],
     enabled: isAuthenticated,
-    onSuccess: (data) => {
-      setGoogleCalendarStatus(data);
-    }
   });
+  
+  // Update Google Calendar status when data changes
+  useEffect(() => {
+    if (googleStatus) {
+      setGoogleCalendarStatus(googleStatus);
+    }
+  }, [googleStatus]);
+  
+  // Fix initial form value for photographer to avoid empty string
+  useEffect(() => {
+    if (eventForm.photographerId === "") {
+      setEventForm(prev => ({ ...prev, photographerId: "none" }));
+    }
+  }, [eventForm.photographerId]);
 
   const createEventMutation = useMutation({
     mutationFn: async (eventData: any) => {
@@ -384,21 +395,33 @@ export default function Calendar() {
                     <Button
                       size="sm"
                       variant={currentView === "dayGridMonth" ? "default" : "outline"}
-                      onClick={() => handleViewChange("dayGridMonth")}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleViewChange("dayGridMonth");
+                      }}
+                      className="hover:bg-blue-50 transition-colors"
                     >
                       Month
                     </Button>
                     <Button
                       size="sm"
                       variant={currentView === "timeGridWeek" ? "default" : "outline"}
-                      onClick={() => handleViewChange("timeGridWeek")}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleViewChange("timeGridWeek");
+                      }}
+                      className="hover:bg-blue-50 transition-colors"
                     >
                       Week
                     </Button>
                     <Button
                       size="sm"
                       variant={currentView === "timeGridDay" ? "default" : "outline"}
-                      onClick={() => handleViewChange("timeGridDay")}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleViewChange("timeGridDay");
+                      }}
+                      className="hover:bg-blue-50 transition-colors"
                     >
                       Day
                     </Button>
@@ -445,14 +468,19 @@ export default function Calendar() {
                       <Checkbox
                         id={type}
                         checked={visibleEventTypes[type as keyof typeof visibleEventTypes]}
-                        onCheckedChange={() => toggleEventType(type)}
+                        onCheckedChange={(checked) => {
+                          setVisibleEventTypes(prev => ({
+                            ...prev,
+                            [type]: !!checked
+                          }));
+                        }}
                       />
                       <div className="flex items-center space-x-2">
                         <div 
                           className="w-3 h-3 rounded-sm"
                           style={{ backgroundColor: eventTypeColors[type as keyof typeof eventTypeColors] }}
                         />
-                        <Label htmlFor={type} className="text-sm">{label}</Label>
+                        <Label htmlFor={type} className="text-sm cursor-pointer">{label}</Label>
                       </div>
                     </div>
                   ))}
@@ -481,8 +509,11 @@ export default function Calendar() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="w-full"
-                        onClick={() => syncGoogleCalendarMutation.mutate()}
+                        className="w-full hover:bg-blue-50 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          syncGoogleCalendarMutation.mutate();
+                        }}
                         disabled={syncGoogleCalendarMutation.isPending}
                       >
                         {syncGoogleCalendarMutation.isPending ? "Syncing..." : "Sync Now"}
@@ -490,10 +521,14 @@ export default function Calendar() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="w-full text-red-600"
-                        onClick={() => disconnectGoogleCalendarMutation.mutate()}
+                        className="w-full text-red-600 hover:bg-red-50 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          disconnectGoogleCalendarMutation.mutate();
+                        }}
+                        disabled={disconnectGoogleCalendarMutation.isPending}
                       >
-                        Disconnect
+                        {disconnectGoogleCalendarMutation.isPending ? "Disconnecting..." : "Disconnect"}
                       </Button>
                     </div>
                   ) : (
@@ -504,8 +539,11 @@ export default function Calendar() {
                       </div>
                       <Button
                         size="sm"
-                        className="w-full"
-                        onClick={() => window.location.href = '/api/auth/google'}
+                        className="w-full hover:bg-blue-600 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.location.href = '/api/auth/google';
+                        }}
                       >
                         Connect Google Calendar
                       </Button>
@@ -525,8 +563,11 @@ export default function Calendar() {
                 <CardContent className="space-y-2">
                   <Button
                     size="sm"
-                    className="w-full justify-start"
-                    onClick={() => setIsEventModalOpen(true)}
+                    className="w-full justify-start hover:bg-blue-600 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsEventModalOpen(true);
+                    }}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Add Event
@@ -534,7 +575,11 @@ export default function Calendar() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="w-full justify-start"
+                    className="w-full justify-start hover:bg-slate-50 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // TODO: Navigate to business hours settings
+                    }}
                   >
                     <Settings className="h-4 w-4 mr-2" />
                     Business Hours
@@ -554,7 +599,7 @@ export default function Calendar() {
                 headerToolbar={{
                   left: "prev,next today",
                   center: "title",
-                  right: "dayGridMonth,timeGridWeek,timeGridDay",
+                  right: false, // Disable default view buttons since we have custom ones
                 }}
                 events={calendarEventsFormatted}
                 dateClick={handleDateClick}
@@ -577,6 +622,15 @@ export default function Calendar() {
                   hour: "numeric",
                   minute: "2-digit",
                   meridiem: "short",
+                }}
+                // Add Today button functionality
+                customButtons={{
+                  today: {
+                    text: 'Today',
+                    click: function() {
+                      calendarRef.current?.getApi().today();
+                    }
+                  }
                 }}
               />
             </div>
@@ -630,7 +684,7 @@ export default function Calendar() {
                     <SelectValue placeholder="Select photographer..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Photographers</SelectItem>
+                    <SelectItem value="none">All Photographers</SelectItem>
                     {photographers?.map((photographer) => (
                       <SelectItem key={photographer.id} value={photographer.id}>
                         {photographer.firstName} {photographer.lastName}
@@ -685,15 +739,21 @@ export default function Calendar() {
             <div className="flex gap-2 mt-6">
               <Button
                 variant="outline"
-                onClick={() => setIsEventModalOpen(false)}
-                className="flex-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsEventModalOpen(false);
+                }}
+                className="flex-1 hover:bg-slate-50 transition-colors"
               >
                 Cancel
               </Button>
               <Button
-                onClick={handleSubmitEvent}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSubmitEvent();
+                }}
                 disabled={createEventMutation.isPending}
-                className="flex-1"
+                className="flex-1 hover:bg-blue-600 transition-colors"
               >
                 {createEventMutation.isPending ? "Creating..." : "Create Event"}
               </Button>
@@ -745,17 +805,23 @@ export default function Calendar() {
             <div className="flex gap-2 mt-6">
               <Button
                 variant="outline"
-                onClick={() => setSelectedEvent(null)}
-                className="flex-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedEvent(null);
+                }}
+                className="flex-1 hover:bg-slate-50 transition-colors"
               >
                 Close
               </Button>
               {selectedEvent.type !== "job" && (
                 <Button
                   variant="destructive"
-                  onClick={() => deleteEventMutation.mutate(selectedEvent.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteEventMutation.mutate(selectedEvent.id);
+                  }}
                   disabled={deleteEventMutation.isPending}
-                  className="flex-1"
+                  className="flex-1 hover:bg-red-600 transition-colors"
                 >
                   {deleteEventMutation.isPending ? "Deleting..." : "Delete"}
                 </Button>
