@@ -128,7 +128,7 @@ const statusLabels = {
   booked: "Booked",
   in_progress: "In Progress", 
   editing: "Editing",
-  ready_for_qa: "Ready for QA",
+  ready_for_qa: "Ready for Pre-Delivery Check",
   in_revision: "In Revision",
   delivered: "Delivered",
   completed: "Completed",

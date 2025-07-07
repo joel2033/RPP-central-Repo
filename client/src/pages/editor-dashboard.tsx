@@ -136,7 +136,7 @@ export default function EditorDashboard() {
     switch (status) {
       case "in_progress": return "Assigned";
       case "editing": return "Editing";
-      case "ready_for_qa": return "Ready for QA";
+      case "ready_for_qa": return "Ready for Pre-Delivery Check";
       case "in_revision": return "In Revision";
       case "delivered": return "Delivered";
       default: return status;

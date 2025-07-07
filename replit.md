@@ -187,6 +187,18 @@ Changelog:
   - Database verification confirms job cards, bookings, and calendar events are properly linked
   - Jobs list shows 6 job cards with booking details, client information, and service types
   - Navigation menu and job filtering/search functionality working correctly
+- July 07, 2025. Comprehensive Job Card detail page implementation:
+  - Built complete job detail page with header, customer info, appointment details, billing info
+  - Added file management with tabbed layout (Photos, Floor Plans, Video, Virtual Tour, Other)
+  - Implemented expandable activity log with user avatars and timestamps
+  - Fixed navigation between Jobs list and Job Detail pages with proper routing
+  - Added Google Maps integration for property addresses
+  - Resolved data loading issues and added proper error handling
+- July 07, 2025. Renamed "QA Review" to "Pre-Delivery Check" across application:
+  - Updated sidebar menu, job workflow status labels, and all UI references
+  - Added proper permission controls (Admin and VA access only)
+  - Maintained all existing functionality with new terminology
+  - Updated job status displays throughout editor dashboard, production pages, and job cards
 ```
 
 ## User Preferences

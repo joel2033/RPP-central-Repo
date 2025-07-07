@@ -15,7 +15,7 @@ import Production from "@/pages/production";
 import UploadToEditor from "@/pages/upload-to-editor";
 import EditorDashboard from "@/pages/editor-dashboard";
 import EditorPortal from "@/pages/editor-portal";
-import QaReview from "@/pages/qa-review";
+import PreDeliveryCheck from "@/pages/qa-review";
 import Calendar from "@/pages/calendar";
 import Delivery from "@/pages/delivery";
 import Reports from "@/pages/reports";
@@ -47,7 +47,7 @@ function Router() {
           <Route path="/production" component={Production} />
           <Route path="/upload-to-editor" component={UploadToEditor} />
           <Route path="/editor" component={EditorDashboard} />
-          <Route path="/qa-review" component={QaReview} />
+          <Route path="/qa-review" component={PreDeliveryCheck} />
           <Route path="/delivery" component={Delivery} />
           <Route path="/reports" component={Reports} />
           <Route path="/settings" component={Settings} />

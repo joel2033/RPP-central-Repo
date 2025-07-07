@@ -64,7 +64,7 @@ const navigationSections: NavSection[] = [
     items: [
       { name: "Upload to Editor", href: "/upload-to-editor", icon: Upload },
       { name: "Editor Dashboard", href: "/editor", icon: Camera },
-      { name: "QA Review", href: "/qa-review", icon: Eye },
+      { name: "Pre-Delivery Check", href: "/qa-review", icon: Eye },
       { name: "Revisions Queue", href: "/qa-review", icon: RotateCcw },
     ]
   },

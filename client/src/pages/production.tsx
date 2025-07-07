@@ -186,7 +186,7 @@ export default function Production() {
                 <SelectItem value="unassigned">Unassigned</SelectItem>
                 <SelectItem value="in_progress">In Progress</SelectItem>
                 <SelectItem value="editing">Editing</SelectItem>
-                <SelectItem value="ready_for_qa">Ready for QA</SelectItem>
+                <SelectItem value="ready_for_qa">Ready for Pre-Delivery Check</SelectItem>
                 <SelectItem value="in_revision">In Revision</SelectItem>
                 <SelectItem value="delivered">Delivered</SelectItem>
               </SelectContent>
