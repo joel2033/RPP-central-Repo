@@ -156,6 +156,13 @@ Changelog:
     * Detailed instructions and custom export type descriptions
     * Professional card-based layout matching modern UI patterns
     * Integration with job card system for seamless workflow handoffs
+  - Created dedicated Editor Portal with role-based access control:
+    * Separate dashboard for editors with restricted access
+    * Role-based routing that redirects non-editors to main app
+    * Editor-specific job card API endpoints with proper authorization
+    * Download raw files, upload final files, and job completion workflow
+    * Clean editor interface with job statistics and status management
+    * Secure file download and upload functionality for editor workflow
 ```
 
 ## User Preferences

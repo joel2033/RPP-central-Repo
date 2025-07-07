@@ -13,19 +13,28 @@ import Jobs from "@/pages/jobs";
 import Production from "@/pages/production";
 import UploadToEditor from "@/pages/upload-to-editor";
 import EditorDashboard from "@/pages/editor-dashboard";
+import EditorPortal from "@/pages/editor-portal";
 import QaReview from "@/pages/qa-review";
 import Delivery from "@/pages/delivery";
 import Reports from "@/pages/reports";
 import Settings from "@/pages/settings";
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   return (
     <Switch>
       {isLoading || !isAuthenticated ? (
         <Route path="/" component={Landing} />
+      ) : user?.role === 'editor' ? (
+        // Editor-only routes
+        <>
+          <Route path="/" component={EditorPortal} />
+          <Route path="/editor-portal" component={EditorPortal} />
+          <Route component={() => <EditorPortal />} />
+        </>
       ) : (
+        // Admin/Licensee/Photographer routes
         <>
           <Route path="/" component={Dashboard} />
           <Route path="/clients" component={Clients} />

@@ -13,6 +13,7 @@ import {
 import { z } from "zod";
 import multer from "multer";
 import { fileStorage } from "./fileStorage";
+import { requireEditor, requireAdmin } from "./middleware/roleAuth";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -268,8 +269,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Job Cards routes
-  app.get('/api/job-cards', isAuthenticated, async (req: any, res) => {
+  // Job Cards routes (admin/licensee access)
+  app.get('/api/job-cards', isAuthenticated, requireAdmin, async (req: any, res) => {
     try {
       const licenseeId = req.user.claims.sub;
       const { status, editorId } = req.query;
@@ -286,6 +287,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(jobCards);
     } catch (error) {
       console.error("Error fetching job cards:", error);
+      res.status(500).json({ message: "Failed to fetch job cards" });
+    }
+  });
+
+  // Editor-specific job cards route
+  app.get('/api/editor/job-cards', isAuthenticated, requireEditor, async (req: any, res) => {
+    try {
+      const editorId = req.user.claims.sub;
+      const userData = (req as any).userData;
+      const licenseeId = userData.licenseeId;
+      
+      const jobCards = await storage.getJobCardsByEditor(editorId, licenseeId);
+      res.json(jobCards);
+    } catch (error) {
+      console.error("Error fetching editor job cards:", error);
       res.status(500).json({ message: "Failed to fetch job cards" });
     }
   });
@@ -307,9 +323,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/job-cards/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const licenseeId = req.user.claims.sub;
+      const userId = req.user.claims.sub;
+      const userData = (req as any).userData;
       const jobCardId = parseInt(req.params.id);
       const updateData = req.body;
+      
+      // Determine licenseeId based on user role
+      const licenseeId = userData?.role === 'editor' ? userData.licenseeId : userId;
+      
+      // For editors, only allow certain status updates
+      if (userData?.role === 'editor') {
+        const allowedStatuses = ['editing', 'ready_for_qa'];
+        if (updateData.status && !allowedStatuses.includes(updateData.status)) {
+          return res.status(403).json({ message: "Editors cannot set this status" });
+        }
+        
+        // Ensure editor can only update their own jobs
+        const jobCard = await storage.getJobCard(jobCardId, licenseeId);
+        if (!jobCard || jobCard.editorId !== userId) {
+          return res.status(403).json({ message: "Cannot update job not assigned to you" });
+        }
+      }
       
       // Handle status updates with automatic timestamp setting
       if (updateData.status) {
