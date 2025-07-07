@@ -150,12 +150,15 @@ export const productionFiles = pgTable("production_files", {
   jobCardId: integer("job_card_id").notNull(),
   fileName: varchar("file_name", { length: 255 }).notNull(),
   originalName: varchar("original_name", { length: 255 }),
-  filePath: text("file_path").notNull(),
+  filePath: text("file_path"),
   fileSize: integer("file_size"),
   mimeType: varchar("mime_type", { length: 100 }),
   mediaType: mediaTypeEnum("media_type").notNull(), // raw, edited, final
   serviceCategory: serviceCategoryEnum("service_category").notNull(),
   uploadedBy: varchar("uploaded_by").notNull(),
+  instructions: text("instructions"),
+  exportType: varchar("export_type", { length: 100 }),
+  customDescription: text("custom_description"),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
   isActive: boolean("is_active").default(true),
 });

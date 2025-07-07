@@ -121,19 +121,30 @@ export default function UploadToEditor() {
       // Upload files for each service block
       for (const block of serviceBlocks) {
         if (block.files.length > 0) {
-          for (const file of block.files) {
-            const fileData = {
-              originalName: block.fileName || file.name,
-              mediaType: "raw",
-              serviceCategory: block.service.toLowerCase().replace(/\s+/g, '_'),
-              fileSize: file.size,
-              instructions: block.instructions,
-              exportType: block.exportType,
-              customDescription: block.customDescription,
-              quantity: block.quantity
-            };
-            
-            await apiRequest("POST", `/api/job-cards/${selectedJobId}/files`, fileData);
+          const formData = new FormData();
+          
+          // Add files to FormData
+          block.files.forEach(file => {
+            formData.append('files', file);
+          });
+          
+          // Add metadata
+          formData.append('fileName', block.fileName || '');
+          formData.append('mediaType', 'raw');
+          formData.append('serviceCategory', block.service.toLowerCase().replace(/\s+/g, '_'));
+          formData.append('instructions', block.instructions);
+          formData.append('exportType', block.exportType);
+          formData.append('customDescription', block.customDescription);
+          
+          // Upload files using fetch with FormData
+          const response = await fetch(`/api/job-cards/${selectedJobId}/files`, {
+            method: 'POST',
+            body: formData,
+            credentials: 'include',
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Failed to upload files for ${block.service}`);
           }
         }
       }

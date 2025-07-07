@@ -11,6 +11,23 @@ import {
   insertProductionNotificationSchema 
 } from "@shared/schema";
 import { z } from "zod";
+import multer from "multer";
+import { fileStorage } from "./fileStorage";
+
+// Configure multer for file uploads
+const upload = multer({
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept images and videos
+    if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image and video files are allowed'));
+    }
+  }
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -351,20 +368,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/job-cards/:id/files', isAuthenticated, async (req: any, res) => {
+  app.post('/api/job-cards/:id/files', isAuthenticated, upload.array('files', 10), async (req: any, res) => {
     try {
       const jobCardId = parseInt(req.params.id);
       const userId = req.user.claims.sub;
-      const fileData = insertProductionFileSchema.parse({
-        ...req.body,
-        jobCardId,
-        uploadedBy: userId,
-      });
-      const file = await storage.createProductionFile(fileData);
-      res.status(201).json(file);
+      const files = req.files as Express.Multer.File[];
+      
+      if (!files || files.length === 0) {
+        return res.status(400).json({ message: "No files uploaded" });
+      }
+
+      const savedFiles = [];
+      
+      for (const file of files) {
+        // Save file to storage
+        const fileName = await fileStorage.saveFile(file.buffer, file.originalname, jobCardId);
+        
+        // Create database record
+        const fileData = insertProductionFileSchema.parse({
+          originalName: req.body.fileName || file.originalname,
+          fileName: fileName,
+          mediaType: req.body.mediaType || "raw",
+          serviceCategory: req.body.serviceCategory || "general",
+          fileSize: file.size,
+          mimeType: file.mimetype,
+          jobCardId,
+          uploadedBy: userId,
+          instructions: req.body.instructions || "",
+          exportType: req.body.exportType || "",
+          customDescription: req.body.customDescription || "",
+        });
+        
+        const savedFile = await storage.createProductionFile(fileData);
+        savedFiles.push(savedFile);
+      }
+      
+      res.status(201).json(savedFiles);
     } catch (error) {
-      console.error("Error creating production file:", error);
-      res.status(400).json({ message: "Failed to create production file" });
+      console.error("Error uploading files:", error);
+      res.status(400).json({ message: "Failed to upload files" });
     }
   });
 
@@ -399,6 +441,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error marking notification as read:", error);
       res.status(500).json({ message: "Failed to mark notification as read" });
+    }
+  });
+
+  // File serving routes
+  app.get('/api/files/:fileName', isAuthenticated, async (req: any, res) => {
+    try {
+      const fileName = req.params.fileName;
+      const fileBuffer = await fileStorage.getFile(fileName);
+      
+      // Set appropriate headers
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      res.send(fileBuffer);
+    } catch (error) {
+      console.error("Error serving file:", error);
+      res.status(404).json({ message: "File not found" });
     }
   });
 
