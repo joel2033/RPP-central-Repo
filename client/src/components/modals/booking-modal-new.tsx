@@ -39,110 +39,9 @@ import { z } from "zod";
 import AddressInput from "@/components/ui/address-input";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { ServiceValidation } from "@/components/ui/service-validation";
+import ServiceSelection from "@/components/ui/service-selection";
 
-// Service Selection Component (separated to prevent re-render issues)
-interface ServiceSelectionProps {
-  value: string[];
-  onChange: (services: string[]) => void;
-}
-
-function ServiceSelection({ value, onChange }: ServiceSelectionProps) {
-  const services = [
-    { 
-      id: "photography", 
-      value: "photography", 
-      label: "Photography", 
-      icon: Camera,
-      description: "Interior and exterior property photos",
-      price: "200",
-      duration: "1-2 hours"
-    },
-    { 
-      id: "drone", 
-      value: "drone", 
-      label: "Drone", 
-      icon: PlaneTakeoff,
-      description: "Aerial photography and videography",
-      price: "150",
-      duration: "30-60 minutes"
-    },
-    { 
-      id: "floor_plans", 
-      value: "floor_plans", 
-      label: "Floor Plans", 
-      icon: Home,
-      description: "Detailed property floor plans",
-      price: "100",
-      duration: "1 hour"
-    },
-    { 
-      id: "video", 
-      value: "video", 
-      label: "Video", 
-      icon: Video,
-      description: "Property walkthrough videos",
-      price: "300",
-      duration: "2-3 hours"
-    },
-  ];
-
-  const handleToggle = (serviceValue: string) => {
-    try {
-      console.log('Service clicked:', serviceValue);
-      
-      const isSelected = value.includes(serviceValue);
-      let newServices;
-      
-      if (isSelected) {
-        newServices = value.filter(v => v !== serviceValue);
-      } else {
-        newServices = [...value, serviceValue];
-      }
-      
-      console.log('New services array:', newServices);
-      onChange(newServices);
-    } catch (error) {
-      console.error('Error updating services:', error);
-    }
-  };
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {services.map((service) => {
-        const Icon = service.icon;
-        const isSelected = value.includes(service.value);
-        
-        return (
-          <Card 
-            key={service.id}
-            className={`cursor-pointer transition-all ${
-              isSelected ? "border-brand-blue bg-blue-50" : "hover:border-gray-300"
-            }`}
-            onClick={() => handleToggle(service.value)}
-          >
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-3 mb-2">
-                <Checkbox
-                  checked={isSelected}
-                  readOnly
-                />
-                <Icon className="h-5 w-5" />
-                <span className="font-medium">{service.label}</span>
-              </div>
-              <div className="text-sm text-gray-600 ml-8">
-                <div>{service.description}</div>
-                <div className="flex justify-between mt-1">
-                  <span>From ${service.price}</span>
-                  <span>{service.duration}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
-  );
-}
+// Service Selection Component moved to separate file
 
 interface BookingWithDetails extends Booking {
   client: Client;
@@ -557,10 +456,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
                     }>
                       <ServiceSelection 
                         value={selectedServices}
-                        onChange={(services) => {
-                          console.log('Services updated:', services);
-                          setSelectedServices(services);
-                        }}
+                        onChange={setSelectedServices}
                       />
                       <ServiceValidation selectedCount={selectedServices.length} />
                     </ErrorBoundary>
