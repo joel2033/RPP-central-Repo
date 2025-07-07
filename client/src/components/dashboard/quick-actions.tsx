@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, UserPlus, Upload, FileText } from "lucide-react";
+import { Link } from "wouter";
 import BookingModal from "@/components/modals/booking-modal";
 import ClientModal from "@/components/modals/client-modal";
 
@@ -22,9 +23,9 @@ export default function QuickActions() {
       onClick: () => setIsClientModalOpen(true),
     },
     {
-      title: "Upload Media",
+      title: "Upload to Editor",
       icon: Upload,
-      onClick: () => {},
+      href: "/upload-to-editor",
     },
     {
       title: "Generate Report",
@@ -45,7 +46,7 @@ export default function QuickActions() {
       color: "bg-blue-500",
     },
     {
-      text: "Media uploaded for Premier Estates",
+      text: "Files uploaded to editor for Premier Estates",
       time: "1 day ago",
       color: "bg-purple-500",
     },
@@ -60,6 +61,27 @@ export default function QuickActions() {
         <CardContent className="space-y-4">
           {actions.map((action) => {
             const Icon = action.icon;
+            
+            // If action has href, wrap in Link
+            if (action.href) {
+              return (
+                <Link key={action.title} href={action.href}>
+                  <Button
+                    className={`w-full flex items-center justify-between p-4 h-auto ${
+                      action.primary
+                        ? "bg-brand-blue text-white hover:bg-blue-700"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    }`}
+                    variant={action.primary ? "default" : "secondary"}
+                  >
+                    <span className="font-medium">{action.title}</span>
+                    <Icon className="h-4 w-4" />
+                  </Button>
+                </Link>
+              );
+            }
+            
+            // Otherwise use onClick
             return (
               <Button
                 key={action.title}
