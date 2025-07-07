@@ -8,7 +8,9 @@ import {
   insertCommunicationSchema,
   insertJobCardSchema,
   insertProductionFileSchema,
-  insertProductionNotificationSchema 
+  insertProductionNotificationSchema,
+  insertCalendarEventSchema,
+  insertBusinessSettingsSchema
 } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
@@ -491,6 +493,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error serving file:", error);
       res.status(404).json({ message: "File not found" });
+    }
+  });
+
+  // Calendar routes
+  app.get('/api/calendar/events', isAuthenticated, async (req: any, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      const { photographerId } = req.query;
+      
+      const events = await storage.getCalendarEvents(licenseeId, photographerId as string);
+      res.json(events);
+    } catch (error) {
+      console.error("Error fetching calendar events:", error);
+      res.status(500).json({ message: "Failed to fetch calendar events" });
+    }
+  });
+
+  app.post('/api/calendar/events', isAuthenticated, async (req: any, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      const userId = req.user.claims.sub;
+      
+      const eventData = insertCalendarEventSchema.parse({
+        ...req.body,
+        licenseeId,
+        createdBy: userId,
+      });
+      
+      const event = await storage.createCalendarEvent(eventData);
+      res.status(201).json(event);
+    } catch (error) {
+      console.error("Error creating calendar event:", error);
+      res.status(400).json({ message: "Failed to create calendar event" });
+    }
+  });
+
+  app.put('/api/calendar/events/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const eventId = parseInt(req.params.id);
+      const updateData = req.body;
+      
+      const event = await storage.updateCalendarEvent(eventId, updateData);
+      res.json(event);
+    } catch (error) {
+      console.error("Error updating calendar event:", error);
+      res.status(400).json({ message: "Failed to update calendar event" });
+    }
+  });
+
+  app.delete('/api/calendar/events/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const eventId = parseInt(req.params.id);
+      await storage.deleteCalendarEvent(eventId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting calendar event:", error);
+      res.status(500).json({ message: "Failed to delete calendar event" });
+    }
+  });
+
+  // Business settings routes
+  app.get('/api/business-settings', isAuthenticated, async (req: any, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      const settings = await storage.getBusinessSettings(licenseeId);
+      
+      if (!settings) {
+        // Return default settings
+        const defaultSettings = {
+          businessHours: {
+            mon: { start: "08:00", end: "18:00" },
+            tue: { start: "08:00", end: "18:00" },
+            wed: { start: "08:00", end: "18:00" },
+            thu: { start: "08:00", end: "18:00" },
+            fri: { start: "08:00", end: "18:00" },
+            sat: { start: "09:00", end: "17:00" },
+            sun: { start: "09:00", end: "17:00" },
+          },
+          minimumNoticeHours: 24,
+          bufferTimeBetweenJobs: 30,
+          defaultJobDuration: 120,
+          timezone: "America/New_York",
+        };
+        return res.json(defaultSettings);
+      }
+      
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching business settings:", error);
+      res.status(500).json({ message: "Failed to fetch business settings" });
+    }
+  });
+
+  app.put('/api/business-settings', isAuthenticated, async (req: any, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      
+      const settingsData = insertBusinessSettingsSchema.parse({
+        ...req.body,
+        licenseeId,
+      });
+      
+      const settings = await storage.upsertBusinessSettings(settingsData);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error updating business settings:", error);
+      res.status(400).json({ message: "Failed to update business settings" });
     }
   });
 

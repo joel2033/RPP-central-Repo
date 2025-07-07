@@ -174,6 +174,37 @@ export const productionNotifications = pgTable("production_notifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Calendar Events table (Photographer availability and business settings)
+export const calendarEvents = pgTable("calendar_events", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  type: varchar("type", { length: 50 }).notNull(), // job, unavailable, external, holiday
+  start: timestamp("start").notNull(),
+  end: timestamp("end").notNull(),
+  allDay: boolean("all_day").default(false),
+  photographerId: varchar("photographer_id"),
+  bookingId: integer("booking_id"),
+  color: varchar("color", { length: 7 }), // hex color
+  description: text("description"),
+  licenseeId: varchar("licensee_id").notNull(),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Business Settings table
+export const businessSettings = pgTable("business_settings", {
+  id: serial("id").primaryKey(),
+  licenseeId: varchar("licensee_id").notNull().unique(),
+  businessHours: jsonb("business_hours").notNull(), // {mon: {start: "08:00", end: "18:00"}, ...}
+  minimumNoticeHours: integer("minimum_notice_hours").default(24),
+  bufferTimeBetweenJobs: integer("buffer_time_minutes").default(30),
+  defaultJobDuration: integer("default_job_duration_minutes").default(120),
+  timezone: varchar("timezone", { length: 100 }).default("America/New_York"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   bookings: many(bookings),
@@ -287,6 +318,24 @@ export const productionNotificationsRelations = relations(productionNotification
   }),
 }));
 
+export const calendarEventsRelations = relations(calendarEvents, ({ one }) => ({
+  photographer: one(users, {
+    fields: [calendarEvents.photographerId],
+    references: [users.id],
+  }),
+  booking: one(bookings, {
+    fields: [calendarEvents.bookingId],
+    references: [bookings.id],
+  }),
+}));
+
+export const businessSettingsRelations = relations(businessSettings, ({ one }) => ({
+  licensee: one(users, {
+    fields: [businessSettings.licenseeId],
+    references: [users.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   id: true,
@@ -342,6 +391,18 @@ export const insertProductionNotificationSchema = createInsertSchema(productionN
   createdAt: true,
 });
 
+export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertBusinessSettingsSchema = createInsertSchema(businessSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -363,3 +424,9 @@ export type InsertProductionFile = z.infer<typeof insertProductionFileSchema>;
 export type ProductionFile = typeof productionFiles.$inferSelect;
 export type InsertProductionNotification = z.infer<typeof insertProductionNotificationSchema>;
 export type ProductionNotification = typeof productionNotifications.$inferSelect;
+
+// Calendar types
+export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;
+export type CalendarEvent = typeof calendarEvents.$inferSelect;
+export type InsertBusinessSettings = z.infer<typeof insertBusinessSettingsSchema>;
+export type BusinessSettings = typeof businessSettings.$inferSelect;

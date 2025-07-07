@@ -8,6 +8,8 @@ import {
   jobCards,
   productionFiles,
   productionNotifications,
+  calendarEvents,
+  businessSettings,
   type User,
   type UpsertUser,
   type Client,
@@ -26,6 +28,10 @@ import {
   type InsertProductionFile,
   type ProductionNotification,
   type InsertProductionNotification,
+  type CalendarEvent,
+  type InsertCalendarEvent,
+  type BusinessSettings,
+  type InsertBusinessSettings,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, count } from "drizzle-orm";
@@ -93,6 +99,16 @@ export interface IStorage {
   getNotifications(userId: string): Promise<ProductionNotification[]>;
   createNotification(notification: InsertProductionNotification): Promise<ProductionNotification>;
   markNotificationAsRead(id: number): Promise<void>;
+  
+  // Calendar Events
+  getCalendarEvents(licenseeId: string, photographerId?: string): Promise<CalendarEvent[]>;
+  createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent>;
+  updateCalendarEvent(id: number, event: Partial<InsertCalendarEvent>): Promise<CalendarEvent>;
+  deleteCalendarEvent(id: number): Promise<void>;
+  
+  // Business Settings
+  getBusinessSettings(licenseeId: string): Promise<BusinessSettings | undefined>;
+  upsertBusinessSettings(settings: InsertBusinessSettings): Promise<BusinessSettings>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -614,6 +630,72 @@ export class DatabaseStorage implements IStorage {
       .update(productionNotifications)
       .set({ isRead: true })
       .where(eq(productionNotifications.id, id));
+  }
+
+  // Calendar Events
+  async getCalendarEvents(licenseeId: string, photographerId?: string): Promise<CalendarEvent[]> {
+    const whereConditions = [eq(calendarEvents.licenseeId, licenseeId)];
+    
+    if (photographerId) {
+      whereConditions.push(eq(calendarEvents.photographerId, photographerId));
+    }
+
+    return await db
+      .select()
+      .from(calendarEvents)
+      .where(and(...whereConditions))
+      .orderBy(desc(calendarEvents.start));
+  }
+
+  async createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent> {
+    const [newEvent] = await db
+      .insert(calendarEvents)
+      .values(event)
+      .returning();
+    return newEvent;
+  }
+
+  async updateCalendarEvent(id: number, event: Partial<InsertCalendarEvent>): Promise<CalendarEvent> {
+    const [updatedEvent] = await db
+      .update(calendarEvents)
+      .set({ ...event, updatedAt: new Date() })
+      .where(eq(calendarEvents.id, id))
+      .returning();
+    return updatedEvent;
+  }
+
+  async deleteCalendarEvent(id: number): Promise<void> {
+    await db
+      .delete(calendarEvents)
+      .where(eq(calendarEvents.id, id));
+  }
+
+  // Business Settings
+  async getBusinessSettings(licenseeId: string): Promise<BusinessSettings | undefined> {
+    const [settings] = await db
+      .select()
+      .from(businessSettings)
+      .where(eq(businessSettings.licenseeId, licenseeId));
+    return settings;
+  }
+
+  async upsertBusinessSettings(settings: InsertBusinessSettings): Promise<BusinessSettings> {
+    const existing = await this.getBusinessSettings(settings.licenseeId);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(businessSettings)
+        .set({ ...settings, updatedAt: new Date() })
+        .where(eq(businessSettings.licenseeId, settings.licenseeId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(businessSettings)
+        .values(settings)
+        .returning();
+      return created;
+    }
   }
 }
 

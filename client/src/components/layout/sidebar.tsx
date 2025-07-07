@@ -54,7 +54,7 @@ const navigationSections: NavSection[] = [
     name: "Bookings",
     icon: Calendar,
     items: [
-      { name: "Calendar", href: "/bookings", icon: Calendar },
+      { name: "Calendar", href: "/calendar", icon: Calendar },
       { name: "New Booking", href: "/bookings", icon: CalendarPlus },
     ]
   },
