@@ -282,6 +282,115 @@ export default function DeliveryPage() {
   const virtualTours = getFilesByCategory('virtual_tour');
   const otherFiles = getFilesByCategory('other');
 
+  // Get section order and visibility from delivery settings
+  const deliverySettings = data?.jobCard.deliverySettings;
+  const sectionOrder = deliverySettings?.sectionOrder || ['photos', 'floor_plans', 'video', 'virtual_tour', 'other_files'];
+  const sectionVisibility = deliverySettings?.sectionVisibility || {
+    photos: true,
+    floor_plans: true,
+    video: true,
+    virtual_tour: true,
+    other_files: true
+  };
+
+  // Function to render each section based on type
+  const renderSection = (sectionType: string) => {
+    if (!sectionVisibility[sectionType]) return null;
+
+    const sectionData = {
+      photos: { files: photos, title: "Photos", icon: Camera },
+      floor_plans: { files: floorPlans, title: "Floor Plans", icon: Home },
+      video: { files: videos, title: "Video", icon: Video },
+      virtual_tour: { files: virtualTours, title: "Virtual Tour", icon: Camera },
+      other_files: { files: otherFiles, title: "Other Files", icon: FileText }
+    };
+
+    const section = sectionData[sectionType as keyof typeof sectionData];
+    if (!section || section.files.length === 0) return null;
+
+    const Icon = section.icon;
+
+    return (
+      <section key={sectionType} className="mb-12">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+          <Icon className="h-6 w-6 mr-2" />
+          {section.title}
+        </h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {section.files.map((file) => (
+            <Card key={file.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+              <div className="aspect-[4/3] bg-gray-200 relative group">
+                {file.mediaType === 'image' ? (
+                  <img 
+                    src={file.url} 
+                    alt={file.originalName}
+                    className="w-full h-full object-cover cursor-pointer"
+                    onClick={() => setViewingImage(file.url)}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                    <Icon className="h-12 w-12 text-gray-400" />
+                  </div>
+                )}
+                
+                {/* Hover overlay for selection */}
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setViewingImage(file.url)}
+                      className="mr-2"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    {data.jobCard.deliverySettings?.enableDownloads && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleDownload(file)}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <CardContent className="p-4">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <h3 className="font-medium text-gray-900 truncate">{file.originalName}</h3>
+                    <p className="text-sm text-gray-500">{file.mediaType}</p>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 ml-2">
+                    <Checkbox
+                      checked={selectedFiles.has(file.id)}
+                      onCheckedChange={() => toggleFileSelection(file.id)}
+                      className="h-4 w-4"
+                    />
+                    {data.jobCard.deliverySettings?.enableDownloads && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDownload(file)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Download className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header Banner */}
@@ -325,8 +434,11 @@ export default function DeliveryPage() {
           </Card>
         )}
 
-        {/* Photos Section */}
-        {photos.length > 0 && (
+        {/* Dynamic Sections Based on Custom Order */}
+        {sectionOrder.map(sectionType => renderSection(sectionType))}
+
+        {/* Legacy Photos Section - Disabled */}
+        {false && photos.length > 0 && (
           <section className="mb-12">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-gray-900 flex items-center">
@@ -417,8 +529,8 @@ export default function DeliveryPage() {
           </section>
         )}
 
-        {/* Floor Plans Section */}
-        {floorPlans.length > 0 && (
+        {/* Legacy Floor Plans Section - Disabled */}
+        {false && floorPlans.length > 0 && (
           <section className="mb-12">
             <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
               <Home className="h-6 w-6 mr-2" />
@@ -456,8 +568,8 @@ export default function DeliveryPage() {
           </section>
         )}
 
-        {/* Video Section */}
-        {videos.length > 0 && (
+        {/* Legacy Video Section - Disabled */}
+        {false && videos.length > 0 && (
           <section className="mb-12">
             <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
               <Video className="h-6 w-6 mr-2" />
@@ -494,8 +606,8 @@ export default function DeliveryPage() {
           </section>
         )}
 
-        {/* Other Files Section */}
-        {otherFiles.length > 0 && (
+        {/* Legacy Other Files Section - Disabled */}
+        {false && otherFiles.length > 0 && (
           <section className="mb-12">
             <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
               <FileText className="h-6 w-6 mr-2" />

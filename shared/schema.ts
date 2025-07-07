@@ -4,6 +4,7 @@ import {
   varchar,
   timestamp,
   jsonb,
+  json,
   index,
   serial,
   integer,
@@ -286,6 +287,14 @@ export const jobCardDeliverySettings = pgTable("job_card_delivery_settings", {
   isPublic: boolean("is_public").default(true),
   passwordProtected: boolean("password_protected").default(false),
   deliveryPassword: varchar("delivery_password"),
+  sectionOrder: jsonb("section_order").$type<string[]>().default(['photos', 'floor_plans', 'video', 'virtual_tour', 'other_files']),
+  sectionVisibility: jsonb("section_visibility").$type<Record<string, boolean>>().default({
+    photos: true,
+    floor_plans: true,
+    video: true,
+    virtual_tour: true,
+    other_files: true
+  }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

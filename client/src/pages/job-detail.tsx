@@ -43,6 +43,7 @@ import {
 import { cn } from "@/lib/utils";
 import DeliverySettingsModal from "@/components/delivery-settings-modal";
 import JobStatusPanel from "@/components/job-status-panel";
+import DeliverySectionReorder from "@/components/delivery-section-reorder";
 
 interface JobDetail {
   id: number;
@@ -517,7 +518,10 @@ export default function JobDetailPage() {
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <CardTitle>Files & Media</CardTitle>
-                  <DeliverySettingsModal jobCardId={job.id} files={files} />
+                  <div className="flex gap-2">
+                    <DeliverySectionReorder jobCardId={job.id} />
+                    <DeliverySettingsModal jobCardId={job.id} files={files} />
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>

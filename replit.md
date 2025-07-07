@@ -212,6 +212,14 @@ Changelog:
   - **Activity Integration**: Client comments automatically create job activity logs and update job status for revision workflow
   - **Admin Dashboard**: Delivery management page showing all jobs with delivery status, quick link copying, and setup shortcuts
   - **Complete Integration**: Seamlessly integrated with existing job card system, file management, and production workflow
+- July 07, 2025. Added section reordering and visibility controls for delivery pages:
+  - **Drag-and-Drop Interface**: Section reorder component with up/down controls for Photos, Floor Plans, Video, Virtual Tour, Other Files
+  - **Custom Section Order**: Database storage of custom section order with default fallback (Photos → Floor Plans → Video → Virtual Tour → Other Files)
+  - **Visibility Toggle**: Admin ability to hide sections per job with simple checkbox controls in job card UI
+  - **Dynamic Rendering**: Public delivery pages now respect custom section order and visibility settings
+  - **Database Extension**: Added sectionOrder and sectionVisibility JSON fields to job_card_delivery_settings table
+  - **Admin Interface**: Integrated section reorder component into job detail pages with live preview
+  - **Flexible Layout**: Each job can have unique section arrangement and visibility for customized client presentation
 ```
 
 ## User Preferences
