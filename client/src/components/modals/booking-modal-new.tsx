@@ -165,6 +165,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
   const [currentStep, setCurrentStep] = useState(1);
   const [sendConfirmationEmail, setSendConfirmationEmail] = useState(true);
   const [addressCoordinates, setAddressCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
   
   const isEditing = !!booking;
   const totalSteps = 3;
@@ -196,18 +197,21 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
 
   useEffect(() => {
     if (booking) {
+      const services = booking.services as ("photography" | "drone" | "floor_plans" | "video")[];
+      setSelectedServices(services);
       form.reset({
         clientId: booking.clientId,
         propertyAddress: booking.propertyAddress,
         scheduledDate: booking.scheduledDate,
         scheduledTime: booking.scheduledTime,
-        services: booking.services as ("photography" | "drone" | "floor_plans" | "video")[],
+        services: services,
         status: booking.status as "pending" | "confirmed" | "completed" | "cancelled",
         photographerId: booking.photographerId,
         notes: booking.notes || "",
         price: booking.price,
       });
     } else {
+      setSelectedServices([]);
       form.reset({
         clientId: 0,
         propertyAddress: "",
@@ -301,6 +305,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
     setCurrentStep(1);
     setSendConfirmationEmail(true);
     setAddressCoordinates(null);
+    setSelectedServices([]);
     onClose();
   };
 
@@ -323,10 +328,16 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
   };
 
   const onSubmit = (data: z.infer<typeof bookingFormSchema>) => {
+    // Ensure services are included from state
+    const submitData = {
+      ...data,
+      services: selectedServices
+    };
+    
     if (isEditing) {
-      updateBookingMutation.mutate(data);
+      updateBookingMutation.mutate(submitData);
     } else {
-      createBookingMutation.mutate(data);
+      createBookingMutation.mutate(submitData);
     }
   };
 
@@ -342,7 +353,6 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
 
   const selectedClient = clients?.find(c => c.id === form.watch("clientId"));
   const selectedPhotographer = photographers?.find(p => p.id === form.watch("photographerId"));
-  const selectedServices = form.watch("services") || [];
   const formData = form.getValues();
 
   const stepTitles = [
@@ -530,9 +540,10 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
                       </div>
                     }>
                       <ServiceSelection 
-                        value={form.watch("services") || []}
+                        value={selectedServices}
                         onChange={(services) => {
                           console.log('Services updated:', services);
+                          setSelectedServices(services);
                           form.setValue("services", services);
                         }}
                       />
