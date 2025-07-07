@@ -84,6 +84,7 @@ export const bookings = pgTable("bookings", {
   scheduledDate: date("scheduled_date").notNull(),
   scheduledTime: varchar("scheduled_time", { length: 10 }),
   services: serviceTypeEnum("services").array().notNull(),
+  selectedProducts: jsonb("selected_products").default([]),
   status: jobStatusEnum("status").default("pending"),
   photographerId: varchar("photographer_id"),
   notes: text("notes"),

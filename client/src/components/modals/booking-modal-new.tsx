@@ -55,7 +55,7 @@ interface BookingModalProps {
 }
 
 const bookingFormSchema = insertBookingSchema.omit({ licenseeId: true }).extend({
-  services: z.array(z.enum(["photography", "drone", "floor_plans", "video"])).min(1, "Select at least one service"),
+  services: z.array(z.string()).min(1, "Select at least one service"),
   propertyAddress: z.string().min(1, "Property address is required"),
 });
 
@@ -66,11 +66,23 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
   const [sendConfirmationEmail, setSendConfirmationEmail] = useState(true);
   const [addressCoordinates, setAddressCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<Array<{
+    productId: string;
+    variantId?: string;
+    productTitle: string;
+    variantName?: string;
+    price: number;
+  }>>([]);
   
   // Debug logging for service updates
   const handleServiceChange = useCallback((services: string[]) => {
     console.log('Service change triggered:', services);
     setSelectedServices(services);
+  }, []);
+
+  const handleProductsChange = useCallback((products: any[]) => {
+    console.log('Products change triggered:', products);
+    setSelectedProducts(products);
   }, []);
   
   const isEditing = !!booking;
@@ -255,7 +267,8 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
     // Ensure services are included from state
     const submitData = {
       ...data,
-      services: selectedServices
+      services: selectedServices,
+      selectedProducts: selectedProducts // Include selected products with variants
     };
     
     if (isEditing) {
@@ -466,6 +479,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
                       <ServiceSelection 
                         value={selectedServices}
                         onChange={handleServiceChange}
+                        onProductsChange={handleProductsChange}
                       />
                       <ServiceValidation selectedCount={selectedServices.length} />
                     </ErrorBoundary>
@@ -566,12 +580,17 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
                     {/* Services */}
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="font-medium mb-2">Services</div>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedServices.length > 0 ? selectedServices.map((service) => (
-                          <Badge key={service} variant="secondary" className="flex items-center gap-1">
-                            {getServiceIcon(service)}
-                            {service.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                          </Badge>
+                      <div className="space-y-2">
+                        {selectedProducts.length > 0 ? selectedProducts.map((product) => (
+                          <div key={product.productId} className="flex items-center justify-between">
+                            <div>
+                              <span className="font-medium">{product.productTitle}</span>
+                              {product.variantName && (
+                                <span className="text-sm text-gray-500 ml-2">({product.variantName})</span>
+                              )}
+                            </div>
+                            <span className="font-medium text-brand-blue">${product.price}</span>
+                          </div>
                         )) : (
                           <span className="text-gray-500 text-sm">No services selected</span>
                         )}
