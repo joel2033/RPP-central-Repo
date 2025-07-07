@@ -34,9 +34,10 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin, Calendar, Clock, Camera, Home, Video, ChevronLeft, ChevronRight, Mail, PlaneTakeoff, UserIcon } from "lucide-react";
+import { MapPin, Calendar, Clock, Camera, Home, Video, ChevronLeft, ChevronRight, Mail, PlaneTakeoff, UserIcon, AlertCircle } from "lucide-react";
 import { z } from "zod";
 import AddressInput from "@/components/ui/address-input";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 interface BookingWithDetails extends Booking {
   client: Client;
@@ -418,61 +419,114 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
                     <CardTitle>Services Required</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <FormField
-                      control={form.control}
-                      name="services"
-                      render={() => (
-                        <FormItem>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <ErrorBoundary fallback={
+                      <div className="p-4 text-center text-red-600">
+                        <AlertCircle className="h-8 w-8 mx-auto mb-2" />
+                        <p>Error loading services. Please refresh and try again.</p>
+                      </div>
+                    }>
+                      <FormField
+                        control={form.control}
+                        name="services"
+                        render={({ field }) => (
+                          <FormItem>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {[
-                              { value: "photography", label: "Photography", icon: Camera },
-                              { value: "drone", label: "Drone", icon: PlaneTakeoff },
-                              { value: "floor_plans", label: "Floor Plans", icon: Home },
-                              { value: "video", label: "Video", icon: Video },
-                            ].map((service) => (
-                              <FormField
-                                key={service.value}
-                                control={form.control}
-                                name="services"
-                                render={({ field }) => {
-                                  const Icon = service.icon;
-                                  const isSelected = field.value?.includes(service.value as any);
-                                  return (
-                                    <Card 
-                                      className={`cursor-pointer transition-all ${
-                                        isSelected ? "border-brand-blue bg-blue-50" : "hover:border-gray-300"
-                                      }`}
-                                      onClick={() => {
-                                        const checked = !isSelected;
-                                        return checked
-                                          ? field.onChange([...field.value, service.value])
-                                          : field.onChange(
-                                              field.value?.filter(
-                                                (value) => value !== service.value
-                                              )
-                                            )
-                                      }}
-                                    >
-                                      <CardContent className="p-4">
-                                        <div className="flex items-center space-x-3">
-                                          <Checkbox
-                                            checked={isSelected}
-                                            readOnly
-                                          />
-                                          <Icon className="h-5 w-5" />
-                                          <span className="font-medium">{service.label}</span>
-                                        </div>
-                                      </CardContent>
-                                    </Card>
-                                  )
-                                }}
-                              />
-                            ))}
+                              { 
+                                id: "photography", 
+                                value: "photography", 
+                                label: "Photography", 
+                                icon: Camera,
+                                description: "Interior and exterior property photos",
+                                price: "200",
+                                duration: "1-2 hours"
+                              },
+                              { 
+                                id: "drone", 
+                                value: "drone", 
+                                label: "Drone", 
+                                icon: PlaneTakeoff,
+                                description: "Aerial photography and videography",
+                                price: "150",
+                                duration: "30-60 minutes"
+                              },
+                              { 
+                                id: "floor_plans", 
+                                value: "floor_plans", 
+                                label: "Floor Plans", 
+                                icon: Home,
+                                description: "Detailed property floor plans",
+                                price: "100",
+                                duration: "1 hour"
+                              },
+                              { 
+                                id: "video", 
+                                value: "video", 
+                                label: "Video", 
+                                icon: Video,
+                                description: "Property walkthrough videos",
+                                price: "300",
+                                duration: "2-3 hours"
+                              },
+                            ].map((service) => {
+                              const Icon = service.icon;
+                              const currentServices = field.value || [];
+                              const isSelected = currentServices.includes(service.value as any);
+                              
+                              const handleServiceToggle = () => {
+                                try {
+                                  console.log('Service clicked:', service);
+                                  
+                                  let newServices;
+                                  if (isSelected) {
+                                    newServices = currentServices.filter(
+                                      (value) => value !== service.value
+                                    );
+                                  } else {
+                                    newServices = [...currentServices, service.value];
+                                  }
+                                  
+                                  console.log('New services array:', newServices);
+                                  field.onChange(newServices);
+                                } catch (error) {
+                                  console.error('Error updating services:', error);
+                                }
+                              };
+
+                              return (
+                                <Card 
+                                  key={service.id}
+                                  className={`cursor-pointer transition-all ${
+                                    isSelected ? "border-brand-blue bg-blue-50" : "hover:border-gray-300"
+                                  }`}
+                                  onClick={handleServiceToggle}
+                                >
+                                  <CardContent className="p-4">
+                                    <div className="flex items-center space-x-3 mb-2">
+                                      <Checkbox
+                                        checked={isSelected}
+                                        readOnly
+                                      />
+                                      <Icon className="h-5 w-5" />
+                                      <span className="font-medium">{service.label}</span>
+                                    </div>
+                                    <div className="text-sm text-gray-600 ml-8">
+                                      <div>{service.description}</div>
+                                      <div className="flex justify-between mt-1">
+                                        <span>From ${service.price}</span>
+                                        <span>{service.duration}</span>
+                                      </div>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              );
+                            })}
                           </div>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+                    </ErrorBoundary>
                   </CardContent>
                 </Card>
 
