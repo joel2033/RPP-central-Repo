@@ -36,6 +36,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MapPin, Calendar, Clock, Camera, Home, Video, ChevronLeft, ChevronRight, Mail, PlaneTakeoff, UserIcon } from "lucide-react";
 import { z } from "zod";
+import AddressInput from "@/components/ui/address-input";
 
 interface BookingWithDetails extends Booking {
   client: Client;
@@ -50,6 +51,7 @@ interface BookingModalProps {
 
 const bookingFormSchema = insertBookingSchema.omit({ licenseeId: true }).extend({
   services: z.array(z.enum(["photography", "drone", "floor_plans", "video"])).min(1, "Select at least one service"),
+  propertyAddress: z.string().min(1, "Property address is required"),
 });
 
 export default function BookingModal({ isOpen, onClose, booking }: BookingModalProps) {
@@ -57,6 +59,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
   const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(1);
   const [sendConfirmationEmail, setSendConfirmationEmail] = useState(true);
+  const [addressCoordinates, setAddressCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   
   const isEditing = !!booking;
   const totalSteps = 3;
@@ -192,10 +195,17 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
     form.reset();
     setCurrentStep(1);
     setSendConfirmationEmail(true);
+    setAddressCoordinates(null);
     onClose();
   };
 
-  const nextStep = () => {
+  const nextStep = async () => {
+    if (currentStep === 1) {
+      // Validate step 1 fields
+      const isValid = await form.trigger(["clientId", "propertyAddress"]);
+      if (!isValid) return;
+    }
+    
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
     }
@@ -314,21 +324,21 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
                         <FormItem>
                           <FormLabel>Property Address *</FormLabel>
                           <FormControl>
-                            <Input placeholder="123 Main St, City, State" {...field} />
+                            <AddressInput
+                              value={field.value}
+                              onChange={(value, coordinates) => {
+                                field.onChange(value);
+                                setAddressCoordinates(coordinates || null);
+                              }}
+                              placeholder="Enter property address"
+                              required
+                              error={form.formState.errors.propertyAddress?.message}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-
-                    {formData.propertyAddress && (
-                      <div className="p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center text-sm text-gray-600">
-                          <MapPin className="h-4 w-4 mr-2" />
-                          Google Maps integration would show here
-                        </div>
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -381,14 +391,14 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Photographer (Optional)</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <Select onValueChange={(value) => field.onChange(value === "none" ? null : value)} value={field.value || "none"}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select photographer" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">No photographer assigned</SelectItem>
+                              <SelectItem value="none">No photographer assigned</SelectItem>
                               {photographers?.map((photographer) => (
                                 <SelectItem key={photographer.id} value={photographer.id}>
                                   {photographer.firstName} {photographer.lastName}
