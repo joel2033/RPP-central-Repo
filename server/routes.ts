@@ -276,12 +276,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Jobs API (user-facing jobs management)
   app.get("/api/jobs", isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
+      console.log("Fetching jobs for licensee:", req.user!.licenseeId);
       const jobCards = await storage.getJobCards(req.user!.licenseeId);
+      console.log("Found job cards:", jobCards.length);
       
       // Enhance job cards with booking details for the jobs page
       const jobsWithBookings = await Promise.all(
         jobCards.map(async (jobCard) => {
           const booking = await storage.getBooking(jobCard.bookingId, req.user!.licenseeId);
+          console.log(`Job card ${jobCard.id} booking:`, booking);
           return {
             ...jobCard,
             booking: booking || {
@@ -296,6 +299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
       
+      console.log("Returning jobs with bookings:", jobsWithBookings.length);
       res.json(jobsWithBookings);
     } catch (error) {
       console.error("Failed to fetch jobs:", error);

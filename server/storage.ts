@@ -278,6 +278,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     const jobCard = await this.createJobCard(jobCardData);
+    console.log("Created job card:", jobCard);
     
     // Create calendar event for the booking
     try {
@@ -312,6 +313,8 @@ export class DatabaseStorage implements IStorage {
       console.error("Failed to create calendar event or activity log:", error);
       // Don't fail the booking creation if calendar event fails
     }
+    
+    console.log("Booking creation completed, returning booking:", newBooking);
     
     return newBooking;
   }
