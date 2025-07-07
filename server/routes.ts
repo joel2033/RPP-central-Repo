@@ -938,6 +938,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Quick job status update endpoint for the status panel
+  app.patch("/api/jobs/:id", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      const jobCardId = parseInt(req.params.id);
+      const { status, notes } = req.body;
+
+      if (!status) {
+        return res.status(400).json({ message: "Status is required" });
+      }
+
+      // Get current job card to check permissions and log changes
+      const currentJob = await storage.getJobCard(jobCardId, licenseeId);
+      if (!currentJob) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+
+      // Update job status
+      const updateData: any = { status };
+      
+      // Set automatic timestamps based on status
+      if (status === 'in_progress' && !currentJob.assignedAt) {
+        updateData.assignedAt = new Date();
+      }
+      if (status === 'delivered' && !currentJob.deliveredAt) {
+        updateData.deliveredAt = new Date();
+      }
+      if (['ready_for_qa', 'editing'].includes(status) && !currentJob.completedAt) {
+        updateData.completedAt = new Date();
+      }
+
+      const updatedJob = await storage.updateJobCard(jobCardId, updateData, licenseeId);
+
+      // Log activity for status change
+      try {
+        await storage.createJobActivityLog({
+          jobCardId: jobCardId,
+          action: "status_updated",
+          description: `Job status changed from ${currentJob.status} to ${status}${notes ? ` - ${notes}` : ''}`,
+          createdAt: new Date(),
+          metadata: {
+            previousStatus: currentJob.status,
+            newStatus: status,
+            notes: notes,
+            updatedBy: licenseeId
+          }
+        });
+      } catch (logError) {
+        console.error("Failed to log status change activity:", logError);
+        // Don't fail the request if logging fails
+      }
+
+      res.json(updatedJob);
+    } catch (error) {
+      console.error("Error updating job status:", error);
+      res.status(500).json({ message: "Failed to update job status" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

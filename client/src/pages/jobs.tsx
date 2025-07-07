@@ -19,6 +19,7 @@ import {
   Eye,
   MoreHorizontal
 } from "lucide-react";
+import JobStatusPanel from "@/components/job-status-panel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -341,6 +342,16 @@ export default function JobsPage() {
                             </Badge>
                           ))}
                         </div>
+                      </div>
+                      
+                      {/* Quick Status Panel */}
+                      <div className="mb-4">
+                        <JobStatusPanel 
+                          jobId={job.id}
+                          currentStatus={job.status}
+                          jobStatus={job.jobStatus}
+                          compact={true}
+                        />
                       </div>
                       
                       {/* Additional Info */}

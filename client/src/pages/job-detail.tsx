@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import DeliverySettingsModal from "@/components/delivery-settings-modal";
+import JobStatusPanel from "@/components/job-status-panel";
 
 interface JobDetail {
   id: number;
@@ -450,6 +451,21 @@ export default function JobDetailPage() {
                         </div>
                       )}
                     </div>
+                  </CardContent>
+                </Card>
+
+                {/* Job Status Management */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Job Status</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <JobStatusPanel 
+                      jobId={job.id}
+                      currentStatus={job.status}
+                      jobStatus={job.jobStatus}
+                      compact={false}
+                    />
                   </CardContent>
                 </Card>
 

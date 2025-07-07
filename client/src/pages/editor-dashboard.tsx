@@ -18,6 +18,7 @@ import {
   Camera,
   FileText
 } from "lucide-react";
+import JobStatusPanel from "@/components/job-status-panel";
 import EmptyState from "@/components/shared/empty-state";
 import LoadingSpinner from "@/components/shared/loading-spinner";
 import type { JobCard, Client, User, ProductionFile } from "@shared/schema";
@@ -278,6 +279,14 @@ export default function EditorDashboard() {
                         </p>
                       </div>
                     )}
+                    
+                    {/* Quick Status Panel */}
+                    <JobStatusPanel 
+                      jobId={jobCard.id}
+                      currentStatus={jobCard.status}
+                      jobStatus={jobCard.jobStatus || jobCard.status}
+                      compact={true}
+                    />
                     
                     <div className="flex gap-2">
                       {jobCard.status === "in_progress" && (
