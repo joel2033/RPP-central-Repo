@@ -142,6 +142,13 @@ Changelog:
   - Added notification system for workflow handoffs
   - Extended database schema with job cards, production files, and notifications
   - Added user roles for editors and comprehensive API endpoints
+  - Redesigned sidebar navigation with collapsible menu sections:
+    * Production Hub (Upload to Editor, Editor Dashboard, QA Review, Revisions Queue)
+    * Clients (CRM, Client Preferences)
+    * Bookings (Calendar, New Booking)
+    * Reports (Analytics, Revenue)
+    * Settings (General, User Management)
+  - Enhanced UI with modern collapsible navigation and user profile section
 ```
 
 ## User Preferences
