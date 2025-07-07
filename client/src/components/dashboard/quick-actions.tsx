@@ -58,27 +58,25 @@ export default function QuickActions() {
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="grid grid-cols-2 gap-3 p-4">
           {actions.map((action) => {
             const Icon = action.icon;
             
             // If action has href, wrap in Link
             if (action.href) {
               return (
-                <Link key={action.title} href={action.href}>
-                  <div className="w-full">
-                    <Button
-                      className={`w-full flex items-center justify-between p-4 h-auto ${
-                        action.primary
-                          ? "bg-blue-600 text-white hover:bg-blue-700"
-                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                      }`}
-                      variant={action.primary ? "default" : "secondary"}
-                    >
-                      <span className="font-medium">{action.title}</span>
-                      <Icon className="h-4 w-4" />
-                    </Button>
-                  </div>
+                <Link key={action.title} href={action.href} className="w-full">
+                  <Button
+                    className={`w-full flex flex-col items-center justify-center p-4 h-20 ${
+                      action.primary
+                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    }`}
+                    variant={action.primary ? "default" : "secondary"}
+                  >
+                    <Icon className="h-5 w-5 mb-1" />
+                    <span className="text-sm font-medium text-center leading-tight">{action.title}</span>
+                  </Button>
                 </Link>
               );
             }
@@ -88,15 +86,15 @@ export default function QuickActions() {
               <Button
                 key={action.title}
                 onClick={action.onClick}
-                className={`w-full flex items-center justify-between p-4 h-auto ${
+                className={`w-full flex flex-col items-center justify-center p-4 h-20 ${
                   action.primary
                     ? "bg-blue-600 text-white hover:bg-blue-700"
                     : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                 }`}
                 variant={action.primary ? "default" : "secondary"}
               >
-                <span className="font-medium">{action.title}</span>
-                <Icon className="h-4 w-4" />
+                <Icon className="h-5 w-5 mb-1" />
+                <span className="text-sm font-medium text-center leading-tight">{action.title}</span>
               </Button>
             );
           })}
