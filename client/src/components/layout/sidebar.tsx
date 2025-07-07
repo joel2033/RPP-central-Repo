@@ -47,14 +47,14 @@ const navigationSections: NavSection[] = [
     icon: Users,
     items: [
       { name: "CRM", href: "/clients", icon: Users },
+      { name: "Jobs", href: "/jobs", icon: Camera },
       { name: "Client Preferences", href: "/clients", icon: UserPlus },
     ]
   },
   {
     name: "Bookings",
-    icon: Calendar,
+    icon: CalendarPlus,
     items: [
-      { name: "Calendar", href: "/calendar", icon: Calendar },
       { name: "New Booking", href: "/bookings", icon: CalendarPlus },
     ]
   },
@@ -87,7 +87,7 @@ const navigationSections: NavSection[] = [
 ];
 
 const additionalNavigation = [
-  { name: "Job Management", href: "/jobs", icon: Camera },
+  { name: "Calendar", href: "/calendar", icon: Calendar },
   { name: "Delivery Portal", href: "/delivery", icon: Download },
 ];
 

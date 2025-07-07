@@ -171,6 +171,14 @@ Changelog:
   - Fixed navigation bugs: Production Hub dropdown now only expands when directly clicked
   - Enhanced button responsiveness with proper event handling and hover effects
   - Resolved SelectItem errors and improved overall UI interaction reliability
+- July 07, 2025. Built comprehensive Jobs Module for client-facing job management:
+  - Created Jobs list page with filtering (All/Upcoming/Delivered/In Revision) and search functionality
+  - Extended database schema with job activity logging and enhanced job status tracking
+  - Added API endpoints: GET /api/jobs, /api/jobs/:id, /api/jobs/:id/files, /api/jobs/:id/activity
+  - Implemented automatic job creation from bookings with proper workflow integration
+  - Jobs display property address, client details, photographer assignments, and service lists
+  - Enhanced sidebar navigation: moved Jobs under Clients section, separated Bookings, Calendar standalone
+  - Ready for detailed job card view with file management and activity tracking features
 ```
 
 ## User Preferences
