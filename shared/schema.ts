@@ -250,6 +250,46 @@ export const calendarSyncLogs = pgTable("calendar_sync_logs", {
   syncedAt: timestamp("synced_at").defaultNow(),
 });
 
+// Delivery Comments table
+export const deliveryComments = pgTable("delivery_comments", {
+  id: serial("id").primaryKey(),
+  jobCardId: integer("job_card_id").notNull(),
+  clientName: varchar("client_name", { length: 255 }).notNull(),
+  clientEmail: varchar("client_email", { length: 255 }).notNull(),
+  comment: text("comment").notNull(),
+  requestRevision: boolean("request_revision").default(false),
+  adminResponse: text("admin_response"),
+  status: varchar("status").default("pending"), // 'pending', 'responded', 'resolved'
+  createdAt: timestamp("created_at").defaultNow(),
+  respondedAt: timestamp("responded_at"),
+});
+
+// Delivery Tracking table
+export const deliveryTracking = pgTable("delivery_tracking", {
+  id: serial("id").primaryKey(),
+  jobCardId: integer("job_card_id").notNull(),
+  actionType: varchar("action_type").notNull(), // 'page_view', 'file_download', 'bulk_download'
+  fileName: varchar("file_name"), // For file downloads
+  clientInfo: jsonb("client_info"), // IP, user agent, etc.
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
+// Job Card Delivery Settings table
+export const jobCardDeliverySettings = pgTable("job_card_delivery_settings", {
+  id: serial("id").primaryKey(),
+  jobCardId: integer("job_card_id").notNull().unique(),
+  headerImageFileId: integer("header_image_file_id"), // Reference to ProductionFile
+  enableComments: boolean("enable_comments").default(true),
+  enableDownloads: boolean("enable_downloads").default(true),
+  customMessage: text("custom_message"),
+  deliveryUrl: varchar("delivery_url").unique(), // Custom URL slug
+  isPublic: boolean("is_public").default(true),
+  passwordProtected: boolean("password_protected").default(false),
+  deliveryPassword: varchar("delivery_password"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   bookings: many(bookings),
@@ -337,6 +377,9 @@ export const jobCardsRelations = relations(jobCards, ({ one, many }) => ({
   }),
   productionFiles: many(productionFiles),
   notifications: many(productionNotifications),
+  deliveryComments: many(deliveryComments),
+  deliveryTracking: many(deliveryTracking),
+  deliverySettings: one(jobCardDeliverySettings),
 }));
 
 // Production Files relations
@@ -393,6 +436,32 @@ export const calendarSyncLogsRelations = relations(calendarSyncLogs, ({ one }) =
   integration: one(googleCalendarIntegrations, {
     fields: [calendarSyncLogs.integrationId],
     references: [googleCalendarIntegrations.id],
+  }),
+}));
+
+// Delivery relations
+export const deliveryCommentsRelations = relations(deliveryComments, ({ one }) => ({
+  jobCard: one(jobCards, {
+    fields: [deliveryComments.jobCardId],
+    references: [jobCards.id],
+  }),
+}));
+
+export const deliveryTrackingRelations = relations(deliveryTracking, ({ one }) => ({
+  jobCard: one(jobCards, {
+    fields: [deliveryTracking.jobCardId],
+    references: [jobCards.id],
+  }),
+}));
+
+export const jobCardDeliverySettingsRelations = relations(jobCardDeliverySettings, ({ one }) => ({
+  jobCard: one(jobCards, {
+    fields: [jobCardDeliverySettings.jobCardId],
+    references: [jobCards.id],
+  }),
+  headerImageFile: one(productionFiles, {
+    fields: [jobCardDeliverySettings.headerImageFileId],
+    references: [productionFiles.id],
   }),
 }));
 
@@ -474,6 +543,23 @@ export const insertCalendarSyncLogSchema = createInsertSchema(calendarSyncLogs).
   syncedAt: true,
 });
 
+export const insertDeliveryCommentSchema = createInsertSchema(deliveryComments).omit({
+  id: true,
+  createdAt: true,
+  respondedAt: true,
+});
+
+export const insertDeliveryTrackingSchema = createInsertSchema(deliveryTracking).omit({
+  id: true,
+  timestamp: true,
+});
+
+export const insertJobCardDeliverySettingsSchema = createInsertSchema(jobCardDeliverySettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -508,3 +594,11 @@ export type InsertGoogleCalendarIntegration = z.infer<typeof insertGoogleCalenda
 export type GoogleCalendarIntegration = typeof googleCalendarIntegrations.$inferSelect;
 export type InsertCalendarSyncLog = z.infer<typeof insertCalendarSyncLogSchema>;
 export type CalendarSyncLog = typeof calendarSyncLogs.$inferSelect;
+
+// Delivery types
+export type InsertDeliveryComment = z.infer<typeof insertDeliveryCommentSchema>;
+export type DeliveryComment = typeof deliveryComments.$inferSelect;
+export type InsertDeliveryTracking = z.infer<typeof insertDeliveryTrackingSchema>;
+export type DeliveryTracking = typeof deliveryTracking.$inferSelect;
+export type InsertJobCardDeliverySettings = z.infer<typeof insertJobCardDeliverySettingsSchema>;
+export type JobCardDeliverySettings = typeof jobCardDeliverySettings.$inferSelect;

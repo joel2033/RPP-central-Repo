@@ -41,6 +41,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import DeliverySettingsModal from "@/components/delivery-settings-modal";
 
 interface JobDetail {
   id: number;
@@ -498,7 +499,10 @@ export default function JobDetailPage() {
             {/* File Management Section */}
             <Card className="mb-6">
               <CardHeader>
-                <CardTitle>Files & Media</CardTitle>
+                <div className="flex justify-between items-center">
+                  <CardTitle>Files & Media</CardTitle>
+                  <DeliverySettingsModal jobCardId={jobDetail.id} files={files} />
+                </div>
               </CardHeader>
               <CardContent>
                 <Tabs value={activeTab} onValueChange={setActiveTab}>

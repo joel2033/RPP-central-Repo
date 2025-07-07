@@ -38,6 +38,15 @@ import {
   type InsertGoogleCalendarIntegration,
   type CalendarSyncLog,
   type InsertCalendarSyncLog,
+  deliveryComments,
+  deliveryTracking,
+  jobCardDeliverySettings,
+  type DeliveryComment,
+  type InsertDeliveryComment,
+  type DeliveryTracking,
+  type InsertDeliveryTracking,
+  type JobCardDeliverySettings,
+  type InsertJobCardDeliverySettings,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, count } from "drizzle-orm";
@@ -130,6 +139,22 @@ export interface IStorage {
   createCalendarSyncLog(log: InsertCalendarSyncLog): Promise<CalendarSyncLog>;
   getCalendarSyncLogByEventId(eventId: string): Promise<CalendarSyncLog | undefined>;
   getCalendarEventByGoogleId(googleEventId: string): Promise<CalendarEvent | undefined>;
+  
+  // Delivery functionality
+  getJobCardDeliverySettings(jobCardId: number): Promise<JobCardDeliverySettings | undefined>;
+  createJobCardDeliverySettings(settings: InsertJobCardDeliverySettings): Promise<JobCardDeliverySettings>;
+  updateJobCardDeliverySettings(jobCardId: number, settings: Partial<InsertJobCardDeliverySettings>): Promise<JobCardDeliverySettings>;
+  
+  getDeliveryComments(jobCardId: number): Promise<DeliveryComment[]>;
+  createDeliveryComment(comment: InsertDeliveryComment): Promise<DeliveryComment>;
+  updateDeliveryComment(id: number, comment: Partial<InsertDeliveryComment>): Promise<DeliveryComment>;
+  
+  createDeliveryTracking(tracking: InsertDeliveryTracking): Promise<DeliveryTracking>;
+  getDeliveryTracking(jobCardId: number): Promise<DeliveryTracking[]>;
+  
+  // Public delivery page access (no authentication required)
+  getJobCardForDelivery(jobCardId: number): Promise<(JobCard & { client: Client; deliverySettings?: JobCardDeliverySettings }) | undefined>;
+  getJobCardByDeliveryUrl(deliveryUrl: string): Promise<(JobCard & { client: Client; deliverySettings?: JobCardDeliverySettings }) | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -835,6 +860,132 @@ export class DatabaseStorage implements IStorage {
 
   async createJobActivityLog(log: any): Promise<any> {
     return {};
+  }
+
+  // Delivery functionality implementations
+  async getJobCardDeliverySettings(jobCardId: number): Promise<JobCardDeliverySettings | undefined> {
+    const [settings] = await db
+      .select()
+      .from(jobCardDeliverySettings)
+      .where(eq(jobCardDeliverySettings.jobCardId, jobCardId));
+    return settings || undefined;
+  }
+
+  async createJobCardDeliverySettings(settings: InsertJobCardDeliverySettings): Promise<JobCardDeliverySettings> {
+    const [newSettings] = await db
+      .insert(jobCardDeliverySettings)
+      .values(settings)
+      .returning();
+    return newSettings;
+  }
+
+  async updateJobCardDeliverySettings(jobCardId: number, settings: Partial<InsertJobCardDeliverySettings>): Promise<JobCardDeliverySettings> {
+    const [updatedSettings] = await db
+      .update(jobCardDeliverySettings)
+      .set(settings)
+      .where(eq(jobCardDeliverySettings.jobCardId, jobCardId))
+      .returning();
+    return updatedSettings;
+  }
+
+  async getDeliveryComments(jobCardId: number): Promise<DeliveryComment[]> {
+    return await db
+      .select()
+      .from(deliveryComments)
+      .where(eq(deliveryComments.jobCardId, jobCardId))
+      .orderBy(desc(deliveryComments.createdAt));
+  }
+
+  async createDeliveryComment(comment: InsertDeliveryComment): Promise<DeliveryComment> {
+    const [newComment] = await db
+      .insert(deliveryComments)
+      .values(comment)
+      .returning();
+    
+    // If this is a revision request, update job status
+    if (comment.requestRevision) {
+      await db
+        .update(jobCards)
+        .set({ status: "in_revision" })
+        .where(eq(jobCards.id, comment.jobCardId));
+        
+      // Log the revision request
+      await this.createJobActivityLog({
+        jobCardId: comment.jobCardId,
+        action: "revision_requested",
+        details: `Client requested revision: ${comment.comment}`,
+        timestamp: new Date(),
+      });
+    }
+    
+    return newComment;
+  }
+
+  async updateDeliveryComment(id: number, comment: Partial<InsertDeliveryComment>): Promise<DeliveryComment> {
+    const [updatedComment] = await db
+      .update(deliveryComments)
+      .set(comment)
+      .where(eq(deliveryComments.id, id))
+      .returning();
+    return updatedComment;
+  }
+
+  async createDeliveryTracking(tracking: InsertDeliveryTracking): Promise<DeliveryTracking> {
+    const [newTracking] = await db
+      .insert(deliveryTracking)
+      .values(tracking)
+      .returning();
+    return newTracking;
+  }
+
+  async getDeliveryTracking(jobCardId: number): Promise<DeliveryTracking[]> {
+    return await db
+      .select()
+      .from(deliveryTracking)
+      .where(eq(deliveryTracking.jobCardId, jobCardId))
+      .orderBy(desc(deliveryTracking.timestamp));
+  }
+
+  async getJobCardForDelivery(jobCardId: number): Promise<(JobCard & { client: Client; deliverySettings?: JobCardDeliverySettings }) | undefined> {
+    const [result] = await db
+      .select({
+        jobCard: jobCards,
+        client: clients,
+        deliverySettings: jobCardDeliverySettings,
+      })
+      .from(jobCards)
+      .innerJoin(clients, eq(jobCards.clientId, clients.id))
+      .leftJoin(jobCardDeliverySettings, eq(jobCards.id, jobCardDeliverySettings.jobCardId))
+      .where(eq(jobCards.id, jobCardId));
+
+    if (!result) return undefined;
+
+    return {
+      ...result.jobCard,
+      client: result.client,
+      deliverySettings: result.deliverySettings || undefined,
+    } as JobCard & { client: Client; deliverySettings?: JobCardDeliverySettings };
+  }
+
+  async getJobCardByDeliveryUrl(deliveryUrl: string): Promise<(JobCard & { client: Client; deliverySettings?: JobCardDeliverySettings }) | undefined> {
+    const [result] = await db
+      .select({
+        jobCard: jobCards,
+        client: clients,
+        deliverySettings: jobCardDeliverySettings,
+      })
+      .from(jobCardDeliverySettings)
+      .innerJoin(jobCards, eq(jobCardDeliverySettings.jobCardId, jobCards.id))
+      .innerJoin(clients, eq(jobCards.clientId, clients.id))
+      .where(eq(jobCardDeliverySettings.deliveryUrl, deliveryUrl));
+
+    if (!result) return undefined;
+
+    return {
+      ...result.jobCard,
+      client: result.client,
+      deliverySettings: result.deliverySettings,
+    } as JobCard & { client: Client; deliverySettings?: JobCardDeliverySettings };
   }
 }
 

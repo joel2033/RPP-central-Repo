@@ -18,6 +18,7 @@ import EditorPortal from "@/pages/editor-portal";
 import PreDeliveryCheck from "@/pages/qa-review";
 import Calendar from "@/pages/calendar";
 import Delivery from "@/pages/delivery";
+import DeliveryPage from "@/pages/delivery-page";
 import Reports from "@/pages/reports";
 import Settings from "@/pages/settings";
 
@@ -53,6 +54,8 @@ function Router() {
           <Route path="/settings" component={Settings} />
         </>
       )}
+      {/* Public delivery page - no authentication required */}
+      <Route path="/delivery/:jobCardId" component={DeliveryPage} />
       <Route component={NotFound} />
     </Switch>
   );

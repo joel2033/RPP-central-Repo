@@ -785,6 +785,159 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delivery routes (public - no authentication required)
+  app.get("/api/delivery/:jobCardId", async (req, res) => {
+    try {
+      const jobCardId = parseInt(req.params.jobCardId);
+      
+      if (isNaN(jobCardId)) {
+        return res.status(400).json({ message: "Invalid job card ID" });
+      }
+
+      const jobCard = await storage.getJobCardForDelivery(jobCardId);
+      if (!jobCard) {
+        return res.status(404).json({ message: "Job card not found" });
+      }
+
+      // Get production files for this job
+      const files = await storage.getProductionFiles(jobCardId);
+      
+      // Track page view
+      await storage.createDeliveryTracking({
+        jobCardId,
+        actionType: "page_view",
+        clientInfo: {
+          ip: req.ip,
+          userAgent: req.get('User-Agent'),
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      res.json({
+        jobCard,
+        files,
+      });
+    } catch (error) {
+      console.error("Get delivery page error:", error);
+      res.status(500).json({ message: "Failed to get delivery page" });
+    }
+  });
+
+  app.post("/api/delivery/:jobCardId/comment", async (req, res) => {
+    try {
+      const jobCardId = parseInt(req.params.jobCardId);
+      const { clientName, clientEmail, comment, requestRevision } = req.body;
+
+      if (isNaN(jobCardId)) {
+        return res.status(400).json({ message: "Invalid job card ID" });
+      }
+
+      if (!clientName || !clientEmail || !comment) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const newComment = await storage.createDeliveryComment({
+        jobCardId,
+        clientName,
+        clientEmail,
+        comment,
+        requestRevision: requestRevision || false,
+      });
+
+      res.json(newComment);
+    } catch (error) {
+      console.error("Create delivery comment error:", error);
+      res.status(500).json({ message: "Failed to create comment" });
+    }
+  });
+
+  app.post("/api/delivery/:jobCardId/download", async (req, res) => {
+    try {
+      const jobCardId = parseInt(req.params.jobCardId);
+      const { fileName, fileType } = req.body;
+
+      if (isNaN(jobCardId)) {
+        return res.status(400).json({ message: "Invalid job card ID" });
+      }
+
+      // Track download
+      await storage.createDeliveryTracking({
+        jobCardId,
+        actionType: fileName ? "file_download" : "bulk_download",
+        fileName: fileName || null,
+        clientInfo: {
+          ip: req.ip,
+          userAgent: req.get('User-Agent'),
+          fileType: fileType || "unknown",
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      res.json({ message: "Download tracked successfully" });
+    } catch (error) {
+      console.error("Track download error:", error);
+      res.status(500).json({ message: "Failed to track download" });
+    }
+  });
+
+  // Delivery settings routes (authenticated)
+  app.get("/api/jobs/:id/delivery-settings", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      
+      if (isNaN(jobCardId)) {
+        return res.status(400).json({ message: "Invalid job card ID" });
+      }
+
+      const settings = await storage.getJobCardDeliverySettings(jobCardId);
+      res.json(settings);
+    } catch (error) {
+      console.error("Get delivery settings error:", error);
+      res.status(500).json({ message: "Failed to get delivery settings" });
+    }
+  });
+
+  app.post("/api/jobs/:id/delivery-settings", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const settings = req.body;
+
+      if (isNaN(jobCardId)) {
+        return res.status(400).json({ message: "Invalid job card ID" });
+      }
+
+      // Generate delivery URL if not provided
+      if (!settings.deliveryUrl) {
+        settings.deliveryUrl = `job-${jobCardId}-${Date.now()}`;
+      }
+
+      settings.jobCardId = jobCardId;
+
+      const newSettings = await storage.createJobCardDeliverySettings(settings);
+      res.json(newSettings);
+    } catch (error) {
+      console.error("Create delivery settings error:", error);
+      res.status(500).json({ message: "Failed to create delivery settings" });
+    }
+  });
+
+  app.put("/api/jobs/:id/delivery-settings", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const settings = req.body;
+
+      if (isNaN(jobCardId)) {
+        return res.status(400).json({ message: "Invalid job card ID" });
+      }
+
+      const updatedSettings = await storage.updateJobCardDeliverySettings(jobCardId, settings);
+      res.json(updatedSettings);
+    } catch (error) {
+      console.error("Update delivery settings error:", error);
+      res.status(500).json({ message: "Failed to update delivery settings" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
