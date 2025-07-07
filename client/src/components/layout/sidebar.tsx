@@ -19,7 +19,14 @@ import {
   UserPlus,
   CalendarPlus,
   DollarSign,
-  UserCog
+  UserCog,
+  Briefcase,
+  FileText,
+  TrendingUp,
+  Shield,
+  User,
+  MapPin,
+  Truck
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -38,7 +45,13 @@ interface NavSection {
 }
 
 const mainNavigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  {
+    name: "Dashboard",
+    icon: LayoutDashboard,
+    items: [
+      { name: "Overview", href: "/", icon: LayoutDashboard },
+    ]
+  },
 ];
 
 const navigationSections: NavSection[] = [
@@ -47,15 +60,16 @@ const navigationSections: NavSection[] = [
     icon: Users,
     items: [
       { name: "CRM", href: "/clients", icon: Users },
-      { name: "Jobs", href: "/jobs", icon: Camera },
       { name: "Client Preferences", href: "/clients", icon: UserPlus },
     ]
   },
   {
-    name: "Bookings",
-    icon: CalendarPlus,
+    name: "Bookings & Jobs",
+    icon: Briefcase,
     items: [
+      { name: "Calendar", href: "/calendar", icon: Calendar },
       { name: "New Booking", href: "/bookings", icon: CalendarPlus },
+      { name: "Jobs", href: "/jobs", icon: Camera },
     ]
   },
   {
@@ -65,30 +79,46 @@ const navigationSections: NavSection[] = [
       { name: "Upload to Editor", href: "/upload-to-editor", icon: Upload },
       { name: "Editor Dashboard", href: "/editor", icon: Camera },
       { name: "Pre-Delivery Check", href: "/qa-review", icon: Eye },
-      { name: "Revisions Queue", href: "/qa-review", icon: RotateCcw },
+      { name: "Revisions", href: "/qa-review", icon: RotateCcw },
+    ]
+  },
+  {
+    name: "Delivery",
+    icon: Truck,
+    items: [
+      { name: "Delivery Pages", href: "/delivery", icon: Download },
+      { name: "Delivery Settings", href: "/settings", icon: Settings },
     ]
   },
   {
     name: "Reports",
     icon: BarChart3,
     items: [
-      { name: "Analytics", href: "/reports", icon: BarChart3 },
-      { name: "Revenue", href: "/reports", icon: DollarSign },
+      { name: "Job Reports", href: "/reports", icon: FileText },
+      { name: "Revenue Overview", href: "/reports", icon: DollarSign },
+      { name: "Licensee Performance", href: "/reports", icon: TrendingUp },
     ]
   },
   {
-    name: "Settings",
-    icon: Settings,
+    name: "Admin Settings",
+    icon: Shield,
     items: [
-      { name: "General", href: "/settings", icon: Settings },
+      { name: "Business Availability", href: "/settings", icon: MapPin },
       { name: "User Management", href: "/settings", icon: UserCog },
+      { name: "System Preferences", href: "/settings", icon: Settings },
+    ]
+  },
+  {
+    name: "Account",
+    icon: User,
+    items: [
+      { name: "My Profile", href: "/profile", icon: User },
     ]
   },
 ];
 
 const additionalNavigation = [
-  { name: "Calendar", href: "/calendar", icon: Calendar },
-  { name: "Delivery Portal", href: "/delivery", icon: Download },
+  { name: "Sign Out", href: "/api/logout", icon: LogOut },
 ];
 
 export default function Sidebar() {
@@ -96,13 +126,11 @@ export default function Sidebar() {
   const { user } = useAuth();
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => {
     // Initialize with default expanded sections
-    const initial: Record<string, boolean> = {};
-    navigationSections.forEach(section => {
-      if (section.defaultExpanded) {
-        initial[section.name] = true;
-      }
-    });
-    return initial;
+    return {
+      "Dashboard": true,
+      "Bookings & Jobs": true,
+      "Production Hub": false,
+    };
   });
 
   const toggleSection = (sectionName: string) => {
@@ -133,23 +161,59 @@ export default function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {/* Main Navigation */}
-          {mainNavigation.map((item) => {
-            const Icon = item.icon;
+          {/* Main Navigation - Dashboard Section */}
+          {mainNavigation.map((section) => {
+            const SectionIcon = section.icon;
+            const isExpanded = expandedSections[section.name] !== undefined 
+              ? expandedSections[section.name] 
+              : true; // Dashboard is expanded by default
+            
             return (
-              <Link key={item.name} href={item.href}>
+              <div key={section.name}>
                 <button
-                  className={cn(
-                    "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors hover:bg-slate-50",
-                    isActive(item.href)
-                      ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700"
-                      : "text-slate-700 hover:text-slate-900"
-                  )}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleSection(section.name);
+                  }}
+                  className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 rounded-md transition-colors"
                 >
-                  <Icon className="mr-3 h-5 w-5" />
-                  {item.name}
+                  <div className="flex items-center">
+                    <SectionIcon className="mr-3 h-5 w-5" />
+                    {section.name}
+                  </div>
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
                 </button>
-              </Link>
+                
+                {isExpanded && (
+                  <div className="ml-6 mt-1 space-y-1">
+                    {section.items.map((item) => {
+                      const ItemIcon = item.icon;
+                      return (
+                        <Link key={item.name} href={item.href}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                            }}
+                            className={cn(
+                              "w-full flex items-center px-3 py-2 text-sm rounded-md transition-colors hover:bg-slate-50",
+                              isActive(item.href)
+                                ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700"
+                                : "text-slate-600 hover:text-slate-900"
+                            )}
+                          >
+                            <ItemIcon className="mr-3 h-4 w-4" />
+                            {item.name}
+                          </button>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
 
@@ -188,7 +252,6 @@ export default function Sidebar() {
                         <Link key={item.name} href={item.href}>
                           <button
                             onClick={(e) => {
-                              // Don't propagate click to parent section toggle
                               e.stopPropagation();
                             }}
                             className={cn(
@@ -210,58 +273,46 @@ export default function Sidebar() {
             );
           })}
 
-          {/* Additional Navigation */}
+          {/* Additional Navigation - Sign Out */}
           <div className="mt-6 pt-4 border-t border-slate-200">
             {additionalNavigation.map((item) => {
               const Icon = item.icon;
               return (
-                <Link key={item.name} href={item.href}>
-                  <button
-                    className={cn(
-                      "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors hover:bg-slate-50",
-                      isActive(item.href)
-                        ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700"
-                        : "text-slate-700 hover:text-slate-900"
-                    )}
-                  >
-                    <Icon className="mr-3 h-5 w-5" />
-                    {item.name}
-                  </button>
-                </Link>
+                <button
+                  key={item.name}
+                  onClick={() => window.location.href = item.href}
+                  className="w-full flex items-center px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 rounded-md transition-colors"
+                >
+                  <Icon className="mr-3 h-5 w-5" />
+                  {item.name}
+                </button>
               );
             })}
           </div>
         </nav>
 
-        {/* User Profile & Logout */}
-        <div className="border-t border-slate-200 p-4">
-          <div className="flex items-center mb-3">
+        {/* User Profile */}
+        <div className="p-4 border-t border-slate-200">
+          <div className="flex items-center">
             <div className="flex-shrink-0">
               <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                <span className="text-white text-sm font-medium">
-                  {user?.firstName?.charAt(0)?.toUpperCase() || 'U'}
+                <span className="text-sm font-medium text-white">
+                  {user?.firstName?.charAt(0) || user?.email?.charAt(0) || 'U'}
                 </span>
               </div>
             </div>
-            <div className="ml-3 min-w-0">
+            <div className="ml-3 flex-1 min-w-0">
               <p className="text-sm font-medium text-slate-900 truncate">
-                {user?.firstName} {user?.lastName}
+                {user?.firstName && user?.lastName 
+                  ? `${user.firstName} ${user.lastName}`
+                  : user?.email || 'User'
+                }
               </p>
               <p className="text-xs text-slate-500 truncate">
-                {user?.email}
+                {user?.email || ''}
               </p>
             </div>
           </div>
-          
-          <Button
-            onClick={handleLogout}
-            variant="outline"
-            size="sm"
-            className="w-full justify-start"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Sign Out
-          </Button>
         </div>
       </div>
     </div>
