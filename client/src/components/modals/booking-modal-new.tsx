@@ -67,6 +67,12 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
   const [addressCoordinates, setAddressCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   
+  // Debug logging for service updates
+  const handleServiceChange = useCallback((services: string[]) => {
+    console.log('Service change triggered:', services);
+    setSelectedServices(services);
+  }, []);
+  
   const isEditing = !!booking;
   const totalSteps = 3;
 
@@ -96,8 +102,10 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
   });
 
   useEffect(() => {
+    console.log('useEffect triggered, booking:', booking);
     if (booking) {
       const services = booking.services as ("photography" | "drone" | "floor_plans" | "video")[];
+      console.log('Setting services from booking:', services);
       setSelectedServices(services);
       form.reset({
         clientId: booking.clientId,
@@ -111,6 +119,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
         price: booking.price,
       });
     } else {
+      console.log('Resetting services to empty array');
       setSelectedServices([]);
       form.reset({
         clientId: 0,
@@ -124,7 +133,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
         price: "0.00",
       });
     }
-  }, [booking, form]);
+  }, [booking]);
 
   const createBookingMutation = useMutation({
     mutationFn: async (data: z.infer<typeof bookingFormSchema>) => {
@@ -456,7 +465,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
                     }>
                       <ServiceSelection 
                         value={selectedServices}
-                        onChange={setSelectedServices}
+                        onChange={handleServiceChange}
                       />
                       <ServiceValidation selectedCount={selectedServices.length} />
                     </ErrorBoundary>

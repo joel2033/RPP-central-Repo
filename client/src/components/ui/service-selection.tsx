@@ -49,11 +49,15 @@ export default function ServiceSelection({ value, onChange }: ServiceSelectionPr
   ];
 
   const handleToggle = useCallback((serviceValue: string) => {
+    console.log('handleToggle called with:', serviceValue);
+    console.log('Current value:', value);
+    
     const isSelected = value.includes(serviceValue);
     const newServices = isSelected 
       ? value.filter(v => v !== serviceValue)
       : [...value, serviceValue];
     
+    console.log('New services:', newServices);
     onChange(newServices);
   }, [value, onChange]);
 
