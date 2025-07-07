@@ -30,7 +30,7 @@ interface JobCardWithDetails extends JobCard {
 
 export default function PreDeliveryCheck() {
   const { toast } = useToast();
-  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const [selectedJobCard, setSelectedJobCard] = useState<JobCardWithDetails | null>(null);
   const [revisionNotes, setRevisionNotes] = useState("");
@@ -47,20 +47,7 @@ export default function PreDeliveryCheck() {
       }, 500);
       return;
     }
-    
-    // Check if user has permission (only admins and VAs)
-    if (isAuthenticated && user && !['admin', 'va'].includes(user.role)) {
-      toast({
-        title: "Access Denied",
-        description: "You don't have permission to access Pre-Delivery Check.",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/";
-      }, 1000);
-      return;
-    }
-  }, [isAuthenticated, authLoading, user, toast]);
+  }, [isAuthenticated, authLoading, toast]);
 
   const { data: qaJobCards, isLoading } = useQuery<JobCardWithDetails[]>({
     queryKey: ["/api/job-cards", "qa"],
@@ -155,25 +142,6 @@ export default function PreDeliveryCheck() {
 
   const getFinalFiles = (files: ProductionFile[]) => 
     files?.filter(file => file.mediaType === "final") || [];
-
-  // Show unauthorized message if user doesn't have permission
-  if (isAuthenticated && user && !['admin', 'va'].includes(user.role)) {
-    return (
-      <div className="flex min-h-screen bg-slate-50">
-        <Sidebar />
-        <div className="flex-1 ml-64">
-          <TopBar title="Access Denied" />
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-red-600 mb-2">Access Denied</h2>
-              <p className="text-gray-600">You don't have permission to access Pre-Delivery Check.</p>
-              <p className="text-sm text-gray-500 mt-2">Only Admins and VAs can access this section.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (authLoading || isLoading) {
     return (
