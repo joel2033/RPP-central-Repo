@@ -81,6 +81,7 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
         exclusiveClients: product.exclusiveClients || [],
         isActive: product.isActive,
         showOnBookingForm: product.showOnBookingForm,
+        showOnCustomerBookingForm: product.showOnCustomerBookingForm || false,
       });
       // Convert old variations format to new variant format if needed
       const productVariants = Array.isArray(product.variations) 
@@ -109,6 +110,7 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
         exclusiveClients: [],
         isActive: true,
         showOnBookingForm: false,
+        showOnCustomerBookingForm: false,
       });
       setVariants([{ name: "", price: 0 }]);
       setExclusiveClients([]);
@@ -509,7 +511,25 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
                           />
                         </FormControl>
                         <div className="space-y-1 leading-none">
-                          <FormLabel>Show on Booking Form</FormLabel>
+                          <FormLabel>Show on Internal Booking Form</FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="showOnCustomerBookingForm"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Add to Customer Booking Form</FormLabel>
                         </div>
                       </FormItem>
                     )}

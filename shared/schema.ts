@@ -630,6 +630,7 @@ export const products = pgTable("products", {
   exclusiveClients: text("exclusive_clients").array().default([]),
   isActive: boolean("is_active").default(true),
   showOnBookingForm: boolean("show_on_booking_form").default(false),
+  showOnCustomerBookingForm: boolean("show_on_customer_booking_form").default(false),
   licenseeId: text("licensee_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

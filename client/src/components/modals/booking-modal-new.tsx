@@ -86,7 +86,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
   }, []);
   
   const isEditing = !!booking;
-  const totalSteps = 3;
+  const totalSteps = 4;
 
   const form = useForm<z.infer<typeof bookingFormSchema>>({
     resolver: zodResolver(bookingFormSchema),
@@ -102,6 +102,11 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
       price: "0.00",
     },
   });
+
+  const handleTotalPriceChange = useCallback((totalPrice: number) => {
+    console.log('Total price change triggered:', totalPrice);
+    form.setValue('price', totalPrice.toFixed(2));
+  }, [form]);
 
   // Load clients
   const { data: clients } = useQuery<Client[]>({
@@ -480,6 +485,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
                         value={selectedServices}
                         onChange={handleServiceChange}
                         onProductsChange={handleProductsChange}
+                        onTotalPriceChange={handleTotalPriceChange}
                       />
                       <ServiceValidation selectedCount={selectedServices.length} />
                     </ErrorBoundary>
@@ -519,8 +525,8 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
               </div>
             )}
 
-            {/* Step 3: Order Summary */}
-            {currentStep === 3 && (
+            {/* Step 4: Order Summary */}
+            {currentStep === 4 && (
               <div className="space-y-6">
                 <Card>
                   <CardHeader>

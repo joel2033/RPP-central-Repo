@@ -24,9 +24,10 @@ interface ServiceSelectionProps {
   value: string[];
   onChange: (services: string[]) => void;
   onProductsChange?: (products: SelectedService[]) => void;
+  onTotalPriceChange?: (totalPrice: number) => void;
 }
 
-export default function ServiceSelection({ value, onChange, onProductsChange }: ServiceSelectionProps) {
+export default function ServiceSelection({ value, onChange, onProductsChange, onTotalPriceChange }: ServiceSelectionProps) {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<SelectedService[]>([]);
@@ -36,10 +37,8 @@ export default function ServiceSelection({ value, onChange, onProductsChange }: 
     queryKey: ["/api/products"],
   });
 
-  // Filter products to show only active ones marked for booking form
-  const availableProducts = products?.filter(product => 
-    product.isActive && product.showOnBookingForm
-  ) || [];
+  // For internal booking form, show all products (no filtering)
+  const availableProducts = products || [];
 
   // Filter products based on search
   const filteredProducts = availableProducts.filter(product =>
@@ -67,6 +66,9 @@ export default function ServiceSelection({ value, onChange, onProductsChange }: 
       setSelectedProducts(newProducts);
       onChange(newProducts.map(p => p.productId));
       onProductsChange?.(newProducts);
+      // Calculate total price and notify parent
+      const totalPrice = newProducts.reduce((sum, p) => sum + p.price, 0);
+      onTotalPriceChange?.(totalPrice);
     } else {
       // Add product
       const newProduct: SelectedService = {
@@ -79,6 +81,9 @@ export default function ServiceSelection({ value, onChange, onProductsChange }: 
       setSelectedProducts(newProducts);
       onChange(newProducts.map(p => p.productId));
       onProductsChange?.(newProducts);
+      // Calculate total price and notify parent
+      const totalPrice = newProducts.reduce((sum, p) => sum + p.price, 0);
+      onTotalPriceChange?.(totalPrice);
     }
   };
 
@@ -90,6 +95,9 @@ export default function ServiceSelection({ value, onChange, onProductsChange }: 
     );
     setSelectedProducts(newProducts);
     onProductsChange?.(newProducts);
+    // Calculate total price and notify parent
+    const totalPrice = newProducts.reduce((sum, p) => sum + p.price, 0);
+    onTotalPriceChange?.(totalPrice);
   };
 
   const isProductSelected = (productId: string) => {
