@@ -68,6 +68,12 @@ export const jobCardStatusEnum = pgEnum("job_card_status", ["unassigned", "in_pr
 export const mediaTypeEnum = pgEnum("media_type", ["raw", "edited", "final"]);
 export const serviceCategoryEnum = pgEnum("service_category", ["photography", "floor_plan", "drone", "video"]);
 
+// Job status enum - extended for better tracking 
+export const jobStatusExtendedEnum = pgEnum("job_status_extended", [
+  "upcoming", "booked", "in_progress", "editing", "ready_for_qa", 
+  "in_revision", "delivered", "completed", "cancelled"
+]);
+
 // Bookings table
 export const bookings = pgTable("bookings", {
   id: serial("id").primaryKey(),
@@ -133,6 +139,7 @@ export const jobCards = pgTable("job_cards", {
   photographerId: varchar("photographer_id"),
   editorId: varchar("editor_id"),
   status: jobCardStatusEnum("status").default("unassigned"),
+  jobStatus: jobStatusExtendedEnum("job_status").default("upcoming"), // User-facing job status
   requestedServices: jsonb("requested_services").notNull(), // Array of services
   editingNotes: text("editing_notes"), // Auto-filled from client preferences
   revisionNotes: text("revision_notes"), // QA revision notes
@@ -171,6 +178,17 @@ export const productionNotifications = pgTable("production_notifications", {
   type: varchar("type", { length: 50 }).notNull(), // assignment, completion, revision
   message: text("message").notNull(),
   isRead: boolean("is_read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Activity Log table for job tracking
+export const jobActivityLog = pgTable("job_activity_log", {
+  id: serial("id").primaryKey(),
+  jobCardId: integer("job_card_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  action: varchar("action", { length: 100 }).notNull(), // booking_created, files_uploaded, sent_to_editor, delivered, revision_requested, etc.
+  description: text("description").notNull(),
+  metadata: jsonb("metadata"), // Additional context data
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -477,6 +495,9 @@ export type InsertProductionFile = z.infer<typeof insertProductionFileSchema>;
 export type ProductionFile = typeof productionFiles.$inferSelect;
 export type InsertProductionNotification = z.infer<typeof insertProductionNotificationSchema>;
 export type ProductionNotification = typeof productionNotifications.$inferSelect;
+
+export type InsertJobActivityLog = typeof jobActivityLog.$inferInsert;
+export type JobActivityLog = typeof jobActivityLog.$inferSelect;
 
 // Calendar types
 export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;

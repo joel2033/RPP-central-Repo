@@ -106,6 +106,10 @@ export interface IStorage {
   createNotification(notification: InsertProductionNotification): Promise<ProductionNotification>;
   markNotificationAsRead(id: number): Promise<void>;
   
+  // Activity Log - simplified for now
+  getJobActivityLog(jobCardId: number): Promise<any[]>;
+  createJobActivityLog(log: any): Promise<any>;
+  
   // Calendar Events
   getCalendarEvents(licenseeId: string, photographerId?: string): Promise<CalendarEvent[]>;
   createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent>;
@@ -784,6 +788,15 @@ export class DatabaseStorage implements IStorage {
       .where(eq(calendarEvents.id, parseInt(log.eventId)));
     
     return event;
+  }
+
+  // Activity Log operations - placeholder for now, will implement properly once schema is fixed
+  async getJobActivityLog(jobCardId: number): Promise<any[]> {
+    return [];
+  }
+
+  async createJobActivityLog(log: any): Promise<any> {
+    return {};
   }
 }
 

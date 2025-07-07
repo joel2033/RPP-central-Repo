@@ -273,6 +273,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Jobs API (user-facing jobs management)
+  app.get("/api/jobs", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const jobCards = await storage.getJobCards(req.user!.licenseeId);
+      
+      // Enhance job cards with booking details for the jobs page
+      const jobsWithBookings = await Promise.all(
+        jobCards.map(async (jobCard) => {
+          const booking = await storage.getBooking(jobCard.bookingId, req.user!.licenseeId);
+          return {
+            ...jobCard,
+            booking: booking || {
+              id: jobCard.bookingId,
+              propertyAddress: "Unknown Address", 
+              scheduledDate: new Date().toISOString(),
+              scheduledTime: "09:00",
+              services: [],
+              totalPrice: 0
+            }
+          };
+        })
+      );
+      
+      res.json(jobsWithBookings);
+    } catch (error) {
+      console.error("Failed to fetch jobs:", error);
+      res.status(500).json({ message: "Failed to fetch jobs" });
+    }
+  });
+
+  app.get("/api/jobs/:id", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const jobId = parseInt(req.params.id);
+      const jobCard = await storage.getJobCard(jobId, req.user!.licenseeId);
+      
+      if (!jobCard) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+      
+      // Get booking details
+      const booking = await storage.getBooking(jobCard.bookingId, req.user!.licenseeId);
+      
+      res.json({
+        ...jobCard,
+        booking: booking || {
+          id: jobCard.bookingId,
+          propertyAddress: "Unknown Address",
+          scheduledDate: new Date().toISOString(), 
+          scheduledTime: "09:00",
+          services: [],
+          totalPrice: 0
+        }
+      });
+    } catch (error) {
+      console.error("Failed to fetch job:", error);
+      res.status(500).json({ message: "Failed to fetch job" });
+    }
+  });
+
+  app.get("/api/jobs/:id/files", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const jobId = parseInt(req.params.id);
+      const files = await storage.getProductionFiles(jobId);
+      res.json(files);
+    } catch (error) {
+      console.error("Failed to fetch job files:", error);
+      res.status(500).json({ message: "Failed to fetch job files" });
+    }
+  });
+
+  app.get("/api/jobs/:id/activity", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const jobId = parseInt(req.params.id);
+      const activityLog = await storage.getJobActivityLog(jobId);
+      res.json(activityLog);
+    } catch (error) {
+      console.error("Failed to fetch job activity:", error);
+      res.status(500).json({ message: "Failed to fetch job activity" });
+    }
+  });
+
   // Job Cards routes (admin/licensee access)
   app.get('/api/job-cards', isAuthenticated, requireAdmin, async (req: any, res) => {
     try {
