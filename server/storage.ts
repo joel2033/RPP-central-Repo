@@ -262,6 +262,7 @@ export class DatabaseStorage implements IStorage {
       photographerId: newBooking.photographerId,
       requestedServices: newBooking.services,
       status: "unassigned",
+      jobStatus: "upcoming", // Set initial job status
       licenseeId: newBooking.licenseeId,
     };
 
@@ -276,7 +277,41 @@ export class DatabaseStorage implements IStorage {
       jobCardData.editingNotes = JSON.stringify(client[0].editingPreferences);
     }
 
-    await this.createJobCard(jobCardData);
+    const jobCard = await this.createJobCard(jobCardData);
+    
+    // Create calendar event for the booking
+    try {
+      const startDateTime = new Date(`${newBooking.scheduledDate}T${newBooking.scheduledTime}`);
+      const endDateTime = new Date(startDateTime);
+      endDateTime.setMinutes(endDateTime.getMinutes() + (newBooking.duration || 60));
+
+      const calendarEventData: InsertCalendarEvent = {
+        title: `${newBooking.propertyAddress} - ${client[0]?.name || 'Photography Session'}`,
+        description: `Photography booking for ${newBooking.propertyAddress}. Services: ${newBooking.services?.join(', ') || 'N/A'}`,
+        start: startDateTime,
+        end: endDateTime,
+        allDay: false,
+        type: 'job',
+        photographerId: newBooking.photographerId,
+        licenseeId: newBooking.licenseeId,
+        bookingId: newBooking.id,
+        createdBy: newBooking.licenseeId,
+      };
+
+      await this.createCalendarEvent(calendarEventData);
+      
+      // Create initial activity log entry
+      await this.createJobActivityLog({
+        jobCardId: jobCard.id,
+        userId: booking.licenseeId,
+        action: "booking_created",
+        description: "Job created from booking and added to calendar"
+      });
+      
+    } catch (error) {
+      console.error("Failed to create calendar event or activity log:", error);
+      // Don't fail the booking creation if calendar event fails
+    }
     
     return newBooking;
   }
