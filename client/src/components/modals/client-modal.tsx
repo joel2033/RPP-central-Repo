@@ -3,13 +3,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { isUnauthorizedError } from "@/lib/authUtils";
 import { useToast } from "@/hooks/use-toast";
-import { insertClientSchema, type Client, type InsertClient } from "@shared/schema";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -21,9 +22,14 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { insertClientSchema, type Client } from "@shared/schema";
+import { z } from "zod";
 
 interface ClientModalProps {
   isOpen: boolean;
@@ -31,31 +37,48 @@ interface ClientModalProps {
   client: Client | null;
 }
 
+const clientFormSchema = insertClientSchema.omit({ 
+  licenseeId: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+type ClientFormData = z.infer<typeof clientFormSchema>;
+
 export default function ClientModal({ isOpen, onClose, client }: ClientModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [expandedSections, setExpandedSections] = useState({
+    customerDetails: true,
+    billingPreferences: false,
+    teamMembers: false,
+    customerNotes: false,
+    editingPreferences: false,
+  });
+
   const isEditing = !!client;
 
-  const form = useForm<InsertClient>({
-    resolver: zodResolver(insertClientSchema.omit({ licenseeId: true })),
+  const form = useForm<ClientFormData>({
+    resolver: zodResolver(clientFormSchema),
     defaultValues: {
       name: "",
       email: "",
       phone: "",
       address: "",
       contactName: "",
+      editingPreferences: "",
     },
   });
 
-  // Update form when client changes
   useEffect(() => {
     if (client) {
       form.reset({
-        name: client.name,
+        name: client.name || "",
         email: client.email || "",
         phone: client.phone || "",
         address: client.address || "",
         contactName: client.contactName || "",
+        editingPreferences: client.editingPreferences || "",
       });
     } else {
       form.reset({
@@ -64,36 +87,27 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
         phone: "",
         address: "",
         contactName: "",
+        editingPreferences: "",
       });
     }
   }, [client, form]);
 
   const createClientMutation = useMutation({
-    mutationFn: async (data: InsertClient) => {
-      const response = await apiRequest("POST", "/api/clients", data);
-      return response.json();
+    mutationFn: async (data: ClientFormData) => {
+      return apiRequest("/api/clients", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
         title: "Success",
         description: "Client created successfully",
       });
-      onClose();
-      form.reset();
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      handleClose();
     },
-    onError: (error: Error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
+    onError: (error) => {
       toast({
         title: "Error",
         description: "Failed to create client",
@@ -103,30 +117,21 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
   });
 
   const updateClientMutation = useMutation({
-    mutationFn: async (data: InsertClient) => {
-      const response = await apiRequest("PUT", `/api/clients/${client!.id}`, data);
-      return response.json();
+    mutationFn: async (data: ClientFormData) => {
+      return apiRequest(`/api/clients/${client?.id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
         title: "Success",
         description: "Client updated successfully",
       });
-      onClose();
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      handleClose();
     },
-    onError: (error: Error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
+    onError: (error) => {
       toast({
         title: "Error",
         description: "Failed to update client",
@@ -135,7 +140,19 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
     },
   });
 
-  const onSubmit = (data: InsertClient) => {
+  const handleClose = () => {
+    form.reset();
+    setExpandedSections({
+      customerDetails: true,
+      billingPreferences: false,
+      teamMembers: false,
+      customerNotes: false,
+      editingPreferences: false,
+    });
+    onClose();
+  };
+
+  const onSubmit = (data: ClientFormData) => {
     if (isEditing) {
       updateClientMutation.mutate(data);
     } else {
@@ -143,94 +160,215 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
     }
   };
 
-  const handleClose = () => {
-    onClose();
-    form.reset();
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit Client" : "Add New Client"}</DialogTitle>
-          <DialogDescription>
-            {isEditing ? "Update client information" : "Add a new real estate agency client"}
-          </DialogDescription>
+          <DialogTitle>
+            {isEditing ? "Edit Client" : "Add New Client"}
+          </DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Client Name *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., Sunrise Realty" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Customer Details */}
+            <Collapsible 
+              open={expandedSections.customerDetails}
+              onOpenChange={() => toggleSection('customerDetails')}
+            >
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" className="w-full justify-between p-0 font-semibold">
+                  <span>Customer Details</span>
+                  {expandedSections.customerDetails ? 
+                    <ChevronDown className="h-4 w-4" /> : 
+                    <ChevronRight className="h-4 w-4" />
+                  }
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Business Name *</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Enter business name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-            <FormField
-              control={form.control}
-              name="contactName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Contact Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., John Smith" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                  <FormField
+                    control={form.control}
+                    name="contactName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Contact Person</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Primary contact name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input type="email" placeholder="contact@client.com" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email Address *</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="email" placeholder="client@email.com" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-            <FormField
-              control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phone</FormLabel>
-                  <FormControl>
-                    <Input placeholder="+1 (555) 123-4567" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone Number</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Phone number" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-            <FormField
-              control={form.control}
-              name="address"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Address</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Business address" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Business Address</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Business address" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CollapsibleContent>
+            </Collapsible>
 
-            <div className="flex justify-end space-x-3 pt-4">
+            {/* Editing Preferences */}
+            <Collapsible 
+              open={expandedSections.editingPreferences}
+              onOpenChange={() => toggleSection('editingPreferences')}
+            >
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" className="w-full justify-between p-0 font-semibold">
+                  <span>Editing Preferences</span>
+                  {expandedSections.editingPreferences ? 
+                    <ChevronDown className="h-4 w-4" /> : 
+                    <ChevronRight className="h-4 w-4" />
+                  }
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 mt-4">
+                <FormField
+                  control={form.control}
+                  name="editingPreferences"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Client Editing Preferences</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          {...field} 
+                          placeholder="Enter specific editing preferences, style requirements, or special instructions for this client's jobs..."
+                          rows={4}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* Billing Preferences */}
+            <Collapsible 
+              open={expandedSections.billingPreferences}
+              onOpenChange={() => toggleSection('billingPreferences')}
+            >
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" className="w-full justify-between p-0 font-semibold">
+                  <span>Billing Preferences (Optional)</span>
+                  {expandedSections.billingPreferences ? 
+                    <ChevronDown className="h-4 w-4" /> : 
+                    <ChevronRight className="h-4 w-4" />
+                  }
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 mt-4">
+                <div className="text-sm text-gray-600 p-3 bg-gray-50 rounded">
+                  Billing preferences will be available in future updates
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* Team Members */}
+            <Collapsible 
+              open={expandedSections.teamMembers}
+              onOpenChange={() => toggleSection('teamMembers')}
+            >
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" className="w-full justify-between p-0 font-semibold">
+                  <span>Team Members (Optional)</span>
+                  {expandedSections.teamMembers ? 
+                    <ChevronDown className="h-4 w-4" /> : 
+                    <ChevronRight className="h-4 w-4" />
+                  }
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 mt-4">
+                <div className="text-sm text-gray-600 p-3 bg-gray-50 rounded">
+                  Team member management will be available in future updates
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* Customer Notes */}
+            <Collapsible 
+              open={expandedSections.customerNotes}
+              onOpenChange={() => toggleSection('customerNotes')}
+            >
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" className="w-full justify-between p-0 font-semibold">
+                  <span>Customer Notes (Optional)</span>
+                  {expandedSections.customerNotes ? 
+                    <ChevronDown className="h-4 w-4" /> : 
+                    <ChevronRight className="h-4 w-4" />
+                  }
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 mt-4">
+                <div className="text-sm text-gray-600 p-3 bg-gray-50 rounded">
+                  Customer notes functionality will be available in future updates
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* Form Actions */}
+            <div className="flex justify-end space-x-3 pt-4 border-t">
               <Button type="button" variant="outline" onClick={handleClose}>
                 Cancel
               </Button>

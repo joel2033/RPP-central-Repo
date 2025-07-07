@@ -32,6 +32,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MapPin, Calendar, Clock, Camera, Home, Video, ChevronLeft, ChevronRight, Mail } from "lucide-react";
 import { z } from "zod";
 
 interface BookingWithDetails extends Booking {
