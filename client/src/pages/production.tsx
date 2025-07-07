@@ -55,7 +55,7 @@ export default function Production() {
   const { data: jobCards, isLoading } = useQuery<JobCardWithDetails[]>({
     queryKey: ["/api/job-cards", statusFilter],
     queryFn: async () => {
-      const url = statusFilter ? `/api/job-cards?status=${statusFilter}` : "/api/job-cards";
+      const url = statusFilter && statusFilter !== "all" ? `/api/job-cards?status=${statusFilter}` : "/api/job-cards";
       const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch job cards");
       return response.json();
@@ -182,7 +182,7 @@ export default function Production() {
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Status</SelectItem>
+                <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="unassigned">Unassigned</SelectItem>
                 <SelectItem value="in_progress">In Progress</SelectItem>
                 <SelectItem value="editing">Editing</SelectItem>
