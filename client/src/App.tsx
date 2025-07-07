@@ -21,6 +21,7 @@ import Delivery from "@/pages/delivery";
 import DeliveryPage from "@/pages/delivery-page";
 import Reports from "@/pages/reports";
 import Settings from "@/pages/settings";
+import Products from "@/pages/products";
 
 function Router() {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -52,6 +53,7 @@ function Router() {
           <Route path="/delivery" component={Delivery} />
           <Route path="/reports" component={Reports} />
           <Route path="/settings" component={Settings} />
+          <Route path="/products" component={Products} />
         </>
       )}
       {/* Public delivery page - no authentication required */}

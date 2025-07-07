@@ -12,6 +12,7 @@ import {
   boolean,
   date,
   pgEnum,
+  uuid,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -611,3 +612,35 @@ export type InsertDeliveryTracking = z.infer<typeof insertDeliveryTrackingSchema
 export type DeliveryTracking = typeof deliveryTracking.$inferSelect;
 export type InsertJobCardDeliverySettings = z.infer<typeof insertJobCardDeliverySettingsSchema>;
 export type JobCardDeliverySettings = typeof jobCardDeliverySettings.$inferSelect;
+
+// Products
+export const products = pgTable("products", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  title: text("title").notNull(),
+  type: text("type").notNull(), // 'product' | 'package' | 'addon'
+  description: text("description"),
+  image: text("image"), // URL or file path
+  category: text("category"),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  taxRate: text("tax_rate").notNull().default("GST 10%"), // 'GST 10%' | '0%' | etc
+  variations: jsonb("variations").default([]), // Array of variation objects
+  isDigital: boolean("is_digital").default(true),
+  requiresOnsite: boolean("requires_onsite").default(false),
+  exclusiveClients: text("exclusive_clients").array().default([]),
+  isActive: boolean("is_active").default(true),
+  showOnBookingForm: boolean("show_on_booking_form").default(false),
+  licenseeId: text("licensee_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Product schemas
+export const insertProductSchema = createInsertSchema(products).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+// Product types
+export type InsertProduct = z.infer<typeof insertProductSchema>;
+export type Product = typeof products.$inferSelect;

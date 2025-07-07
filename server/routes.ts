@@ -11,7 +11,8 @@ import {
   insertProductionNotificationSchema,
   insertCalendarEventSchema,
   insertBusinessSettingsSchema,
-  insertGoogleCalendarIntegrationSchema
+  insertGoogleCalendarIntegrationSchema,
+  insertProductSchema
 } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
@@ -994,6 +995,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating job status:", error);
       res.status(500).json({ message: "Failed to update job status" });
+    }
+  });
+
+  // Product Management Routes
+  app.get("/api/products", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      const products = await storage.getProducts(licenseeId);
+      res.json(products);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      res.status(500).json({ message: "Failed to fetch products" });
+    }
+  });
+
+  app.get("/api/products/:id", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      const product = await storage.getProduct(req.params.id, licenseeId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      res.json(product);
+    } catch (error) {
+      console.error("Error fetching product:", error);
+      res.status(500).json({ message: "Failed to fetch product" });
+    }
+  });
+
+  app.post("/api/products", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      const productData = insertProductSchema.parse({ ...req.body, licenseeId });
+      const product = await storage.createProduct(productData);
+      res.json(product);
+    } catch (error) {
+      console.error("Error creating product:", error);
+      res.status(500).json({ message: "Failed to create product" });
+    }
+  });
+
+  app.put("/api/products/:id", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      const productData = insertProductSchema.partial().parse(req.body);
+      const product = await storage.updateProduct(req.params.id, productData, licenseeId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      res.json(product);
+    } catch (error) {
+      console.error("Error updating product:", error);
+      res.status(500).json({ message: "Failed to update product" });
+    }
+  });
+
+  app.delete("/api/products/:id", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      await storage.deleteProduct(req.params.id, licenseeId);
+      res.json({ message: "Product deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      res.status(500).json({ message: "Failed to delete product" });
     }
   });
 

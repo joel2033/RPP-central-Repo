@@ -26,7 +26,9 @@ import {
   Shield,
   User,
   MapPin,
-  Truck
+  Truck,
+  Package,
+  Box
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -96,6 +98,14 @@ const navigationSections: NavSection[] = [
       { name: "Job Reports", href: "/reports", icon: FileText },
       { name: "Revenue Overview", href: "/reports", icon: DollarSign },
       { name: "Licensee Performance", href: "/reports", icon: TrendingUp },
+    ]
+  },
+  {
+    name: "Products",
+    icon: Package,
+    items: [
+      { name: "Product Management", href: "/products", icon: Package },
+      { name: "Service Catalog", href: "/products", icon: Box },
     ]
   },
   {

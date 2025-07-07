@@ -47,6 +47,9 @@ import {
   type InsertDeliveryTracking,
   type JobCardDeliverySettings,
   type InsertJobCardDeliverySettings,
+  products,
+  type Product,
+  type InsertProduct,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, count } from "drizzle-orm";
@@ -155,6 +158,13 @@ export interface IStorage {
   // Public delivery page access (no authentication required)
   getJobCardForDelivery(jobCardId: number): Promise<(JobCard & { client: Client; deliverySettings?: JobCardDeliverySettings }) | undefined>;
   getJobCardByDeliveryUrl(deliveryUrl: string): Promise<(JobCard & { client: Client; deliverySettings?: JobCardDeliverySettings }) | undefined>;
+  
+  // Product operations
+  getProducts(licenseeId: string): Promise<Product[]>;
+  getProduct(id: string, licenseeId: string): Promise<Product | undefined>;
+  createProduct(product: InsertProduct): Promise<Product>;
+  updateProduct(id: string, product: Partial<InsertProduct>, licenseeId: string): Promise<Product>;
+  deleteProduct(id: string, licenseeId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -986,6 +996,35 @@ export class DatabaseStorage implements IStorage {
       client: result.client,
       deliverySettings: result.deliverySettings,
     } as JobCard & { client: Client; deliverySettings?: JobCardDeliverySettings };
+  }
+
+  // Product operations
+  async getProducts(licenseeId: string): Promise<Product[]> {
+    return await db.select().from(products).where(eq(products.licenseeId, licenseeId));
+  }
+
+  async getProduct(id: string, licenseeId: string): Promise<Product | undefined> {
+    const [product] = await db.select().from(products)
+      .where(and(eq(products.id, id), eq(products.licenseeId, licenseeId)));
+    return product || undefined;
+  }
+
+  async createProduct(product: InsertProduct): Promise<Product> {
+    const [newProduct] = await db.insert(products).values(product).returning();
+    return newProduct;
+  }
+
+  async updateProduct(id: string, product: Partial<InsertProduct>, licenseeId: string): Promise<Product> {
+    const [updatedProduct] = await db.update(products)
+      .set({ ...product, updatedAt: new Date() })
+      .where(and(eq(products.id, id), eq(products.licenseeId, licenseeId)))
+      .returning();
+    return updatedProduct;
+  }
+
+  async deleteProduct(id: string, licenseeId: string): Promise<void> {
+    await db.delete(products)
+      .where(and(eq(products.id, id), eq(products.licenseeId, licenseeId)));
   }
 }
 
