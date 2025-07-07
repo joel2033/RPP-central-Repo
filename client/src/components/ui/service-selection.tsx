@@ -221,7 +221,7 @@ export default function ServiceSelection({ value, onChange, onProductsChange, on
                           <Select 
                             value={selectedProduct.variantId || ""}
                             onValueChange={(variantId) => {
-                              const variant = product.variations.find((v: any) => v.id === variantId);
+                              const variant = product.variations[parseInt(variantId)];
                               if (variant) {
                                 handleVariantSelect(
                                   product.id, 
@@ -237,7 +237,7 @@ export default function ServiceSelection({ value, onChange, onProductsChange, on
                             </SelectTrigger>
                             <SelectContent>
                               {product.variations.map((variant: any, index: number) => (
-                                <SelectItem key={index} value={variant.id || index.toString()}>
+                                <SelectItem key={index} value={index.toString()}>
                                   {variant.name} - ${variant.price || product.price}
                                 </SelectItem>
                               ))}
