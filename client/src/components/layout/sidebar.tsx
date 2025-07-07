@@ -61,7 +61,6 @@ const navigationSections: NavSection[] = [
   {
     name: "Production Hub",
     icon: FolderOpen,
-    defaultExpanded: true,
     items: [
       { name: "Upload to Editor", href: "/upload-to-editor", icon: Upload },
       { name: "Editor Dashboard", href: "/editor", icon: Camera },

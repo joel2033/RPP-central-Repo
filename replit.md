@@ -163,6 +163,14 @@ Changelog:
     * Download raw files, upload final files, and job completion workflow
     * Clean editor interface with job statistics and status management
     * Secure file download and upload functionality for editor workflow
+- July 07, 2025. Added comprehensive Calendar Module with Google Calendar integration:
+  - Implemented FullCalendar with Month/Week/Day views and photographer availability management
+  - Built two-way Google Calendar synchronization with OAuth integration
+  - Added business settings for hours configuration and scheduling rules
+  - Created event management with color-coded types (Jobs, Unavailable, External, Holidays)
+  - Fixed navigation bugs: Production Hub dropdown now only expands when directly clicked
+  - Enhanced button responsiveness with proper event handling and hover effects
+  - Resolved SelectItem errors and improved overall UI interaction reliability
 ```
 
 ## User Preferences
