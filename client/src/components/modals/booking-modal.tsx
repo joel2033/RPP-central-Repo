@@ -393,7 +393,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
                     <SelectContent>
                       <SelectItem value="none">No photographer assigned</SelectItem>
                       {photographers?.map((photographer) => (
-                        <SelectItem key={photographer.id} value={photographer.id}>
+                        <SelectItem key={photographer.id} value={photographer.id || "none"}>
                           {photographer.firstName} {photographer.lastName}
                         </SelectItem>
                       ))}
