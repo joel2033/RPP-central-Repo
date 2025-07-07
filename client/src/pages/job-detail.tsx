@@ -140,18 +140,26 @@ export default function JobDetailPage() {
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   
+  console.log("Job Detail Page - ID from params:", id);
+  
   const [activeTab, setActiveTab] = useState("photos");
   const [showActivity, setShowActivity] = useState(false);
   const [editingPreferences, setEditingPreferences] = useState(false);
   const [preferencesText, setPreferencesText] = useState("");
 
   // Fetch job details
-  const { data: job, isLoading } = useQuery<JobDetail>({
+  const { data: job, isLoading, error } = useQuery<JobDetail>({
     queryKey: ["/api/jobs", id],
     queryFn: async () => {
+      console.log("Fetching job details for ID:", id);
       const response = await fetch(`/api/jobs/${id}`);
-      if (!response.ok) throw new Error("Failed to fetch job details");
-      return response.json();
+      if (!response.ok) {
+        console.error("Failed to fetch job:", response.status, response.statusText);
+        throw new Error("Failed to fetch job details");
+      }
+      const data = await response.json();
+      console.log("Received job data:", data);
+      return data;
     },
     enabled: isAuthenticated && !!id,
   });
@@ -219,6 +227,24 @@ export default function JobDetailPage() {
           <TopBar />
           <div className="flex-1 flex items-center justify-center">
             <div className="text-lg">Loading job details...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-screen bg-slate-50">
+        <Sidebar />
+        <div className="flex-1 flex flex-col ml-64">
+          <TopBar />
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <div className="text-lg text-red-600 mb-2">Failed to load job details</div>
+              <p className="text-gray-600">Job ID: {id}</p>
+              <p className="text-sm text-gray-500 mt-2">{error.message}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -440,7 +466,7 @@ export default function JobDetailPage() {
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-600">Total</span>
                         <span className="font-semibold text-gray-900">
-                          ${job.booking.totalPrice.toFixed(2)}
+                          ${job.booking?.totalPrice ? Number(job.booking.totalPrice).toFixed(2) : '0.00'}
                         </span>
                       </div>
                       <Button variant="outline" size="sm" className="w-full">
