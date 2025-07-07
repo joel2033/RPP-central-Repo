@@ -95,8 +95,15 @@ const additionalNavigation = [
 export default function Sidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    "Production Hub": true, // Default expanded
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => {
+    // Initialize with default expanded sections
+    const initial: Record<string, boolean> = {};
+    navigationSections.forEach(section => {
+      if (section.defaultExpanded) {
+        initial[section.name] = true;
+      }
+    });
+    return initial;
   });
 
   const toggleSection = (sectionName: string) => {
@@ -150,7 +157,9 @@ export default function Sidebar() {
           {/* Collapsible Sections */}
           {navigationSections.map((section) => {
             const SectionIcon = section.icon;
-            const isExpanded = expandedSections[section.name] || section.defaultExpanded;
+            const isExpanded = expandedSections[section.name] !== undefined 
+              ? expandedSections[section.name] 
+              : section.defaultExpanded || false;
             
             return (
               <div key={section.name} className="mt-4">
