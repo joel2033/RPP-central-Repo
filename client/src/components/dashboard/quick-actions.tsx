@@ -18,7 +18,7 @@ export default function QuickActions() {
       primary: true,
     },
     {
-      title: "Add Client",
+      title: "Add Client", 
       icon: UserPlus,
       onClick: () => setIsClientModalOpen(true),
     },
@@ -30,7 +30,7 @@ export default function QuickActions() {
     {
       title: "Generate Report",
       icon: FileText,
-      onClick: () => {},
+      href: "/reports",
     },
   ];
 
@@ -66,17 +66,19 @@ export default function QuickActions() {
             if (action.href) {
               return (
                 <Link key={action.title} href={action.href}>
-                  <Button
-                    className={`w-full flex items-center justify-between p-4 h-auto ${
-                      action.primary
-                        ? "bg-brand-blue text-white hover:bg-blue-700"
-                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                    }`}
-                    variant={action.primary ? "default" : "secondary"}
-                  >
-                    <span className="font-medium">{action.title}</span>
-                    <Icon className="h-4 w-4" />
-                  </Button>
+                  <div className="w-full">
+                    <Button
+                      className={`w-full flex items-center justify-between p-4 h-auto ${
+                        action.primary
+                          ? "bg-blue-600 text-white hover:bg-blue-700"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      }`}
+                      variant={action.primary ? "default" : "secondary"}
+                    >
+                      <span className="font-medium">{action.title}</span>
+                      <Icon className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </Link>
               );
             }
@@ -88,7 +90,7 @@ export default function QuickActions() {
                 onClick={action.onClick}
                 className={`w-full flex items-center justify-between p-4 h-auto ${
                   action.primary
-                    ? "bg-brand-blue text-white hover:bg-blue-700"
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
                     : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                 }`}
                 variant={action.primary ? "default" : "secondary"}
