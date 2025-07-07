@@ -38,6 +38,7 @@ import { MapPin, Calendar, Clock, Camera, Home, Video, ChevronLeft, ChevronRight
 import { z } from "zod";
 import AddressInput from "@/components/ui/address-input";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { ServiceValidation } from "@/components/ui/service-validation";
 
 // Service Selection Component (separated to prevent re-render issues)
 interface ServiceSelectionProps {
@@ -316,6 +317,21 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
       if (!isValid) return;
     }
     
+    if (currentStep === 2) {
+      // Validate step 2 including services
+      const isValid = await form.trigger(["scheduledDate", "scheduledTime"]);
+      if (!isValid) return;
+      
+      if (selectedServices.length === 0) {
+        toast({
+          title: "Services Required",
+          description: "Please select at least one service",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+    
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
     }
@@ -544,9 +560,9 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
                         onChange={(services) => {
                           console.log('Services updated:', services);
                           setSelectedServices(services);
-                          form.setValue("services", services);
                         }}
                       />
+                      <ServiceValidation selectedCount={selectedServices.length} />
                     </ErrorBoundary>
                   </CardContent>
                 </Card>
@@ -646,12 +662,14 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="font-medium mb-2">Services</div>
                       <div className="flex flex-wrap gap-2">
-                        {selectedServices.map((service) => (
+                        {selectedServices.length > 0 ? selectedServices.map((service) => (
                           <Badge key={service} variant="secondary" className="flex items-center gap-1">
                             {getServiceIcon(service)}
                             {service.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                           </Badge>
-                        ))}
+                        )) : (
+                          <span className="text-gray-500 text-sm">No services selected</span>
+                        )}
                       </div>
                     </div>
 
