@@ -274,7 +274,20 @@ export default function ProductsPage() {
                       </TableCell>
                       <TableCell>
                         {Array.isArray(product.variations) && product.variations.length > 0 ? (
-                          <Badge variant="secondary">{product.variations.length} variants</Badge>
+                          <div className="space-y-1">
+                            <Badge variant="secondary">{product.variations.length} variants</Badge>
+                            {product.variations.slice(0, 2).map((variant: any, index: number) => (
+                              <div key={index} className="text-xs text-gray-500">
+                                {typeof variant === 'object' && variant.name 
+                                  ? `${variant.name}: $${variant.price || 0}`
+                                  : variant
+                                }
+                              </div>
+                            ))}
+                            {product.variations.length > 2 && (
+                              <div className="text-xs text-gray-400">+{product.variations.length - 2} more</div>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-gray-400">—</span>
                         )}

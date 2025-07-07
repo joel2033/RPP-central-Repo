@@ -16,8 +16,13 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Upload, X, Package, Image as ImageIcon } from "lucide-react";
+import { Upload, X, Package, Image as ImageIcon, Plus } from "lucide-react";
 import { z } from "zod";
+
+interface Variant {
+  name: string;
+  price: number;
+}
 
 interface ProductModalProps {
   isOpen: boolean;
@@ -34,7 +39,7 @@ const productFormSchema = insertProductSchema.omit({ licenseeId: true }).extend(
 export default function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [variations, setVariations] = useState<string[]>([]);
+  const [variants, setVariants] = useState<Variant[]>([{ name: "", price: 0 }]);
   const [exclusiveClients, setExclusiveClients] = useState<string[]>([]);
   const [hasVariations, setHasVariations] = useState(false);
   const [isExclusive, setIsExclusive] = useState(false);
@@ -70,14 +75,22 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
         category: product.category || "",
         price: product.price,
         taxRate: product.taxRate,
-        variations: product.variations || [],
+        variations: Array.isArray(product.variations) ? product.variations : [],
         isDigital: product.isDigital,
         requiresOnsite: product.requiresOnsite,
         exclusiveClients: product.exclusiveClients || [],
         isActive: product.isActive,
         showOnBookingForm: product.showOnBookingForm,
       });
-      setVariations(Array.isArray(product.variations) ? product.variations.map(String) : []);
+      // Convert old variations format to new variant format if needed
+      const productVariants = Array.isArray(product.variations) 
+        ? product.variations.map((v: any) => 
+            typeof v === 'string' 
+              ? { name: v, price: 0 } 
+              : { name: v.name || '', price: parseFloat(v.price) || 0 }
+          )
+        : [{ name: "", price: 0 }];
+      setVariants(productVariants);
       setExclusiveClients(product.exclusiveClients || []);
       setHasVariations(Array.isArray(product.variations) && product.variations.length > 0);
       setIsExclusive((product.exclusiveClients || []).length > 0);
@@ -90,14 +103,14 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
         category: "",
         price: "0.00",
         taxRate: "GST 10%",
-        variations: [],
+        variations: [{ name: "", price: 0 }],
         isDigital: true,
         requiresOnsite: false,
         exclusiveClients: [],
         isActive: true,
         showOnBookingForm: false,
       });
-      setVariations([]);
+      setVariants([{ name: "", price: 0 }]);
       setExclusiveClients([]);
       setHasVariations(false);
       setIsExclusive(false);
@@ -106,11 +119,7 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
 
   const createProductMutation = useMutation({
     mutationFn: async (data: z.infer<typeof productFormSchema>) => {
-      return await apiRequest(`/api/products`, {
-        method: "POST",
-        body: JSON.stringify(data),
-        headers: { "Content-Type": "application/json" },
-      });
+      return await apiRequest("POST", "/api/products", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
@@ -131,11 +140,7 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
 
   const updateProductMutation = useMutation({
     mutationFn: async (data: z.infer<typeof productFormSchema>) => {
-      return await apiRequest(`/api/products/${product?.id}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-        headers: { "Content-Type": "application/json" },
-      });
+      return await apiRequest("PUT", `/api/products/${product?.id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
@@ -157,7 +162,7 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
   const onSubmit = (data: z.infer<typeof productFormSchema>) => {
     const submitData = {
       ...data,
-      variations: hasVariations ? variations : [],
+      variations: hasVariations ? variants : [],
       exclusiveClients: isExclusive ? exclusiveClients : [],
     };
 
@@ -168,18 +173,20 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
     }
   };
 
-  const addVariation = () => {
-    setVariations([...variations, ""]);
+  const addVariant = () => {
+    setVariants([...variants, { name: "", price: 0 }]);
   };
 
-  const updateVariation = (index: number, value: string) => {
-    const newVariations = [...variations];
-    newVariations[index] = value;
-    setVariations(newVariations);
+  const updateVariant = (index: number, field: 'name' | 'price', value: string | number) => {
+    const newVariants = [...variants];
+    newVariants[index] = { ...newVariants[index], [field]: value };
+    setVariants(newVariants);
   };
 
-  const removeVariation = (index: number) => {
-    setVariations(variations.filter((_, i) => i !== index));
+  const removeVariant = (index: number) => {
+    if (variants.length > 1) {
+      setVariants(variants.filter((_, i) => i !== index));
+    }
   };
 
   const addExclusiveClient = () => {
@@ -400,19 +407,30 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
                   </div>
 
                   {hasVariations && (
-                    <div className="space-y-2">
-                      {variations.map((variation, index) => (
-                        <div key={index} className="flex items-center space-x-2">
+                    <div className="space-y-3">
+                      <div className="text-sm font-medium text-gray-700 mb-2">
+                        Product Variants
+                      </div>
+                      {variants.map((variant, index) => (
+                        <div key={index} className="grid grid-cols-3 gap-2 items-center">
                           <Input
-                            placeholder="Variation name"
-                            value={variation}
-                            onChange={(e) => updateVariation(index, e.target.value)}
+                            placeholder="Variant name"
+                            value={variant.name}
+                            onChange={(e) => updateVariant(index, 'name', e.target.value)}
+                          />
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="Price"
+                            value={variant.price}
+                            onChange={(e) => updateVariant(index, 'price', parseFloat(e.target.value) || 0)}
                           />
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => removeVariation(index)}
+                            onClick={() => removeVariant(index)}
+                            disabled={variants.length === 1}
                           >
                             <X className="h-4 w-4" />
                           </Button>
@@ -422,9 +440,11 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={addVariation}
+                        onClick={addVariant}
+                        className="flex items-center gap-2"
                       >
-                        Add Variation
+                        <Plus className="h-4 w-4" />
+                        Add Variant
                       </Button>
                     </div>
                   )}

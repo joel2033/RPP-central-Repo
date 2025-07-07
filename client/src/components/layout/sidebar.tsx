@@ -105,7 +105,6 @@ const navigationSections: NavSection[] = [
     icon: Package,
     items: [
       { name: "Product Management", href: "/products", icon: Package },
-      { name: "Service Catalog", href: "/products", icon: Box },
     ]
   },
   {

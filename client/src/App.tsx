@@ -54,6 +54,12 @@ function Router() {
           <Route path="/reports" component={Reports} />
           <Route path="/settings" component={Settings} />
           <Route path="/products" component={Products} />
+          <Route path="/services">
+            {() => {
+              window.location.replace("/products");
+              return null;
+            }}
+          </Route>
         </>
       )}
       {/* Public delivery page - no authentication required */}
