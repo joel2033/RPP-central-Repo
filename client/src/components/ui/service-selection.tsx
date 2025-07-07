@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Camera, Home, Video, PlaneTakeoff } from "lucide-react";
@@ -48,7 +48,7 @@ export default function ServiceSelection({ value, onChange }: ServiceSelectionPr
     },
   ];
 
-  const handleToggle = useCallback((serviceValue: string) => {
+  const handleToggle = (serviceValue: string) => {
     console.log('handleToggle called with:', serviceValue);
     console.log('Current value:', value);
     
@@ -59,7 +59,7 @@ export default function ServiceSelection({ value, onChange }: ServiceSelectionPr
     
     console.log('New services:', newServices);
     onChange(newServices);
-  }, [value, onChange]);
+  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
