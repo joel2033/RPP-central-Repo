@@ -501,7 +501,7 @@ export default function JobDetailPage() {
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <CardTitle>Files & Media</CardTitle>
-                  <DeliverySettingsModal jobCardId={jobDetail.id} files={files} />
+                  <DeliverySettingsModal jobCardId={job.id} files={files} />
                 </div>
               </CardHeader>
               <CardContent>
