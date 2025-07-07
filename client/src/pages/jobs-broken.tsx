@@ -50,19 +50,21 @@ interface JobCardWithDetails {
     name: string;
     email?: string;
     phone?: string;
+    address?: string;
+    contactName?: string;
   };
-  photographer?: {
+  photographer: {
     id: string;
     firstName: string;
     lastName: string;
     email: string;
-  };
-  editor?: {
+  } | null;
+  editor: {
     id: string;
     firstName: string;
     lastName: string;
     email: string;
-  };
+  } | null;
   booking: {
     id: number;
     propertyAddress: string;
@@ -243,125 +245,109 @@ export default function JobsPage() {
               </CardContent>
             </Card>
 
-            {/* Jobs List */}
-            <div className="space-y-4">
-              {sortedJobs.length === 0 ? (
-                <Card>
-                  <CardContent className="flex flex-col items-center justify-center py-12">
-                    <Building className="h-12 w-12 text-gray-300 mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No jobs found</h3>
-                    <p className="text-gray-600 text-center mb-4">
-                      {searchTerm || statusFilter !== "all" 
-                        ? "No jobs match your current filters. Try adjusting your search or filters."
-                        : "You haven't created any jobs yet. Jobs are automatically created when you add bookings."
-                      }
-                    </p>
-                    <Button asChild>
-                      <Link to="/bookings">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Your First Booking
-                      </Link>
+      {/* Jobs List */}
+      <div className="space-y-4">
+        {sortedJobs.length === 0 ? (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <div className="text-gray-500 text-lg">No jobs found</div>
+              <p className="text-gray-400 mt-2">
+                {searchTerm || statusFilter !== "all" 
+                  ? "Try adjusting your search or filters" 
+                  : "Create your first job to get started"
+                }
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          sortedJobs.map((job) => (
+            <Card key={job.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                  {/* Main Job Info */}
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-semibold text-lg text-gray-900">
+                            {job.booking.propertyAddress}
+                          </h3>
+                          <Badge 
+                            className={cn("text-xs", statusColors[job.jobStatus as keyof typeof statusColors])}
+                          >
+                            {statusLabels[job.jobStatus as keyof typeof statusLabels]}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-gray-500 font-mono">
+                          Job ID: {job.jobId}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                      <div className="flex items-center text-gray-600">
+                        <Calendar className="h-4 w-4 mr-2" />
+                        <span>
+                          {formatDate(job.booking.scheduledDate)} at {formatTime(job.booking.scheduledTime)}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center text-gray-600">
+                        <Building className="h-4 w-4 mr-2" />
+                        <span>{job.client.name}</span>
+                      </div>
+                      
+                      {job.photographer && (
+                        <div className="flex items-center text-gray-600">
+                          <User className="h-4 w-4 mr-2" />
+                          <span>{job.photographer.firstName} {job.photographer.lastName}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {job.booking.services.map((service, index) => (
+                        <Badge key={index} variant="secondary" className="text-xs">
+                          {service}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm">
+                      <Eye className="h-4 w-4 mr-2" />
+                      View Job
                     </Button>
-                  </CardContent>
-                </Card>
-              ) : (
-                sortedJobs.map((job) => (
-                  <Card key={job.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-semibold text-gray-900">
-                              {job.booking?.propertyAddress || "Unknown Address"}
-                            </h3>
-                            <Badge className={cn("text-xs", statusColors[job.jobStatus as keyof typeof statusColors])}>
-                              {statusLabels[job.jobStatus as keyof typeof statusLabels]}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-gray-600 mb-2">Job ID: {job.jobId}</p>
-                          <div className="flex items-center gap-4 text-sm text-gray-600">
-                            <div className="flex items-center gap-1">
-                              <User className="h-4 w-4" />
-                              <span>{job.client?.name || "Unknown Client"}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-4 w-4" />
-                              <span>
-                                {job.booking?.scheduledDate 
-                                  ? formatDate(job.booking.scheduledDate)
-                                  : "Date TBD"
-                                }
-                                {job.booking?.scheduledTime && (
-                                  <span className="ml-1">
-                                    at {formatTime(job.booking.scheduledTime)}
-                                  </span>
-                                )}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" asChild>
-                            <Link to={`/jobs/${job.id}`}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </Link>
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <DropdownMenuItem>
-                                View Files
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                Edit Job
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                Send to Production
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="text-red-600">
-                                Cancel Job
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-                      
-                      {/* Services */}
-                      <div className="mb-4">
-                        <p className="text-sm text-gray-600 mb-2">Services:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {job.requestedServices?.map((service: string) => (
-                            <Badge key={service} variant="secondary" className="text-xs">
-                              {service.charAt(0).toUpperCase() + service.slice(1).replace('_', ' ')}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      {/* Additional Info */}
-                      <div className="flex items-center justify-between text-sm text-gray-600">
-                        <div>
-                          Created: {formatDate(job.createdAt)}
-                        </div>
-                        <div className="flex items-center gap-4">
-                          {job.photographerId && (
-                            <span>Photographer: {job.photographerId}</span>
-                          )}
-                          {job.editorId && (
-                            <span>Editor: {job.editorId}</span>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </div>
+                    
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>
+                          Edit Job
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          View Files
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          Send to Editor
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-red-600">
+                          Cancel Job
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
           </div>
         </div>
       </div>

@@ -277,14 +277,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/jobs", isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       console.log("User object:", req.user);
-      console.log("Fetching jobs for licensee:", req.user!.licenseeId || req.user!.id);
-      const jobCards = await storage.getJobCards(req.user!.licenseeId || req.user!.id);
+      const userId = req.user!.id || req.user!.claims?.sub;
+      console.log("Fetching jobs for licensee:", userId);
+      const jobCards = await storage.getJobCards(userId);
       console.log("Found job cards:", jobCards.length);
       
       // Enhance job cards with booking details for the jobs page
       const jobsWithBookings = await Promise.all(
         jobCards.map(async (jobCard) => {
-          const booking = await storage.getBooking(jobCard.bookingId, req.user!.licenseeId || req.user!.id);
+          const booking = await storage.getBooking(jobCard.bookingId, userId);
           console.log(`Job card ${jobCard.id} booking:`, booking);
           return {
             ...jobCard,
@@ -311,14 +312,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/jobs/:id", isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const jobId = parseInt(req.params.id);
-      const jobCard = await storage.getJobCard(jobId, req.user!.licenseeId || req.user!.id);
+      const userId = req.user!.id || req.user!.claims?.sub;
+      const jobCard = await storage.getJobCard(jobId, userId);
       
       if (!jobCard) {
         return res.status(404).json({ message: "Job not found" });
       }
       
       // Get booking details
-      const booking = await storage.getBooking(jobCard.bookingId, req.user!.licenseeId || req.user!.id);
+      const booking = await storage.getBooking(jobCard.bookingId, userId);
       
       res.json({
         ...jobCard,
