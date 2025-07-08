@@ -581,24 +581,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Invalid action" });
       }
 
-      // Add to history if field exists
-      if (jobCard.history) {
-        const historyEntry = {
-          action,
-          by: userId,
-          at: now.toISOString(),
-          notes
-        };
-        updateData.history = [...(jobCard.history || []), historyEntry];
+      // Add to history if field exists (will be available after database migration)
+      try {
+        if (jobCard.history !== undefined) {
+          const historyEntry = {
+            action,
+            by: userId,
+            at: now.toISOString(),
+            notes
+          };
+          updateData.history = [...(jobCard.history || []), historyEntry];
+        }
+      } catch (error) {
+        // Ignore history errors if column doesn't exist yet
+        console.log("History tracking not available yet");
       }
 
-      // Update job card using existing storage method
-      const updatedJobCard = await storage.updateJobCard(jobCardId, updateData, userId);
+      // Update job card using existing storage method - handle missing timestamp columns gracefully
+      try {
+        const updatedJobCard = await storage.updateJobCard(jobCardId, updateData, userId);
+        res.json(updatedJobCard);
+      } catch (error) {
+        // If timestamp columns don't exist, fall back to legacy status update
+        console.log("Timestamp columns not available, using legacy status update");
+        let legacyStatus = jobCard.status;
+        
+        switch (action) {
+          case "accept":
+            legacyStatus = "in_progress";
+            break;
+          case "readyForQC":
+            legacyStatus = "ready_for_qc";
+            break;
+          case "revision":
+            legacyStatus = "in_revision";
+            break;
+          case "delivered":
+            legacyStatus = "delivered";
+            break;
+        }
+        
+        const updatedJobCard = await storage.updateJobCardStatus(jobCardId, legacyStatus, userId, notes);
+        
+        // Log activity
+        await storage.logJobActivity(jobCardId, userId, `job_${action}`, activityDescription, { action, notes });
+        
+        res.json(updatedJobCard);
+        return;
+      }
 
       // Log activity
       await storage.logJobActivity(jobCardId, userId, `job_${action}`, activityDescription, { action, notes });
-
-      res.json(updatedJobCard);
     } catch (error) {
       console.error("Error performing job action:", error);
       res.status(500).json({ message: "Internal server error" });

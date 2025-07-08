@@ -78,9 +78,10 @@ export function createHistoryEntry(
 
 /**
  * Get the next available actions for a user based on current status and role
+ * Support both new timestamp-based and legacy status-based systems
  */
 export function getAvailableActions(
-  order: JobCardWithTimestamps,
+  order: JobCardWithTimestamps & { status?: string },
   userRole: string,
   userId?: string
 ): Array<{
@@ -88,7 +89,11 @@ export function getAvailableActions(
   label: string;
   variant: "default" | "destructive" | "outline" | "secondary";
 }> {
-  const status = getOrderStatus(order);
+  // Use timestamp-based status if available, otherwise fall back to legacy status
+  const hasTimestamps = order.uploadedAt || order.acceptedAt || order.readyForQCAt || 
+                       order.revisionRequestedAt || order.deliveredAt;
+  const status = hasTimestamps ? getOrderStatus(order) : (order.status || 'pending');
+  
   const actions: Array<{
     action: "upload" | "accept" | "readyForQC" | "revision" | "delivered";
     label: string;
@@ -97,17 +102,17 @@ export function getAvailableActions(
 
   // Editor actions
   if (userRole === "editor") {
-    if (status === "pending" && !order.acceptedAt) {
+    if ((status === "pending" || status === "unassigned") && !order.acceptedAt) {
       actions.push({ action: "accept", label: "Accept Job", variant: "default" });
     }
-    if (status === "in_progress" && order.acceptedAt && !order.readyForQCAt) {
+    if ((status === "in_progress" || status === "editing") && !order.readyForQCAt) {
       actions.push({ action: "readyForQC", label: "Mark Ready for QC", variant: "default" });
     }
   }
 
   // Admin/Photographer actions
   if (userRole === "admin" || userRole === "licensee" || userRole === "photographer") {
-    if (status === "ready_for_qc") {
+    if (status === "ready_for_qc" || status === "ready_for_qa") {
       actions.push({ action: "revision", label: "Request Revision", variant: "destructive" });
       actions.push({ action: "delivered", label: "Deliver to Client", variant: "default" });
     }

@@ -21,7 +21,7 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
   showTimestamp = false,
   size = 'default'
 }) => {
-  // Use new action-based status if timestamps are available
+  // Use new action-based status if timestamps are available, fallback to legacy status
   const hasTimestamps = jobCard.uploadedAt || jobCard.acceptedAt || jobCard.readyForQCAt || 
                        jobCard.revisionRequestedAt || jobCard.deliveredAt;
   
