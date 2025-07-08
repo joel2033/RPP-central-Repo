@@ -588,7 +588,25 @@ export class DatabaseStorage implements IStorage {
   async getJobCard(id: number, licenseeId: string): Promise<(JobCard & { client: Client; photographer: User | null; editor: User | null }) | undefined> {
     const result = await db
       .select({
-        jobCard: jobCards,
+        jobCard: {
+          id: jobCards.id,
+          jobId: jobCards.jobId,
+          bookingId: jobCards.bookingId,
+          clientId: jobCards.clientId,
+          photographerId: jobCards.photographerId,
+          editorId: jobCards.editorId,
+          status: jobCards.status,
+          jobStatus: jobCards.jobStatus,
+          requestedServices: jobCards.requestedServices,
+          editingNotes: jobCards.editingNotes,
+          revisionNotes: jobCards.revisionNotes,
+          assignedAt: jobCards.assignedAt,
+          completedAt: jobCards.completedAt,
+          deliveredAt: jobCards.deliveredAt,
+          licenseeId: jobCards.licenseeId,
+          createdAt: jobCards.createdAt,
+          updatedAt: jobCards.updatedAt,
+        },
         client: clients,
         photographer: users,
         editor: {
