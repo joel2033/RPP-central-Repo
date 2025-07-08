@@ -231,6 +231,17 @@ Changelog:
   - **Streamlined Workflow**: Modal-based forms replace full-page navigation for better UX
   - **Auto-refresh Integration**: Job and client lists automatically update after modal form submissions
   - **Professional Layout**: Google Maps placeholder, service selection cards, and comprehensive order summaries
+- July 08, 2025. Completed 4-step booking flow with full Product Management integration:
+  - **Fixed Product Variant Selection**: Variants now display and update pricing correctly using array indices
+  - **Dynamic Service Selection**: Product Management API integration with automatic price calculation from variants
+  - **4-Step Booking Flow**: Client Info → Service Selection → Date/Time/Photographer → Order Summary → Create Job
+  - **Product-to-Service Mapping**: Intelligent mapping of product titles to service enum values (photography, drone, floor_plans, video)
+  - **Form Validation Fix**: Resolved service validation issues by mapping product IDs to valid service types
+  - **Price Field Updates**: Form price automatically syncs with selected product variants
+  - **API Request Resolution**: Fixed parameter order in apiRequest function for successful booking creation
+  - **Complete Integration**: Booking modal now creates jobs with proper service types, product details, and pricing
+  - **Customer Booking Toggle**: Added showOnCustomerBookingForm field for future customer portal separation
+  - **Workflow Prevention**: Fixed automatic form submission to ensure all 4 steps are properly navigated
 ```
 
 ## User Preferences
