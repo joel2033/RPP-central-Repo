@@ -21,6 +21,7 @@ interface ClientModalProps {
 }
 
 const clientFormSchema = insertClientSchema.omit({ 
+  id: true,
   licenseeId: true, 
   createdAt: true, 
   updatedAt: true 

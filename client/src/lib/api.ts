@@ -1,39 +1,59 @@
 import { apiRequest } from './queryClient';
 
 export const clientApi = {
-  getAll: () => apiRequest('/api/clients'),
-  getById: (id: number) => apiRequest(`/api/clients/${id}`),
-  create: (data: any) => apiRequest('/api/clients', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  update: (id: number, data: any) => apiRequest(`/api/clients/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  }),
-  delete: (id: number) => apiRequest(`/api/clients/${id}`, {
-    method: 'DELETE',
-  }),
+  getAll: async () => {
+    const response = await apiRequest('GET', '/api/clients');
+    return response.json();
+  },
+  getById: async (id: number) => {
+    const response = await apiRequest('GET', `/api/clients/${id}`);
+    return response.json();
+  },
+  create: async (data: any) => {
+    const response = await apiRequest('POST', '/api/clients', data);
+    return response.json();
+  },
+  update: async (id: number, data: any) => {
+    const response = await apiRequest('PUT', `/api/clients/${id}`, data);
+    return response.json();
+  },
+  delete: async (id: number) => {
+    const response = await apiRequest('DELETE', `/api/clients/${id}`);
+    return response.json();
+  },
 };
 
 export const jobApi = {
-  getAll: (params?: any) => {
+  getAll: async (params?: any) => {
     const searchParams = new URLSearchParams(params);
-    return apiRequest(`/api/jobs?${searchParams}`);
+    const response = await apiRequest('GET', `/api/jobs?${searchParams}`);
+    return response.json();
   },
-  getById: (id: number) => apiRequest(`/api/jobs/${id}`),
-  updateStatus: (id: number, status: string) => apiRequest(`/api/jobs/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ status }),
-  }),
-  getFiles: (id: number) => apiRequest(`/api/jobs/${id}/files`),
-  getActivity: (id: number) => apiRequest(`/api/jobs/${id}/activity`),
+  getById: async (id: number) => {
+    const response = await apiRequest('GET', `/api/jobs/${id}`);
+    return response.json();
+  },
+  updateStatus: async (id: number, status: string) => {
+    const response = await apiRequest('PATCH', `/api/jobs/${id}`, { status });
+    return response.json();
+  },
+  getFiles: async (id: number) => {
+    const response = await apiRequest('GET', `/api/jobs/${id}/files`);
+    return response.json();
+  },
+  getActivity: async (id: number) => {
+    const response = await apiRequest('GET', `/api/jobs/${id}/activity`);
+    return response.json();
+  },
 };
 
 export const bookingApi = {
-  getAll: () => apiRequest('/api/bookings'),
-  create: (data: any) => apiRequest('/api/bookings', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
+  getAll: async () => {
+    const response = await apiRequest('GET', '/api/bookings');
+    return response.json();
+  },
+  create: async (data: any) => {
+    const response = await apiRequest('POST', '/api/bookings', data);
+    return response.json();
+  },
 };

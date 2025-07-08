@@ -38,6 +38,7 @@ interface ClientModalProps {
 }
 
 const clientFormSchema = insertClientSchema.omit({ 
+  id: true,
   licenseeId: true, 
   createdAt: true, 
   updatedAt: true 
@@ -94,10 +95,8 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
 
   const createClientMutation = useMutation({
     mutationFn: async (data: ClientFormData) => {
-      return apiRequest("/api/clients", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      const response = await apiRequest("POST", "/api/clients", data);
+      return response.json();
     },
     onSuccess: () => {
       toast({
@@ -118,10 +117,8 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
 
   const updateClientMutation = useMutation({
     mutationFn: async (data: ClientFormData) => {
-      return apiRequest(`/api/clients/${client?.id}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      });
+      const response = await apiRequest("PUT", `/api/clients/${client?.id}`, data);
+      return response.json();
     },
     onSuccess: () => {
       toast({
