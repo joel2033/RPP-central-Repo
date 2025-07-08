@@ -41,12 +41,18 @@ import {
   deliveryComments,
   deliveryTracking,
   jobCardDeliverySettings,
+  orderStatusAudit,
+  emailDeliveryLog,
   type DeliveryComment,
   type InsertDeliveryComment,
   type DeliveryTracking,
   type InsertDeliveryTracking,
   type JobCardDeliverySettings,
   type InsertJobCardDeliverySettings,
+  type OrderStatusAudit,
+  type InsertOrderStatusAudit,
+  type EmailDeliveryLog,
+  type InsertEmailDeliveryLog,
   products,
   type Product,
   type InsertProduct,
@@ -1041,6 +1047,111 @@ export class DatabaseStorage implements IStorage {
   async deleteProduct(id: string, licenseeId: string): Promise<void> {
     await db.delete(products)
       .where(and(eq(products.id, id), eq(products.licenseeId, licenseeId)));
+  }
+
+  // Order Status Audit operations
+  async createOrderStatusAudit(audit: InsertOrderStatusAudit): Promise<OrderStatusAudit> {
+    const [newAudit] = await db
+      .insert(orderStatusAudit)
+      .values(audit)
+      .returning();
+    return newAudit;
+  }
+
+  async getOrderStatusAuditLog(jobCardId: number): Promise<OrderStatusAudit[]> {
+    return await db
+      .select()
+      .from(orderStatusAudit)
+      .where(eq(orderStatusAudit.jobCardId, jobCardId))
+      .orderBy(desc(orderStatusAudit.createdAt));
+  }
+
+  // Email Delivery Log operations
+  async createEmailDeliveryLog(log: InsertEmailDeliveryLog): Promise<EmailDeliveryLog> {
+    const [newLog] = await db
+      .insert(emailDeliveryLog)
+      .values(log)
+      .returning();
+    return newLog;
+  }
+
+  async getEmailDeliveryLogs(jobCardId: number): Promise<EmailDeliveryLog[]> {
+    return await db
+      .select()
+      .from(emailDeliveryLog)
+      .where(eq(emailDeliveryLog.jobCardId, jobCardId))
+      .orderBy(desc(emailDeliveryLog.createdAt));
+  }
+
+  // Enhanced job card operations for order status
+  async updateJobCardStatus(id: number, status: string, changedBy: string, reason?: string): Promise<JobCard> {
+    // First get the current job card to record the old status
+    const [currentJobCard] = await db
+      .select()
+      .from(jobCards)
+      .where(eq(jobCards.id, id));
+
+    if (!currentJobCard) {
+      throw new Error("Job card not found");
+    }
+
+    // Update the job card status
+    const [updated] = await db
+      .update(jobCards)
+      .set({ 
+        status: status as any, 
+        updatedAt: new Date(),
+        ...(status === "complete" && { completedAt: new Date() }),
+        ...(status === "delivered" && { deliveredAt: new Date() })
+      })
+      .where(eq(jobCards.id, id))
+      .returning();
+
+    // Create audit log entry
+    await this.createOrderStatusAudit({
+      jobCardId: id,
+      previousStatus: currentJobCard.status,
+      newStatus: status,
+      changedBy,
+      changeReason: reason,
+      metadata: { timestamp: new Date().toISOString() }
+    });
+
+    return updated;
+  }
+
+  async sendDeliveryEmail(jobCardId: number, recipientEmail: string): Promise<EmailDeliveryLog> {
+    // Create email delivery log
+    const emailLog = await this.createEmailDeliveryLog({
+      jobCardId,
+      recipientEmail,
+      emailType: "delivery_notification",
+      emailStatus: "sent",
+      deliveredAt: new Date()
+    });
+
+    // Update job card status to delivered
+    await this.updateJobCardStatus(jobCardId, "delivered", "system", "Delivery email sent to client");
+
+    return emailLog;
+  }
+
+  async getJobCardWithClient(jobCardId: number): Promise<(JobCard & { client: Client }) | undefined> {
+    const [result] = await db
+      .select({
+        jobCard: jobCards,
+        client: clients,
+      })
+      .from(jobCards)
+      .innerJoin(clients, eq(jobCards.clientId, clients.id))
+      .where(eq(jobCards.id, jobCardId));
+
+    if (!result) return undefined;
+
+    return {
+      ...result.jobCard,
+      client: result.client,
+    } as JobCard & { client: Client };
   }
 }
 

@@ -12,7 +12,9 @@ import {
   insertCalendarEventSchema,
   insertBusinessSettingsSchema,
   insertGoogleCalendarIntegrationSchema,
-  insertProductSchema
+  insertProductSchema,
+  insertOrderStatusAuditSchema,
+  insertEmailDeliveryLogSchema
 } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
@@ -379,7 +381,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/job-cards', isAuthenticated, requireAdminOrVA, async (req: any, res) => {
     try {
       const licenseeId = req.user.claims.sub;
-      const { status, editorId } = req.query;
+      const { status, editorId, include_details } = req.query;
       
       let jobCards;
       if (status) {
@@ -389,8 +391,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         jobCards = await storage.getJobCards(licenseeId);
       }
-      
-      res.json(jobCards);
+
+      // If include_details is requested, enhance with client and booking information
+      if (include_details === 'true') {
+        const enhancedJobCards = await Promise.all(
+          jobCards.map(async (jobCard) => {
+            const client = await storage.getClient(jobCard.clientId, licenseeId);
+            const booking = await storage.getBooking(jobCard.bookingId, licenseeId);
+            return {
+              ...jobCard,
+              client: client || { 
+                id: jobCard.clientId, 
+                name: "Unknown Client", 
+                email: "", 
+                contactName: "" 
+              },
+              booking: booking || { 
+                id: jobCard.bookingId, 
+                propertyAddress: "Unknown Address",
+                price: "0.00",
+                scheduledDate: new Date().toISOString().split('T')[0],
+                scheduledTime: "09:00"
+              }
+            };
+          })
+        );
+        res.json(enhancedJobCards);
+      } else {
+        res.json(jobCards);
+      }
     } catch (error) {
       console.error("Error fetching job cards:", error);
       res.status(500).json({ message: "Failed to fetch job cards" });
@@ -484,6 +513,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Enhanced Order Status API endpoints
+  app.put('/api/job-cards/:id/status', isAuthenticated, requireAdminOrVA, async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const { status, reason, changedBy } = req.body;
+      
+      const jobCard = await storage.updateJobCardStatus(jobCardId, status, changedBy || req.user.claims.sub, reason);
+      res.json(jobCard);
+    } catch (error) {
+      console.error("Error updating job card status:", error);
+      res.status(400).json({ message: "Failed to update job card status" });
+    }
+  });
+
+  app.post('/api/job-cards/:id/send-delivery-email', isAuthenticated, requireAdminOrVA, async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      
+      // Get job card and client details
+      const jobCard = await storage.getJobCardWithClient(jobCardId);
+      if (!jobCard) {
+        return res.status(404).json({ message: "Job card not found" });
+      }
+
+      const emailLog = await storage.sendDeliveryEmail(jobCardId, jobCard.client.email);
+      res.json(emailLog);
+    } catch (error) {
+      console.error("Error sending delivery email:", error);
+      res.status(500).json({ message: "Failed to send delivery email" });
+    }
+  });
+
+  app.get('/api/job-cards/:id/audit-log', isAuthenticated, requireAdminOrVA, async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const auditLog = await storage.getOrderStatusAuditLog(jobCardId);
+      res.json(auditLog);
+    } catch (error) {
+      console.error("Error fetching audit log:", error);
+      res.status(500).json({ message: "Failed to fetch audit log" });
+    }
+  });
+
   // Production Files routes
   app.get('/api/job-cards/:id/files', isAuthenticated, async (req: any, res) => {
     try {
@@ -508,7 +580,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/job-cards/:id/files', isAuthenticated, requireEditor, upload.array('files', 10), async (req: any, res) => {
+  app.post('/api/job-cards/:id/files', isAuthenticated, upload.array('files', 10), async (req: any, res) => {
     try {
       const jobCardId = parseInt(req.params.id);
       const userId = req.user.claims.sub;

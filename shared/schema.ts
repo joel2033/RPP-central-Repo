@@ -66,7 +66,7 @@ export const serviceTypeEnum = pgEnum("service_type", ["photography", "drone", "
 export const jobStatusEnum = pgEnum("job_status", ["pending", "confirmed", "in_progress", "completed", "cancelled"]);
 
 // Production workflow enums
-export const jobCardStatusEnum = pgEnum("job_card_status", ["unassigned", "in_progress", "editing", "ready_for_qa", "in_revision", "delivered"]);
+export const jobCardStatusEnum = pgEnum("job_card_status", ["unassigned", "pending", "in_progress", "editing", "ready_for_qa", "in_revision", "complete", "delivered", "cancelled"]);
 export const mediaTypeEnum = pgEnum("media_type", ["raw", "edited", "final"]);
 export const serviceCategoryEnum = pgEnum("service_category", ["photography", "floor_plan", "drone", "video"]);
 
@@ -181,6 +181,30 @@ export const productionNotifications = pgTable("production_notifications", {
   type: varchar("type", { length: 50 }).notNull(), // assignment, completion, revision
   message: text("message").notNull(),
   isRead: boolean("is_read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Order status audit log for tracking status changes
+export const orderStatusAudit = pgTable("order_status_audit", {
+  id: serial("id").primaryKey(),
+  jobCardId: integer("job_card_id").notNull(),
+  previousStatus: varchar("previous_status", { length: 50 }),
+  newStatus: varchar("new_status", { length: 50 }).notNull(),
+  changedBy: varchar("changed_by").notNull(),
+  changeReason: text("change_reason"),
+  metadata: jsonb("metadata"), // Additional context about the change
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Email delivery log for tracking client communications
+export const emailDeliveryLog = pgTable("email_delivery_log", {
+  id: serial("id").primaryKey(),
+  jobCardId: integer("job_card_id").notNull(),
+  recipientEmail: varchar("recipient_email").notNull(),
+  emailType: varchar("email_type", { length: 50 }).notNull(), // delivery_notification, completion_notice
+  emailStatus: varchar("email_status", { length: 20 }).notNull(), // sent, failed, pending
+  deliveredAt: timestamp("delivered_at"),
+  errorMessage: text("error_message"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -646,3 +670,20 @@ export const insertProductSchema = createInsertSchema(products).omit({
 // Product types
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
+
+// Add missing schema types for audit tables
+export const insertOrderStatusAuditSchema = createInsertSchema(orderStatusAudit).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertEmailDeliveryLogSchema = createInsertSchema(emailDeliveryLog).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Add missing types for audit tables
+export type InsertOrderStatusAudit = z.infer<typeof insertOrderStatusAuditSchema>;
+export type OrderStatusAudit = typeof orderStatusAudit.$inferSelect;
+export type InsertEmailDeliveryLog = z.infer<typeof insertEmailDeliveryLogSchema>;
+export type EmailDeliveryLog = typeof emailDeliveryLog.$inferSelect;
