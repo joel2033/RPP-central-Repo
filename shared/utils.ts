@@ -33,8 +33,11 @@ export function getOrderStatus(order: JobCardWithTimestamps): string {
 export function getStatusLabel(status: string): string {
   switch (status) {
     case "pending": return "Pending";
+    case "unassigned": return "Pending";
     case "in_progress": return "In Progress";
+    case "editing": return "In Progress";
     case "ready_for_qc": return "Ready for QC";
+    case "ready_for_qa": return "Ready for QC";
     case "in_revision": return "In Revision";
     case "delivered": return "Delivered";
     default: return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());

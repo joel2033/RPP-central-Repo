@@ -33,6 +33,9 @@ export function StatusPill({ order }: StatusPillProps) {
   if (status === 'ready_for_qa') {
     status = 'ready_for_qc';
   }
+  if (status === 'unassigned') {
+    status = 'pending';
+  }
   
   const statusLabel = getStatusLabel(status);
   
