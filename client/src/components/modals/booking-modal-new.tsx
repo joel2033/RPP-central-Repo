@@ -511,7 +511,14 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
                             <FormControl>
                               <DatePicker
                                 value={field.value ? new Date(field.value) : undefined}
-                                onChange={(date) => field.onChange(date ? date.toISOString().split('T')[0] : "")}
+                                onChange={(date) => {
+                                  if (date) {
+                                    const dateStr = date instanceof Date ? date.toISOString().split('T')[0] : date;
+                                    field.onChange(dateStr);
+                                  } else {
+                                    field.onChange("");
+                                  }
+                                }}
                                 placeholder="Select a date"
                               />
                             </FormControl>
