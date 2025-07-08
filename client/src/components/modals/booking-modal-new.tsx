@@ -163,8 +163,8 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
       toast({
         title: "Success",
         description: sendConfirmationEmail 
-          ? "Booking created and confirmation email sent!"
-          : "Booking created successfully!",
+          ? "Job created and confirmation email sent!"
+          : "Job created successfully!",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
@@ -183,7 +183,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
       } else {
         toast({
           title: "Error",
-          description: "Failed to create booking",
+          description: "Failed to create job",
           variant: "destructive",
         });
       }
@@ -243,10 +243,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
     }
     
     if (currentStep === 2) {
-      // Validate step 2 including services
-      const isValid = await form.trigger(["scheduledDate", "scheduledTime"]);
-      if (!isValid) return;
-      
+      // Validate step 2 - services
       if (selectedServices.length === 0) {
         toast({
           title: "Services Required",
@@ -255,6 +252,12 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
         });
         return;
       }
+    }
+    
+    if (currentStep === 3) {
+      // Validate step 3 - appointment details
+      const isValid = await form.trigger(["scheduledDate", "scheduledTime"]);
+      if (!isValid) return;
     }
     
     if (currentStep < totalSteps) {
@@ -298,8 +301,9 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
   const formData = form.getValues();
 
   const stepTitles = [
-    "Job Information",
-    "Appointment Details", 
+    "Client Information & Property Address",
+    "Service Selection",
+    "Appointment Date, Time & Photographer",
     "Order Summary"
   ];
 
@@ -401,14 +405,73 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
               </div>
             )}
 
-            {/* Step 2: Appointment Details */}
+            {/* Step 2: Service Selection */}
             {currentStep === 2 && (
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Services Required</CardTitle>
+                    <p className="text-sm text-gray-600">Select all services needed for this job.</p>
+                  </CardHeader>
+                  <CardContent>
+                    <ErrorBoundary fallback={
+                      <div className="p-4 text-center text-red-600">
+                        <AlertCircle className="h-8 w-8 mx-auto mb-2" />
+                        <p>Error loading services. Please refresh and try again.</p>
+                      </div>
+                    }>
+                      <ServiceSelection 
+                        value={selectedServices}
+                        onChange={handleServiceChange}
+                        onProductsChange={handleProductsChange}
+                        onTotalPriceChange={handleTotalPriceChange}
+                      />
+                      <ServiceValidation selectedCount={selectedServices.length} />
+                    </ErrorBoundary>
+                  </CardContent>
+                </Card>
+
+                <FormField
+                  control={form.control}
+                  name="price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Total Price</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notes</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Any special instructions or notes..."
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
+
+            {/* Step 3: Appointment Date, Time & Photographer */}
+            {currentStep === 3 && (
               <div className="space-y-6">
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center">
                       <Calendar className="h-5 w-5 mr-2" />
-                      Scheduling
+                      Appointment Scheduling
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -469,59 +532,6 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
                     />
                   </CardContent>
                 </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Services Required</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ErrorBoundary fallback={
-                      <div className="p-4 text-center text-red-600">
-                        <AlertCircle className="h-8 w-8 mx-auto mb-2" />
-                        <p>Error loading services. Please refresh and try again.</p>
-                      </div>
-                    }>
-                      <ServiceSelection 
-                        value={selectedServices}
-                        onChange={handleServiceChange}
-                        onProductsChange={handleProductsChange}
-                        onTotalPriceChange={handleTotalPriceChange}
-                      />
-                      <ServiceValidation selectedCount={selectedServices.length} />
-                    </ErrorBoundary>
-                  </CardContent>
-                </Card>
-
-                <FormField
-                  control={form.control}
-                  name="price"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Price</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="0.01" placeholder="0.00" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="notes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Notes</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Any special instructions or notes..."
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
             )}
 
