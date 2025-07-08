@@ -272,12 +272,18 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
   };
 
   const onSubmit = (data: z.infer<typeof bookingFormSchema>) => {
+    console.log('Form submitted with data:', data);
+    console.log('Selected services:', selectedServices);
+    console.log('Selected products:', selectedProducts);
+    
     // Ensure services are included from state
     const submitData = {
       ...data,
       services: selectedServices,
       selectedProducts: selectedProducts // Include selected products with variants
     };
+    
+    console.log('Final submit data:', submitData);
     
     if (isEditing) {
       updateBookingMutation.mutate(submitData);
@@ -667,6 +673,11 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
                   type="submit"
                   className="bg-brand-blue hover:bg-blue-700"
                   disabled={createBookingMutation.isPending || updateBookingMutation.isPending}
+                  onClick={() => {
+                    console.log('Create Job button clicked');
+                    console.log('Form errors:', form.formState.errors);
+                    console.log('Form valid:', form.formState.isValid);
+                  }}
                 >
                   {createBookingMutation.isPending || updateBookingMutation.isPending
                     ? "Creating..."
