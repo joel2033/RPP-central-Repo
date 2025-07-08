@@ -17,7 +17,7 @@ import {
 import { z } from "zod";
 import multer from "multer";
 import { fileStorage } from "./fileStorage";
-import { requireEditor, requireAdmin } from "./middleware/roleAuth";
+import { requireEditor, requireAdmin, requireVA, requireAdminOrVA, requireProductionStaff } from "./middleware/roleAuth";
 import { googleCalendarService } from "./googleCalendar";
 
 // Configure multer for file uploads
@@ -376,7 +376,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Job Cards routes (admin/licensee access)
-  app.get('/api/job-cards', isAuthenticated, requireAdmin, async (req: any, res) => {
+  app.get('/api/job-cards', isAuthenticated, requireAdminOrVA, async (req: any, res) => {
     try {
       const licenseeId = req.user.claims.sub;
       const { status, editorId } = req.query;
@@ -508,7 +508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/job-cards/:id/files', isAuthenticated, upload.array('files', 10), async (req: any, res) => {
+  app.post('/api/job-cards/:id/files', isAuthenticated, requireEditor, upload.array('files', 10), async (req: any, res) => {
     try {
       const jobCardId = parseInt(req.params.id);
       const userId = req.user.claims.sub;

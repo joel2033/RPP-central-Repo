@@ -6,6 +6,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/topbar";
+import { RoleProtectedRoute } from "@/components/auth/RoleProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +29,7 @@ interface JobCardWithDetails extends JobCard {
   photographer: User | null;
 }
 
-export default function EditorDashboard() {
+function EditorDashboardContent() {
   const { toast } = useToast();
   const { isAuthenticated, user, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
@@ -430,5 +431,13 @@ export default function EditorDashboard() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function EditorDashboard() {
+  return (
+    <RoleProtectedRoute allowedRoles={["editor"]}>
+      <EditorDashboardContent />
+    </RoleProtectedRoute>
   );
 }

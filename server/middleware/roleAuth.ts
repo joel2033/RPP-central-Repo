@@ -1,46 +1,29 @@
 import { Request, Response, NextFunction } from "express";
-
-export interface AuthenticatedRequest extends Request {
-  user?: {
-    claims: {
-      sub: string;
-      email: string;
-    };
-  };
-}
+import { AuthenticatedRequest } from "../replitAuth";
 
 export function requireRole(allowedRoles: string[]) {
-  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    try {
-      const userId = req.user?.claims.sub;
-      if (!userId) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-
-      // Import storage here to avoid circular dependency
-      const { storage } = await import("../storage");
-      const user = await storage.getUser(userId);
-      
-      if (!user) {
-        return res.status(401).json({ message: "User not found" });
-      }
-
-      if (!allowedRoles.includes(user.role)) {
-        return res.status(403).json({ message: "Insufficient permissions" });
-      }
-
-      // Attach user data to request
-      (req as any).userRole = user.role;
-      (req as any).userData = user;
-      
-      next();
-    } catch (error) {
-      console.error("Role authorization error:", error);
-      res.status(500).json({ message: "Authorization failed" });
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Not authenticated" });
     }
+
+    const userRole = req.user.role || "licensee";
+    
+    if (!allowedRoles.includes(userRole)) {
+      return res.status(403).json({ 
+        error: "Access denied", 
+        message: `This endpoint requires one of these roles: ${allowedRoles.join(", ")}. Your role: ${userRole}` 
+      });
+    }
+
+    next();
   };
 }
 
+// Specific role middleware
+export const requireAdmin = requireRole(["admin"]);
 export const requireEditor = requireRole(["editor"]);
-export const requireAdmin = requireRole(["admin", "licensee"]);
-export const requirePhotographer = requireRole(["photographer", "admin", "licensee"]);
+export const requirePhotographer = requireRole(["photographer"]);
+export const requireVA = requireRole(["va"]);
+export const requireAdminOrVA = requireRole(["admin", "va"]);
+export const requireProductionStaff = requireRole(["admin", "va", "photographer"]);

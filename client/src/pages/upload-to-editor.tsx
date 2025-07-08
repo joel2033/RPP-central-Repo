@@ -6,6 +6,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/topbar";
+import { RoleProtectedRoute } from "@/components/auth/RoleProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -68,7 +69,7 @@ const availableServices = [
   "360° Tour Processing"
 ];
 
-export default function UploadToEditor() {
+function UploadToEditorContent() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
@@ -536,5 +537,13 @@ export default function UploadToEditor() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function UploadToEditor() {
+  return (
+    <RoleProtectedRoute allowedRoles={["admin", "va", "photographer"]}>
+      <UploadToEditorContent />
+    </RoleProtectedRoute>
   );
 }

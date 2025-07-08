@@ -56,7 +56,7 @@ const mainNavigation = [
   },
 ];
 
-const navigationSections: NavSection[] = [
+const getFilteredNavigationSections = (userRole: string): NavSection[] => [
   {
     name: "Clients",
     icon: Users,
@@ -73,16 +73,18 @@ const navigationSections: NavSection[] = [
       { name: "Jobs", href: "/jobs", icon: Camera },
     ]
   },
-  {
+  // Production Hub - visible to admin, va, photographer only
+  ...(["admin", "va", "photographer"].includes(userRole) ? [{
     name: "Production Hub",
     icon: FolderOpen,
     items: [
       { name: "Upload to Editor", href: "/production/upload", icon: Upload },
-      { name: "Editor Dashboard", href: "/editor", icon: Camera },
+      // Editor Dashboard - only visible to editors
+      ...(userRole === "editor" ? [{ name: "Editor Dashboard", href: "/editor-dashboard", icon: Camera }] : []),
       { name: "Pre-Delivery Check", href: "/qa-review", icon: Eye },
       { name: "Revisions", href: "/qa-review", icon: RotateCcw },
     ]
-  },
+  }] : []),
   {
     name: "Delivery",
     icon: Truck,
@@ -107,7 +109,8 @@ const navigationSections: NavSection[] = [
       { name: "Product Management", href: "/products", icon: Package },
     ]
   },
-  {
+  // Admin Settings - only visible to admin and licensee
+  ...(["admin", "licensee"].includes(userRole) ? [{
     name: "Admin Settings",
     icon: Shield,
     items: [
@@ -115,7 +118,7 @@ const navigationSections: NavSection[] = [
       { name: "User Management", href: "/settings", icon: UserCog },
       { name: "System Preferences", href: "/settings", icon: Settings },
     ]
-  },
+  }] : []),
   {
     name: "Account",
     icon: User,
@@ -147,6 +150,10 @@ export default function Sidebar() {
       [sectionName]: !prev[sectionName]
     }));
   };
+
+  // Get user role for permission filtering
+  const userRole = user?.role || "licensee";
+  const navigationSections = getFilteredNavigationSections(userRole);
 
   const isActive = (href: string) => {
     if (href === "/") {
