@@ -55,7 +55,7 @@ interface BookingModalProps {
 }
 
 const bookingFormSchema = insertBookingSchema.omit({ licenseeId: true }).extend({
-  services: z.array(z.string()).min(1, "Select at least one service"),
+  services: z.array(z.string()).optional(),
   propertyAddress: z.string().min(1, "Property address is required"),
 });
 
@@ -73,17 +73,6 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
     variantName?: string;
     price: number;
   }>>([]);
-  
-  // Debug logging for service updates
-  const handleServiceChange = useCallback((services: string[]) => {
-    console.log('Service change triggered:', services);
-    setSelectedServices(services);
-  }, []);
-
-  const handleProductsChange = useCallback((products: any[]) => {
-    console.log('Products change triggered:', products);
-    setSelectedProducts(products);
-  }, []);
   
   const isEditing = !!booking;
   const totalSteps = 4;
@@ -103,10 +92,20 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
     },
   });
 
+  // Debug logging for service updates
+  const handleServiceChange = useCallback((services: string[]) => {
+    console.log('Service change triggered:', services);
+    setSelectedServices(services);
+  }, []);
+
+  const handleProductsChange = useCallback((products: any[]) => {
+    console.log('Products change triggered:', products);
+    setSelectedProducts(products);
+  }, []);
+
   const handleTotalPriceChange = useCallback((totalPrice: number) => {
     console.log('Total price change triggered:', totalPrice);
-    form.setValue('price', totalPrice.toFixed(2));
-  }, [form]);
+  }, []);
 
   // Load clients
   const { data: clients } = useQuery<Client[]>({
@@ -252,6 +251,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
         });
         return;
       }
+
     }
     
     if (currentStep === 3) {
@@ -271,10 +271,20 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
     }
   };
 
-  const onSubmit = (data: z.infer<typeof bookingFormSchema>) => {
+  const onSubmit = async (data: z.infer<typeof bookingFormSchema>) => {
     console.log('Form submitted with data:', data);
     console.log('Selected services:', selectedServices);
     console.log('Selected products:', selectedProducts);
+    
+    // Validate that we have services selected
+    if (selectedServices.length === 0) {
+      toast({
+        title: "Services Required",
+        description: "Please select at least one service",
+        variant: "destructive"
+      });
+      return;
+    }
     
     // Ensure services are included from state
     const submitData = {
