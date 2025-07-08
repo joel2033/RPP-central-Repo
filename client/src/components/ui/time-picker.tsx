@@ -44,11 +44,27 @@ export function TimePicker({
   className
 }: TimePickerProps) {
   const [open, setOpen] = useState(false);
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   
   const handleSelect = (time: string) => {
     onChange(time);
     setOpen(false);
   };
+
+  // Auto-scroll to current time when dropdown opens
+  useEffect(() => {
+    if (open && scrollContainerRef.current) {
+      const currentTimeIndex = getCurrentTimeIndex();
+      if (currentTimeIndex >= 0) {
+        const buttonHeight = 40; // Approximate button height with margin
+        const scrollTop = currentTimeIndex * buttonHeight - 120; // Center it
+        scrollContainerRef.current.scrollTo({
+          top: Math.max(0, scrollTop),
+          behavior: 'smooth'
+        });
+      }
+    }
+  }, [open]);
 
   // Get current time as default scroll position
   const getCurrentTimeIndex = () => {
@@ -90,14 +106,21 @@ export function TimePicker({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-48 p-0" align="start" side="bottom">
-        <div className="max-h-60 overflow-y-auto">
+        <div 
+          ref={scrollContainerRef}
+          className="max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400"
+          style={{
+            scrollBehavior: 'smooth',
+            WebkitOverflowScrolling: 'touch'
+          }}
+        >
           <div className="p-1">
             {timeSlots.map((time, index) => (
               <Button
                 key={time}
                 variant={value === time ? "default" : "ghost"}
                 className={cn(
-                  "w-full justify-start text-left font-normal mb-1 hover:bg-accent hover:text-accent-foreground",
+                  "w-full justify-start text-left font-normal mb-1 hover:bg-accent hover:text-accent-foreground transition-colors duration-150",
                   value === time && "bg-primary text-primary-foreground"
                 )}
                 onClick={() => handleSelect(time)}
