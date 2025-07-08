@@ -13,6 +13,7 @@ const Jobs = lazy(() => import('@/pages/jobs'));
 const Calendar = lazy(() => import('@/pages/calendar'));
 const Bookings = lazy(() => import('@/pages/bookings'));
 const Production = lazy(() => import('@/pages/production'));
+const UploadToEditor = lazy(() => import('@/pages/upload-to-editor'));
 const EditorDashboard = lazy(() => import('@/pages/editor-dashboard'));
 const JobDetail = lazy(() => import('@/pages/job-detail'));
 const DeliveryPage = lazy(() => import('@/pages/delivery-page'));
@@ -35,6 +36,8 @@ const AppRoutes = React.memo(() => (
     <Route path="/calendar" component={Calendar} />
     <Route path="/bookings" component={Bookings} />
     <Route path="/production" component={Production} />
+    <Route path="/production/upload" component={UploadToEditor} />
+    <Route path="/upload-to-editor" component={UploadToEditor} />
     <Route path="/editor-dashboard" component={EditorDashboard} />
     <Route path="/products" component={Products} />
     <Route path="/delivery/:jobId" component={DeliveryPage} />

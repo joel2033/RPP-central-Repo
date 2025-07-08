@@ -77,7 +77,7 @@ const navigationSections: NavSection[] = [
     name: "Production Hub",
     icon: FolderOpen,
     items: [
-      { name: "Upload to Editor", href: "/upload-to-editor", icon: Upload },
+      { name: "Upload to Editor", href: "/production/upload", icon: Upload },
       { name: "Editor Dashboard", href: "/editor", icon: Camera },
       { name: "Pre-Delivery Check", href: "/qa-review", icon: Eye },
       { name: "Revisions", href: "/qa-review", icon: RotateCcw },
