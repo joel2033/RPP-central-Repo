@@ -541,9 +541,5 @@ function UploadToEditorContent() {
 }
 
 export default function UploadToEditor() {
-  return (
-    <RoleProtectedRoute allowedRoles={["admin", "va", "photographer"]}>
-      <UploadToEditorContent />
-    </RoleProtectedRoute>
-  );
+  return <UploadToEditorContent />;
 }

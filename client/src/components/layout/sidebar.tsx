@@ -73,8 +73,7 @@ const getFilteredNavigationSections = (userRole: string): NavSection[] => [
       { name: "Jobs", href: "/jobs", icon: Camera },
     ]
   },
-  // Production Hub - visible to admin, va, photographer only
-  ...(["admin", "va", "photographer"].includes(userRole) ? [{
+  {
     name: "Production Hub",
     icon: FolderOpen,
     items: [
@@ -84,7 +83,7 @@ const getFilteredNavigationSections = (userRole: string): NavSection[] => [
       { name: "Pre-Delivery Check", href: "/qa-review", icon: Eye },
       { name: "Revisions", href: "/qa-review", icon: RotateCcw },
     ]
-  }] : []),
+  },
   {
     name: "Delivery",
     icon: Truck,
