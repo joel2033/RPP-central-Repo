@@ -214,9 +214,23 @@ const OrderStatus = memo(() => {
       order.client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.booking?.propertyAddress?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+    if (!matchesSearch) return false;
+    if (statusFilter === "all") return true;
     
-    return matchesSearch && matchesStatus;
+    // Use the same status logic as StatusPill
+    const hasTimestamps = order.uploadedAt || order.acceptedAt || order.readyForQCAt || 
+                         order.revisionRequestedAt || order.deliveredAt;
+    const currentStatus = hasTimestamps ? getOrderStatus(order) : (order.status || 'pending');
+    
+    // Handle status matching including legacy status mappings
+    if (statusFilter === "in_progress") {
+      return currentStatus === "in_progress" || order.status === "editing" || order.status === "in_progress";
+    }
+    if (statusFilter === "ready_for_qc") {
+      return currentStatus === "ready_for_qc" || order.status === "ready_for_qa" || order.status === "ready_for_qc";
+    }
+    
+    return currentStatus === statusFilter || order.status === statusFilter;
   });
 
   const handleStatusChange = useCallback((orderId: number, newStatus: string) => {
@@ -236,10 +250,21 @@ const OrderStatus = memo(() => {
   }, [sendEmailMutation]);
 
   const getOrdersByStatus = (status: string) => {
-    if (status === "ready_for_qc") {
-      return filteredOrders.filter(order => order.status === "ready_for_qa" || order.status === "ready_for_qc");
-    }
-    return filteredOrders.filter(order => order.status === status);
+    return jobCards.filter(order => {
+      // Use the same status logic as StatusPill and filtering
+      const hasTimestamps = order.uploadedAt || order.acceptedAt || order.readyForQCAt || 
+                           order.revisionRequestedAt || order.deliveredAt;
+      const currentStatus = hasTimestamps ? getOrderStatus(order) : (order.status || 'pending');
+      
+      if (status === "in_progress") {
+        return currentStatus === "in_progress" || order.status === "editing" || order.status === "in_progress";
+      }
+      if (status === "ready_for_qc") {
+        return currentStatus === "ready_for_qc" || order.status === "ready_for_qa" || order.status === "ready_for_qc";
+      }
+      
+      return currentStatus === status || order.status === status;
+    });
   };
 
   if (isLoading) {
