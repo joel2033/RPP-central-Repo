@@ -105,7 +105,9 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
 
   const handleTotalPriceChange = useCallback((totalPrice: number) => {
     console.log('Total price change triggered:', totalPrice);
-  }, []);
+    // Update the form price field
+    form.setValue('price', totalPrice.toFixed(2));
+  }, [form]);
 
   // Load clients
   const { data: clients } = useQuery<Client[]>({
@@ -153,10 +155,18 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
 
   const createBookingMutation = useMutation({
     mutationFn: async (data: z.infer<typeof bookingFormSchema>) => {
-      return apiRequest("/api/bookings", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      console.log("Making API request with data:", data);
+      try {
+        const response = await apiRequest("/api/bookings", {
+          method: "POST",
+          body: JSON.stringify(data),
+        });
+        console.log("API response:", response);
+        return response;
+      } catch (error) {
+        console.error("API request failed:", error);
+        throw error;
+      }
     },
     onSuccess: () => {
       toast({
@@ -170,6 +180,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
       handleClose();
     },
     onError: (error) => {
+      console.error("Booking creation mutation error:", error);
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
