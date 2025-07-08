@@ -242,6 +242,14 @@ Changelog:
   - **Complete Integration**: Booking modal now creates jobs with proper service types, product details, and pricing
   - **Customer Booking Toggle**: Added showOnCustomerBookingForm field for future customer portal separation
   - **Workflow Prevention**: Fixed automatic form submission to ensure all 4 steps are properly navigated
+- July 08, 2025. Enhanced date and time picker components with modern UI and functionality:
+  - **Modern Date Picker**: Implemented react-day-picker with calendar UI, month/year navigation, and proper date formatting
+  - **Advanced Time Picker**: Created dropdown with 15-minute intervals, proper AM/PM formatting, and smooth scrolling
+  - **Cross-Browser Scrolling**: Fixed time picker scroll behavior with mouse wheel and trackpad support across all browsers
+  - **Calendar Event Integration**: Fixed time parsing for calendar event creation, resolving "Invalid time value" errors
+  - **Auto-Scroll Feature**: Time picker automatically scrolls to current time when opened for better UX
+  - **Professional Styling**: Custom scrollbars, smooth animations, and responsive design matching existing UI theme
+  - **Form Integration**: Seamless integration with React Hook Form and Zod validation for Step 3 appointment scheduling
 ```
 
 ## User Preferences
