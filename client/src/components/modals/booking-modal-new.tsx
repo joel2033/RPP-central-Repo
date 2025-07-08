@@ -364,7 +364,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
         </div>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
             {/* Step 1: Job Information */}
             {currentStep === 1 && (
               <div className="space-y-6">
@@ -688,14 +688,15 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
                 </Button>
               ) : (
                 <Button
-                  type="submit"
-                  className="bg-brand-blue hover:bg-blue-700"
-                  disabled={createBookingMutation.isPending || updateBookingMutation.isPending}
+                  type="button"
                   onClick={() => {
                     console.log('Create Job button clicked');
                     console.log('Form errors:', form.formState.errors);
                     console.log('Form valid:', form.formState.isValid);
+                    form.handleSubmit(onSubmit)();
                   }}
+                  className="bg-brand-blue hover:bg-blue-700"
+                  disabled={createBookingMutation.isPending || updateBookingMutation.isPending}
                 >
                   {createBookingMutation.isPending || updateBookingMutation.isPending
                     ? "Creating..."
