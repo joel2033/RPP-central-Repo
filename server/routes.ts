@@ -614,11 +614,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             legacyStatus = "ready_for_qc";
             break;
           case "revision":
-            legacyStatus = "in_revision";
-            break;
           case "delivered":
-            legacyStatus = "delivered";
-            break;
+            return res.status(400).json({ message: "This action is handled within job cards" });
         }
         
         const updatedJobCard = await storage.updateJobCardStatus(jobCardId, legacyStatus, userId, notes);

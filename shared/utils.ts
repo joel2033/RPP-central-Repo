@@ -110,16 +110,7 @@ export function getAvailableActions(
     }
   }
 
-  // Admin/Photographer actions
-  if (userRole === "admin" || userRole === "licensee" || userRole === "photographer") {
-    if (status === "ready_for_qc" || status === "ready_for_qa") {
-      actions.push({ action: "revision", label: "Request Revision", variant: "destructive" });
-      actions.push({ action: "delivered", label: "Deliver to Client", variant: "default" });
-    }
-    if (status === "in_revision") {
-      actions.push({ action: "delivered", label: "Deliver to Client", variant: "default" });
-    }
-  }
+  // Admin/Photographer actions (removed delivery and revision buttons - these will be in job cards)
 
   return actions;
 }
