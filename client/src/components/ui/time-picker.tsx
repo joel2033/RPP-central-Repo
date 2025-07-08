@@ -89,15 +89,15 @@ export function TimePicker({
           {value || placeholder}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-48 p-0" align="start">
-        <ScrollArea className="h-60">
+      <PopoverContent className="w-48 p-0" align="start" side="bottom">
+        <div className="max-h-60 overflow-y-auto">
           <div className="p-1">
             {timeSlots.map((time, index) => (
               <Button
                 key={time}
                 variant={value === time ? "default" : "ghost"}
                 className={cn(
-                  "w-full justify-start text-left font-normal mb-1",
+                  "w-full justify-start text-left font-normal mb-1 hover:bg-accent hover:text-accent-foreground",
                   value === time && "bg-primary text-primary-foreground"
                 )}
                 onClick={() => handleSelect(time)}
@@ -106,7 +106,7 @@ export function TimePicker({
               </Button>
             ))}
           </div>
-        </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );

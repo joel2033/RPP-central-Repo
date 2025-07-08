@@ -317,7 +317,23 @@ export class DatabaseStorage implements IStorage {
     
     // Create calendar event for the booking
     try {
-      const startDateTime = new Date(`${newBooking.scheduledDate}T${newBooking.scheduledTime}`);
+      // Parse the time string (e.g., "2:15PM") to 24-hour format
+      const parseTime = (timeStr: string): string => {
+        const [time, period] = timeStr.split(/([AP]M)/);
+        const [hours, minutes] = time.split(':');
+        let hour = parseInt(hours);
+        
+        if (period === 'PM' && hour !== 12) {
+          hour += 12;
+        } else if (period === 'AM' && hour === 12) {
+          hour = 0;
+        }
+        
+        return `${hour.toString().padStart(2, '0')}:${minutes || '00'}`;
+      };
+      
+      const timeString = parseTime(newBooking.scheduledTime);
+      const startDateTime = new Date(`${newBooking.scheduledDate}T${timeString}:00`);
       const endDateTime = new Date(startDateTime);
       endDateTime.setMinutes(endDateTime.getMinutes() + (newBooking.duration || 60));
 
