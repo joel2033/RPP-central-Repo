@@ -200,10 +200,13 @@ const CustomerProfileContent = memo(({ id }: CustomerProfileProps) => {
 
   // Calculate metrics
   const metrics = React.useMemo<CustomerMetrics>(() => {
-    if (!jobs.length) return { totalJobs: 0, totalSales: 0, averageJobValue: 0, completedJobs: 0 };
+    if (!jobs || !jobs.length) return { totalJobs: 0, totalSales: 0, averageJobValue: 0, completedJobs: 0 };
     
     const completedJobs = jobs.filter(job => job.status === 'delivered').length;
-    const totalSales = jobs.reduce((sum, job) => sum + (parseFloat(job.price || '0') || 0), 0);
+    const totalSales = jobs.reduce((sum, job) => {
+      const price = job.price ? parseFloat(job.price.toString()) : 0;
+      return sum + (isNaN(price) ? 0 : price);
+    }, 0);
     const averageJobValue = jobs.length > 0 ? totalSales / jobs.length : 0;
     
     return {
@@ -216,7 +219,11 @@ const CustomerProfileContent = memo(({ id }: CustomerProfileProps) => {
 
   // Filter jobs
   const filteredJobs = React.useMemo(() => {
+    if (!jobs || !Array.isArray(jobs)) return [];
+    
     return jobs.filter(job => {
+      if (!job) return false;
+      
       const propertyAddress = job.propertyAddress || '';
       const jobId = job.jobId || '';
       const matchesSearch = propertyAddress.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -464,9 +471,9 @@ const CustomerProfileContent = memo(({ id }: CustomerProfileProps) => {
                           </div>
                         </div>
                         <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
-                          <span>{formatDate(job.scheduledDate)}</span>
+                          <span>{job.scheduledDate ? formatDate(job.scheduledDate) : 'No date set'}</span>
                           <span>{job.scheduledTime || 'No time set'}</span>
-                          <span>{formatCurrency(job.price || '0')}</span>
+                          <span>{formatCurrency(job.price ? job.price.toString() : '0')}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">

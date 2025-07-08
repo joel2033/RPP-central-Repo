@@ -2,8 +2,17 @@ import { format, formatDistance, parseISO } from 'date-fns';
 
 // Date formatting utilities
 export const formatDate = (date: string | Date): string => {
-  const dateObj = typeof date === 'string' ? parseISO(date) : date;
-  return format(dateObj, 'MMM dd, yyyy');
+  if (!date) return '';
+  
+  try {
+    const dateObj = typeof date === 'string' ? parseISO(date) : date;
+    if (isNaN(dateObj.getTime())) {
+      return '';
+    }
+    return format(dateObj, 'MMM dd, yyyy');
+  } catch (error) {
+    return '';
+  }
 };
 
 export const formatTime = (time: string): string => {
