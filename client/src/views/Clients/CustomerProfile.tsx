@@ -217,8 +217,10 @@ const CustomerProfileContent = memo(({ id }: CustomerProfileProps) => {
   // Filter jobs
   const filteredJobs = React.useMemo(() => {
     return jobs.filter(job => {
-      const matchesSearch = job.propertyAddress.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           job.jobId.toLowerCase().includes(searchTerm.toLowerCase());
+      const propertyAddress = job.propertyAddress || '';
+      const jobId = job.jobId || '';
+      const matchesSearch = propertyAddress.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           jobId.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
@@ -457,14 +459,14 @@ const CustomerProfileContent = memo(({ id }: CustomerProfileProps) => {
                       <div className="flex-1">
                         <div className="flex items-center gap-3">
                           <div>
-                            <h3 className="font-medium">{job.propertyAddress}</h3>
-                            <p className="text-sm text-gray-600">{job.jobId}</p>
+                            <h3 className="font-medium">{job.propertyAddress || 'No address'}</h3>
+                            <p className="text-sm text-gray-600">{job.jobId || 'No job ID'}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
                           <span>{formatDate(job.scheduledDate)}</span>
-                          <span>{job.scheduledTime}</span>
-                          <span>{formatCurrency(job.price)}</span>
+                          <span>{job.scheduledTime || 'No time set'}</span>
+                          <span>{formatCurrency(job.price || '0')}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
