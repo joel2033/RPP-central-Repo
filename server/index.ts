@@ -46,14 +46,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Setup authentication first
-  const { setupAuth } = await import("./replitAuth");
-  await setupAuth(app);
-
-  // API routes with authentication
-  app.use('/api', apiRoutes);
-
-  // Legacy routes registration
+  // Legacy routes registration (includes existing API routes)
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

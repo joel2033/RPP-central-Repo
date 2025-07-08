@@ -99,43 +99,57 @@ export const ClientModal = memo(({ isOpen, onClose, client, onSuccess }: ClientM
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              {...form.register('name')}
-              type="text"
-              label="Company Name"
-              placeholder="Enter company name"
-              required
-            />
-            <FormField
-              {...form.register('email')}
-              type="email"
-              label="Email Address"
-              placeholder="Enter email address"
-            />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Company Name *</label>
+              <input
+                {...form.register('name')}
+                type="text"
+                placeholder="Enter company name"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Email Address</label>
+              <input
+                {...form.register('email')}
+                type="email"
+                placeholder="Enter email address"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              {...form.register('phone')}
-              type="tel"
-              label="Phone Number"
-              placeholder="Enter phone number"
-            />
-            <FormField
-              {...form.register('contactName')}
-              type="text"
-              label="Contact Person"
-              placeholder="Enter contact person name"
-            />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Phone Number</label>
+              <input
+                {...form.register('phone')}
+                type="tel"
+                placeholder="Enter phone number"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Contact Person</label>
+              <input
+                {...form.register('contactName')}
+                type="text"
+                placeholder="Enter contact person name"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
 
-          <FormField
-            {...form.register('address')}
-            type="textarea"
-            label="Address"
-            placeholder="Enter full address"
-            rows={2}
-          />
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Address</label>
+            <textarea
+              {...form.register('address')}
+              placeholder="Enter full address"
+              rows={2}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            />
+          </div>
 
           <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
             <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900">
@@ -147,14 +161,16 @@ export const ClientModal = memo(({ isOpen, onClose, client, onSuccess }: ClientM
               Advanced Settings
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-4 space-y-4">
-              <FormField
-                {...form.register('editingPreferences')}
-                type="textarea"
-                label="Editing Preferences"
-                placeholder="Enter specific editing preferences and instructions..."
-                description="These preferences will be automatically included in job cards for consistent editing requirements."
-                rows={3}
-              />
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Editing Preferences</label>
+                <textarea
+                  {...form.register('editingPreferences')}
+                  placeholder="Enter specific editing preferences and instructions..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+                <p className="text-xs text-gray-500">These preferences will be automatically included in job cards for consistent editing requirements.</p>
+              </div>
             </CollapsibleContent>
           </Collapsible>
 
