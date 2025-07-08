@@ -13,9 +13,10 @@ interface OfficeModalProps {
   isOpen: boolean;
   onClose: () => void;
   office?: Office;
+  onSuccess?: () => void;
 }
 
-export const OfficeModal: React.FC<OfficeModalProps> = ({ isOpen, onClose, office }) => {
+export const OfficeModal: React.FC<OfficeModalProps> = ({ isOpen, onClose, office, onSuccess }) => {
   const [formData, setFormData] = useState<Partial<InsertOffice>>({
     name: office?.name || '',
     email: office?.email || '',
@@ -33,7 +34,9 @@ export const OfficeModal: React.FC<OfficeModalProps> = ({ isOpen, onClose, offic
     mutationFn: officeApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['offices'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/offices'] });
       toast({ title: "Office created successfully!" });
+      onSuccess?.();
       onClose();
     },
     onError: (error) => {
@@ -46,8 +49,10 @@ export const OfficeModal: React.FC<OfficeModalProps> = ({ isOpen, onClose, offic
       officeApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['offices'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/offices'] });
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       toast({ title: "Office updated successfully!" });
+      onSuccess?.();
       onClose();
     },
     onError: (error) => {
