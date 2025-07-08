@@ -46,6 +46,38 @@ export default function ServiceSelection({ value, onChange, onProductsChange, on
     (product.category && product.category.toLowerCase().includes(searchValue.toLowerCase()))
   );
 
+  // Map product categories to service enum values
+  const getServiceTypeFromProduct = (product: Product): string => {
+    // For now, since the product title shows "photography", map all to photography
+    // This can be expanded when products have proper categories
+    if (product.title.toLowerCase().includes('photography')) return 'photography';
+    if (product.title.toLowerCase().includes('drone') || product.title.toLowerCase().includes('aerial')) return 'drone';
+    if (product.title.toLowerCase().includes('floor') || product.title.toLowerCase().includes('plan')) return 'floor_plans';
+    if (product.title.toLowerCase().includes('video')) return 'video';
+    
+    // Default fallback based on category if available
+    if (product.category) {
+      switch (product.category.toLowerCase()) {
+        case 'photography':
+          return 'photography';
+        case 'drone':
+        case 'aerial':
+          return 'drone';
+        case 'floor_plans':
+        case 'floorplans':
+        case 'floor plans':
+          return 'floor_plans';
+        case 'video':
+        case 'videography':
+          return 'video';
+        default:
+          return 'photography';
+      }
+    }
+    
+    return 'photography'; // final fallback
+  };
+
   const getProductIcon = (type: string) => {
     switch (type.toLowerCase()) {
       case "photography": return Camera;
@@ -64,7 +96,12 @@ export default function ServiceSelection({ value, onChange, onProductsChange, on
       // Remove product
       const newProducts = selectedProducts.filter(p => p.productId !== productId);
       setSelectedProducts(newProducts);
-      onChange(newProducts.map(p => p.productId));
+      // Send service type enum values instead of product IDs
+      const serviceTypes = newProducts.map(p => {
+        const matchingProduct = availableProducts.find(prod => prod.id === p.productId);
+        return matchingProduct ? getServiceTypeFromProduct(matchingProduct) : 'photography';
+      });
+      onChange(serviceTypes);
       onProductsChange?.(newProducts);
       // Calculate total price and notify parent
       const totalPrice = newProducts.reduce((sum, p) => sum + p.price, 0);
@@ -79,7 +116,12 @@ export default function ServiceSelection({ value, onChange, onProductsChange, on
       
       const newProducts = [...selectedProducts, newProduct];
       setSelectedProducts(newProducts);
-      onChange(newProducts.map(p => p.productId));
+      // Send service type enum values instead of product IDs
+      const serviceTypes = newProducts.map(p => {
+        const matchingProduct = availableProducts.find(prod => prod.id === p.productId);
+        return matchingProduct ? getServiceTypeFromProduct(matchingProduct) : 'photography';
+      });
+      onChange(serviceTypes);
       onProductsChange?.(newProducts);
       // Calculate total price and notify parent
       const totalPrice = newProducts.reduce((sum, p) => sum + p.price, 0);
