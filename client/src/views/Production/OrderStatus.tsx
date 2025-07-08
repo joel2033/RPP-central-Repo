@@ -149,6 +149,7 @@ const OrderStatus = memo(() => {
       case "editing":
         return <Clock className="h-4 w-4 text-blue-500" />;
       case "ready_for_qa":
+      case "ready_for_qc":
         return <AlertCircle className="h-4 w-4 text-yellow-500" />;
       case "in_revision":
         return <XCircle className="h-4 w-4 text-red-500" />;
@@ -169,15 +170,17 @@ const OrderStatus = memo(() => {
       in_progress: "bg-blue-100 text-blue-800",
       editing: "bg-blue-100 text-blue-800",
       ready_for_qa: "bg-yellow-100 text-yellow-800",
+      ready_for_qc: "bg-yellow-100 text-yellow-800",
       in_revision: "bg-red-100 text-red-800",
       complete: "bg-green-100 text-green-800",
       delivered: "bg-green-100 text-green-800",
       cancelled: "bg-red-100 text-red-800"
     };
 
+    const label = status === "ready_for_qa" || status === "ready_for_qc" ? "READY FOR QC" : status.replace("_", " ").toUpperCase();
     return (
       <Badge variant="secondary" className={variants[status as keyof typeof variants] || "bg-gray-100 text-gray-800"}>
-        {status.replace("_", " ").toUpperCase()}
+        {label}
       </Badge>
     );
   };
@@ -186,7 +189,8 @@ const OrderStatus = memo(() => {
     { value: "pending", label: "Pending" },
     { value: "in_progress", label: "In Progress" },
     { value: "editing", label: "Editing" },
-    { value: "ready_for_qa", label: "Ready for QA" },
+    { value: "ready_for_qa", label: "Ready for QC" },
+    { value: "ready_for_qc", label: "Ready for QC" },
     { value: "in_revision", label: "In Revision" },
     { value: "complete", label: "Complete" },
     { value: "delivered", label: "Delivered" },
@@ -221,6 +225,9 @@ const OrderStatus = memo(() => {
   }, [sendEmailMutation]);
 
   const getOrdersByStatus = (status: string) => {
+    if (status === "ready_for_qc") {
+      return filteredOrders.filter(order => order.status === "ready_for_qa" || order.status === "ready_for_qc");
+    }
     return filteredOrders.filter(order => order.status === status);
   };
 
@@ -264,7 +271,7 @@ const OrderStatus = memo(() => {
           <TabsTrigger value="all">All ({filteredOrders.length})</TabsTrigger>
           <TabsTrigger value="pending">Pending ({getOrdersByStatus("pending").length})</TabsTrigger>
           <TabsTrigger value="in_progress">In Progress ({getOrdersByStatus("in_progress").length + getOrdersByStatus("editing").length})</TabsTrigger>
-          <TabsTrigger value="ready_for_qa">Ready for QA ({getOrdersByStatus("ready_for_qa").length})</TabsTrigger>
+          <TabsTrigger value="ready_for_qc">Ready for QC ({getOrdersByStatus("ready_for_qc").length})</TabsTrigger>
           <TabsTrigger value="in_revision">In Revision ({getOrdersByStatus("in_revision").length})</TabsTrigger>
           <TabsTrigger value="complete">Complete ({getOrdersByStatus("complete").length})</TabsTrigger>
           <TabsTrigger value="delivered">Delivered ({getOrdersByStatus("delivered").length})</TabsTrigger>

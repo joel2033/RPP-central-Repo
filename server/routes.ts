@@ -488,7 +488,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (updateData.status === 'delivered' && !updateData.deliveredAt) {
           updateData.deliveredAt = new Date();
         }
-        if (['ready_for_qa', 'editing'].includes(updateData.status) && !updateData.completedAt) {
+        if (['ready_for_qc', 'editing'].includes(updateData.status) && !updateData.completedAt) {
           updateData.completedAt = new Date();
         }
       }
@@ -514,7 +514,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Enhanced Order Status API endpoints
-  app.put('/api/job-cards/:id/status', isAuthenticated, requireAdminOrVA, async (req: any, res) => {
+  app.put('/api/job-cards/:id/status', isAuthenticated, async (req: any, res) => {
     try {
       const jobCardId = parseInt(req.params.id);
       const { status, reason, changedBy } = req.body;
@@ -527,7 +527,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/job-cards/:id/send-delivery-email', isAuthenticated, requireAdminOrVA, async (req: any, res) => {
+  app.post('/api/job-cards/:id/send-delivery-email', isAuthenticated, async (req: any, res) => {
     try {
       const jobCardId = parseInt(req.params.id);
       
@@ -545,7 +545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/job-cards/:id/audit-log', isAuthenticated, requireAdminOrVA, async (req: any, res) => {
+  app.get('/api/job-cards/:id/audit-log', isAuthenticated, async (req: any, res) => {
     try {
       const jobCardId = parseInt(req.params.id);
       const auditLog = await storage.getOrderStatusAuditLog(jobCardId);

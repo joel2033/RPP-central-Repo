@@ -117,7 +117,7 @@ function EditorDashboardContent() {
     updateJobCardMutation.mutate({
       id: jobCard.id,
       data: { 
-        status: "ready_for_qa",
+        status: "ready_for_qc",
         editingNotes: completionNotes || jobCard.editingNotes,
       }
     });
@@ -127,7 +127,7 @@ function EditorDashboardContent() {
     switch (status) {
       case "in_progress": return "bg-blue-500";
       case "editing": return "bg-yellow-500";
-      case "ready_for_qa": return "bg-green-500";
+      case "ready_for_qc": return "bg-green-500";
       case "in_revision": return "bg-orange-500";
       case "delivered": return "bg-emerald-500";
       default: return "bg-gray-500";
@@ -138,7 +138,7 @@ function EditorDashboardContent() {
     switch (status) {
       case "in_progress": return "Assigned";
       case "editing": return "Editing";
-      case "ready_for_qa": return "Ready for Pre-Delivery Check";
+      case "ready_for_qc": return "Ready for QC";
       case "in_revision": return "In Revision";
       case "delivered": return "Delivered";
       default: return status;
@@ -209,7 +209,7 @@ function EditorDashboardContent() {
                   <div>
                     <p className="text-sm font-medium text-slate-600">Completed</p>
                     <p className="text-2xl font-bold">
-                      {myJobCards?.filter(j => j.status === "ready_for_qa").length || 0}
+                      {myJobCards?.filter(j => j.status === "ready_for_qc").length || 0}
                     </p>
                   </div>
                 </div>

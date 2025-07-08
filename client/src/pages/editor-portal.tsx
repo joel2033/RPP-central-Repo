@@ -157,7 +157,7 @@ export default function EditorPortal() {
           updateJobCardMutation.mutate({
             id: jobCard.id,
             data: { 
-              status: "ready_for_qa",
+              status: "ready_for_qc",
               editingNotes: completionNotes || jobCard.editingNotes,
             }
           });
@@ -174,7 +174,7 @@ export default function EditorPortal() {
     switch (status) {
       case "in_progress": return "bg-blue-500";
       case "editing": return "bg-yellow-500";
-      case "ready_for_qa": return "bg-green-500";
+      case "ready_for_qc": return "bg-green-500";
       case "in_revision": return "bg-orange-500";
       case "delivered": return "bg-emerald-500";
       default: return "bg-gray-500";
@@ -185,7 +185,7 @@ export default function EditorPortal() {
     switch (status) {
       case "in_progress": return "Assigned";
       case "editing": return "In Progress";
-      case "ready_for_qa": return "Ready for QA";
+      case "ready_for_qc": return "Ready for QC";
       case "in_revision": return "Needs Revision";
       case "delivered": return "Delivered";
       default: return status;

@@ -66,13 +66,13 @@ export const serviceTypeEnum = pgEnum("service_type", ["photography", "drone", "
 export const jobStatusEnum = pgEnum("job_status", ["pending", "confirmed", "in_progress", "completed", "cancelled"]);
 
 // Production workflow enums
-export const jobCardStatusEnum = pgEnum("job_card_status", ["unassigned", "pending", "in_progress", "editing", "ready_for_qa", "in_revision", "complete", "delivered", "cancelled"]);
+export const jobCardStatusEnum = pgEnum("job_card_status", ["unassigned", "pending", "in_progress", "editing", "ready_for_qc", "in_revision", "complete", "delivered", "cancelled"]);
 export const mediaTypeEnum = pgEnum("media_type", ["raw", "edited", "final"]);
 export const serviceCategoryEnum = pgEnum("service_category", ["photography", "floor_plan", "drone", "video"]);
 
 // Job status enum - extended for better tracking 
 export const jobStatusExtendedEnum = pgEnum("job_status_extended", [
-  "upcoming", "booked", "in_progress", "editing", "ready_for_qa", 
+  "upcoming", "booked", "in_progress", "editing", "ready_for_qc", 
   "in_revision", "delivered", "completed", "cancelled"
 ]);
 
