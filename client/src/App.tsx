@@ -9,6 +9,7 @@ import { queryClient } from '@/lib/queryClient';
 // Lazy load pages for better performance
 const Dashboard = lazy(() => import('@/views/Dashboard/Dashboard'));
 const Clients = lazy(() => import('@/views/Clients/Clients'));
+const CustomerProfile = lazy(() => import('@/views/Clients/CustomerProfile'));
 const Jobs = lazy(() => import('@/pages/jobs'));
 const Calendar = lazy(() => import('@/pages/calendar'));
 const Bookings = lazy(() => import('@/pages/bookings'));
@@ -34,6 +35,7 @@ const AppRoutes = React.memo(() => (
     <Route path="/" component={Dashboard} />
     <Route path="/dashboard" component={Dashboard} />
     <Route path="/clients" component={Clients} />
+    <Route path="/clients/:id" component={CustomerProfile} />
     <Route path="/jobs" component={Jobs} />
     <Route path="/jobs/:id" component={JobDetail} />
     <Route path="/calendar" component={Calendar} />

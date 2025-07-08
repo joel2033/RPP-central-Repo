@@ -1,8 +1,9 @@
 import React, { memo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Mail, Phone, MapPin, Edit, Trash2 } from 'lucide-react';
+import { Mail, Phone, MapPin, Edit, Trash2, Eye } from 'lucide-react';
 import { formatDate, formatPhoneNumber } from '@/utils/formatting';
+import { useLocation } from 'wouter';
 import type { Client } from '@shared/schema';
 
 interface ClientCardProps {
@@ -12,6 +13,8 @@ interface ClientCardProps {
 }
 
 export const ClientCard = memo(({ client, onEdit, onDelete }: ClientCardProps) => {
+  const [_, navigate] = useLocation();
+  
   const handleEdit = useCallback(() => {
     onEdit(client);
   }, [client, onEdit]);
@@ -20,12 +23,25 @@ export const ClientCard = memo(({ client, onEdit, onDelete }: ClientCardProps) =
     onDelete(client);
   }, [client, onDelete]);
 
+  const handleViewProfile = useCallback(() => {
+    navigate(`/clients/${client.id}`);
+  }, [client.id, navigate]);
+
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg">{client.name}</CardTitle>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleViewProfile}
+              className="gap-1"
+            >
+              <Eye className="h-3 w-3" />
+              View
+            </Button>
             <Button
               variant="outline"
               size="sm"

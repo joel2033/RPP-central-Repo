@@ -53,6 +53,11 @@ export const clients = pgTable("clients", {
   phone: varchar("phone", { length: 50 }),
   address: text("address"),
   contactName: varchar("contact_name", { length: 255 }),
+  agencyName: varchar("agency_name", { length: 255 }),
+  tags: text("tags").array(),
+  preferences: text("preferences"),
+  teamMembers: jsonb("team_members").$type<Array<{ name: string; email: string; phone?: string }>>(),
+  notes: text("notes").array(),
   editingPreferences: jsonb("editing_preferences"), // Client preset preferences for auto-fill
   licenseeId: varchar("licensee_id").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
