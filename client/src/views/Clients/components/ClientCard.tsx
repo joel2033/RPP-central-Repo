@@ -1,7 +1,8 @@
 import React, { memo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Mail, Phone, MapPin, Edit, Trash2, Eye } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Mail, Phone, MapPin, Edit, Trash2, Eye, MoreVertical } from 'lucide-react';
 import { formatDate, formatPhoneNumber } from '@/utils/formatting';
 import { useLocation } from 'wouter';
 import type { Client } from '@shared/schema';
@@ -31,36 +32,36 @@ export const ClientCard = memo(({ client, onEdit, onDelete }: ClientCardProps) =
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">{client.name}</CardTitle>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleViewProfile}
-              className="gap-1"
-            >
-              <Eye className="h-3 w-3" />
-              View
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleEdit}
-              className="gap-1"
-            >
-              <Edit className="h-3 w-3" />
-              Edit
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDelete}
-              className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-            >
-              <Trash2 className="h-3 w-3" />
-              Delete
-            </Button>
-          </div>
+          <CardTitle 
+            className="text-lg cursor-pointer hover:text-blue-600 transition-colors"
+            onClick={handleViewProfile}
+          >
+            {client.name}
+          </CardTitle>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleViewProfile}>
+                <Eye className="h-4 w-4 mr-2" />
+                View Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleEdit}>
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Client
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={handleDelete}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Client
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
