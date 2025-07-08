@@ -1,82 +1,61 @@
-import { Switch, Route } from "wouter";
-import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { useAuth } from "@/hooks/useAuth";
-import NotFound from "@/pages/not-found";
-import Landing from "@/pages/landing";
-import Dashboard from "@/pages/dashboard";
-import Clients from "@/pages/clients";
-import Bookings from "@/pages/bookings";
-import Jobs from "@/pages/jobs";
-import JobDetailPage from "@/pages/job-detail";
-import Production from "@/pages/production";
-import UploadToEditor from "@/pages/upload-to-editor";
-import EditorDashboard from "@/pages/editor-dashboard";
-import EditorPortal from "@/pages/editor-portal";
-import PreDeliveryCheck from "@/pages/qa-review";
-import Calendar from "@/pages/calendar";
-import Delivery from "@/pages/delivery";
-import DeliveryPage from "@/pages/delivery-page";
-import Reports from "@/pages/reports";
-import Settings from "@/pages/settings";
-import Products from "@/pages/products";
+import React, { Suspense, lazy } from 'react';
+import { Route, Switch } from 'wouter';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from '@/components/ui/toaster';
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { queryClient } from '@/lib/queryClient';
 
-function Router() {
-  const { isAuthenticated, isLoading, user } = useAuth();
+// Lazy load pages for better performance
+const Dashboard = lazy(() => import('@/views/Dashboard/Dashboard'));
+const Clients = lazy(() => import('@/views/Clients/Clients'));
+const Jobs = lazy(() => import('@/pages/jobs'));
+const Calendar = lazy(() => import('@/pages/calendar'));
+const Bookings = lazy(() => import('@/pages/bookings'));
+const Production = lazy(() => import('@/pages/production'));
+const EditorDashboard = lazy(() => import('@/pages/editor-dashboard'));
+const JobDetail = lazy(() => import('@/pages/job-detail'));
+const DeliveryPage = lazy(() => import('@/pages/delivery-page'));
+const Products = lazy(() => import('@/pages/products'));
+const NotFound = lazy(() => import('@/pages/not-found'));
 
-  return (
-    <Switch>
-      {isLoading || !isAuthenticated ? (
-        <Route path="/" component={Landing} />
-      ) : user?.role === 'editor' ? (
-        // Editor-only routes
-        <>
-          <Route path="/" component={EditorPortal} />
-          <Route path="/editor-portal" component={EditorPortal} />
-          <Route component={() => <EditorPortal />} />
-        </>
-      ) : (
-        // Admin/Licensee/Photographer routes
-        <>
-          <Route path="/" component={Dashboard} />
-          <Route path="/clients" component={Clients} />
-          <Route path="/bookings" component={Bookings} />
-          <Route path="/calendar" component={Calendar} />
-          <Route path="/jobs" component={Jobs} />
-          <Route path="/jobs/:id" component={JobDetailPage} />
-          <Route path="/production" component={Production} />
-          <Route path="/upload-to-editor" component={UploadToEditor} />
-          <Route path="/editor" component={EditorDashboard} />
-          <Route path="/qa-review" component={PreDeliveryCheck} />
-          <Route path="/delivery" component={Delivery} />
-          <Route path="/reports" component={Reports} />
-          <Route path="/settings" component={Settings} />
-          <Route path="/products" component={Products} />
-          <Route path="/services">
-            {() => {
-              window.location.replace("/products");
-              return null;
-            }}
-          </Route>
-        </>
-      )}
-      {/* Public delivery page - no authentication required */}
-      <Route path="/delivery/:jobCardId" component={DeliveryPage} />
-      <Route component={NotFound} />
-    </Switch>
-  );
-}
+const PageLoader = () => (
+  <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <LoadingSpinner />
+  </div>
+);
+
+const AppRoutes = React.memo(() => (
+  <Switch>
+    <Route path="/" component={Dashboard} />
+    <Route path="/dashboard" component={Dashboard} />
+    <Route path="/clients" component={Clients} />
+    <Route path="/jobs" component={Jobs} />
+    <Route path="/jobs/:id" component={JobDetail} />
+    <Route path="/calendar" component={Calendar} />
+    <Route path="/bookings" component={Bookings} />
+    <Route path="/production" component={Production} />
+    <Route path="/editor-dashboard" component={EditorDashboard} />
+    <Route path="/products" component={Products} />
+    <Route path="/delivery/:jobId" component={DeliveryPage} />
+    <Route component={NotFound} />
+  </Switch>
+));
+
+AppRoutes.displayName = 'AppRoutes';
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <div className="min-h-screen bg-gray-50">
+          <Suspense fallback={<PageLoader />}>
+            <AppRoutes />
+          </Suspense>
+        </div>
         <Toaster />
-        <Router />
-      </TooltipProvider>
-    </QueryClientProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -1,8 +1,6 @@
 import { Router } from 'express';
 import clientRoutes from './clientRoutes';
 import jobRoutes from './jobRoutes';
-import bookingRoutes from './bookingRoutes';
-import productRoutes from './productRoutes';
 import { errorHandler, notFoundHandler } from '../utils/errorHandler';
 
 const router = Router();
@@ -14,9 +12,7 @@ router.get('/health', (req, res) => {
 
 // API routes
 router.use('/clients', clientRoutes);
-// router.use('/jobs', jobRoutes);
-// router.use('/bookings', bookingRoutes);
-// router.use('/products', productRoutes);
+router.use('/jobs', jobRoutes);
 
 // 404 handler for API routes
 router.use('*', notFoundHandler);

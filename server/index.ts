@@ -1,10 +1,19 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { securityHeaders, rateLimiter, requestSizeLimit, inputSanitization } from "./middleware/securityMiddleware";
+import apiRoutes from "./routes/index";
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+
+// Security middleware
+app.use(securityHeaders);
+app.use(rateLimiter(15 * 60 * 1000, 1000)); // 15 minutes, 1000 requests
+app.use(requestSizeLimit(50 * 1024 * 1024)); // 50MB limit
+
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+app.use(inputSanitization);
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -37,6 +46,14 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Setup authentication first
+  const { setupAuth } = await import("./replitAuth");
+  await setupAuth(app);
+
+  // API routes with authentication
+  app.use('/api', apiRoutes);
+
+  // Legacy routes registration
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

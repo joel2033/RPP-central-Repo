@@ -1,119 +1,39 @@
 import { apiRequest } from './queryClient';
-import type {
-  ApiResponse,
-  PaginatedResponse,
-  ClientQueryParams,
-  JobQueryParams,
-  BookingQueryParams,
-  CreateClientRequest,
-  UpdateClientRequest,
-  CreateBookingRequest,
-  UpdateBookingRequest,
-} from '@/types/api';
-import type { Client, JobCard, Booking, Product } from '@shared/schema';
-import { API_ENDPOINTS } from '@/utils/constants';
 
-// Utility function to build query string
-const buildQueryString = (params: Record<string, any>): string => {
-  const searchParams = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      searchParams.append(key, String(value));
-    }
-  });
-  return searchParams.toString();
-};
-
-// Client API
 export const clientApi = {
-  getAll: async (params?: ClientQueryParams): Promise<PaginatedResponse<Client>> => {
-    const queryString = params ? `?${buildQueryString(params)}` : '';
-    return apiRequest('GET', `${API_ENDPOINTS.CLIENTS}${queryString}`);
-  },
-
-  getById: async (id: number): Promise<Client> => {
-    return apiRequest('GET', `${API_ENDPOINTS.CLIENTS}/${id}`);
-  },
-
-  create: async (data: CreateClientRequest): Promise<Client> => {
-    return apiRequest('POST', API_ENDPOINTS.CLIENTS, data);
-  },
-
-  update: async (id: number, data: UpdateClientRequest): Promise<Client> => {
-    return apiRequest('PUT', `${API_ENDPOINTS.CLIENTS}/${id}`, data);
-  },
-
-  delete: async (id: number): Promise<void> => {
-    return apiRequest('DELETE', `${API_ENDPOINTS.CLIENTS}/${id}`);
-  },
+  getAll: () => apiRequest('/api/clients'),
+  getById: (id: number) => apiRequest(`/api/clients/${id}`),
+  create: (data: any) => apiRequest('/api/clients', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  update: (id: number, data: any) => apiRequest(`/api/clients/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+  delete: (id: number) => apiRequest(`/api/clients/${id}`, {
+    method: 'DELETE',
+  }),
 };
 
-// Job API
 export const jobApi = {
-  getAll: async (params?: JobQueryParams): Promise<PaginatedResponse<JobCard>> => {
-    const queryString = params ? `?${buildQueryString(params)}` : '';
-    return apiRequest('GET', `${API_ENDPOINTS.JOBS}${queryString}`);
+  getAll: (params?: any) => {
+    const searchParams = new URLSearchParams(params);
+    return apiRequest(`/api/jobs?${searchParams}`);
   },
-
-  getById: async (id: number): Promise<JobCard> => {
-    return apiRequest('GET', `${API_ENDPOINTS.JOBS}/${id}`);
-  },
-
-  updateStatus: async (id: number, status: string): Promise<JobCard> => {
-    return apiRequest('PATCH', `${API_ENDPOINTS.JOBS}/${id}`, { status });
-  },
+  getById: (id: number) => apiRequest(`/api/jobs/${id}`),
+  updateStatus: (id: number, status: string) => apiRequest(`/api/jobs/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  }),
+  getFiles: (id: number) => apiRequest(`/api/jobs/${id}/files`),
+  getActivity: (id: number) => apiRequest(`/api/jobs/${id}/activity`),
 };
 
-// Booking API
 export const bookingApi = {
-  getAll: async (params?: BookingQueryParams): Promise<PaginatedResponse<Booking>> => {
-    const queryString = params ? `?${buildQueryString(params)}` : '';
-    return apiRequest('GET', `${API_ENDPOINTS.BOOKINGS}${queryString}`);
-  },
-
-  getById: async (id: number): Promise<Booking> => {
-    return apiRequest('GET', `${API_ENDPOINTS.BOOKINGS}/${id}`);
-  },
-
-  create: async (data: CreateBookingRequest): Promise<Booking> => {
-    return apiRequest('POST', API_ENDPOINTS.BOOKINGS, data);
-  },
-
-  update: async (id: number, data: UpdateBookingRequest): Promise<Booking> => {
-    return apiRequest('PUT', `${API_ENDPOINTS.BOOKINGS}/${id}`, data);
-  },
-
-  delete: async (id: number): Promise<void> => {
-    return apiRequest('DELETE', `${API_ENDPOINTS.BOOKINGS}/${id}`);
-  },
-};
-
-// Product API
-export const productApi = {
-  getAll: async (): Promise<Product[]> => {
-    return apiRequest('GET', API_ENDPOINTS.PRODUCTS);
-  },
-
-  getById: async (id: string): Promise<Product> => {
-    return apiRequest('GET', `${API_ENDPOINTS.PRODUCTS}/${id}`);
-  },
-
-  create: async (data: any): Promise<Product> => {
-    return apiRequest('POST', API_ENDPOINTS.PRODUCTS, data);
-  },
-
-  update: async (id: string, data: any): Promise<Product> => {
-    return apiRequest('PUT', `${API_ENDPOINTS.PRODUCTS}/${id}`, data);
-  },
-
-  delete: async (id: string): Promise<void> => {
-    return apiRequest('DELETE', `${API_ENDPOINTS.PRODUCTS}/${id}`);
-  },
-};
-
-// Dashboard API
-export const dashboardApi = {
-  getStats: async (): Promise<any> => {
-    return apiRequest('GET', `${API_ENDPOINTS.DASHBOARD}/stats`);
-  },
+  getAll: () => apiRequest('/api/bookings'),
+  create: (data: any) => apiRequest('/api/bookings', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
 };

@@ -1,7 +1,7 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { z } from 'zod';
-import { storage } from '../storage';
 import { asyncHandler, createError } from '../utils/errorHandler';
+import { clientService } from '../services/clientService';
 import { insertClientSchema } from '@shared/schema';
 import type { AuthenticatedRequest } from '../middleware/roleAuth';
 
@@ -19,27 +19,19 @@ export const getClients = asyncHandler(async (req: AuthenticatedRequest, res: Re
   const { search, limit = 50, offset = 0 } = req.query as any;
   const licenseeId = req.user.claims.sub;
 
-  const clients = await storage.getClientsByLicenseeId(licenseeId);
-  
-  let filteredClients = clients;
-  if (search) {
-    const searchLower = search.toLowerCase();
-    filteredClients = clients.filter(client =>
-      client.name.toLowerCase().includes(searchLower) ||
-      client.email?.toLowerCase().includes(searchLower) ||
-      client.contactName?.toLowerCase().includes(searchLower)
-    );
-  }
+  const clients = search 
+    ? await clientService.searchClients(licenseeId, search)
+    : await clientService.getAllClients(licenseeId);
 
-  const paginatedClients = filteredClients.slice(offset, offset + limit);
+  const paginatedClients = clients.slice(offset, offset + limit);
   
   res.json({
     data: paginatedClients,
     pagination: {
-      total: filteredClients.length,
+      total: clients.length,
       limit,
       offset,
-      hasMore: offset + limit < filteredClients.length,
+      hasMore: offset + limit < clients.length,
     },
   });
 });
@@ -48,12 +40,7 @@ export const getClient = asyncHandler(async (req: AuthenticatedRequest, res: Res
   const { id } = idParamSchema.parse(req.params);
   const licenseeId = req.user.claims.sub;
 
-  const client = await storage.getClient(id);
-  
-  if (!client || client.licenseeId !== licenseeId) {
-    throw createError('Client not found', 404, 'CLIENT_NOT_FOUND');
-  }
-
+  const client = await clientService.getClientById(id, licenseeId);
   res.json(client);
 });
 
@@ -64,7 +51,7 @@ export const createClient = asyncHandler(async (req: AuthenticatedRequest, res: 
     licenseeId,
   });
 
-  const client = await storage.createClient(clientData);
+  const client = await clientService.createClient(clientData);
   res.status(201).json(client);
 });
 
@@ -72,13 +59,8 @@ export const updateClient = asyncHandler(async (req: AuthenticatedRequest, res: 
   const { id } = idParamSchema.parse(req.params);
   const licenseeId = req.user.claims.sub;
 
-  const existingClient = await storage.getClient(id);
-  if (!existingClient || existingClient.licenseeId !== licenseeId) {
-    throw createError('Client not found', 404, 'CLIENT_NOT_FOUND');
-  }
-
   const updateData = insertClientSchema.partial().parse(req.body);
-  const updatedClient = await storage.updateClient(id, updateData);
+  const updatedClient = await clientService.updateClient(id, updateData, licenseeId);
   
   res.json(updatedClient);
 });
@@ -87,11 +69,6 @@ export const deleteClient = asyncHandler(async (req: AuthenticatedRequest, res: 
   const { id } = idParamSchema.parse(req.params);
   const licenseeId = req.user.claims.sub;
 
-  const client = await storage.getClient(id);
-  if (!client || client.licenseeId !== licenseeId) {
-    throw createError('Client not found', 404, 'CLIENT_NOT_FOUND');
-  }
-
-  await storage.deleteClient(id);
+  await clientService.deleteClient(id, licenseeId);
   res.status(204).send();
 });

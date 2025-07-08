@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { memo, useState, useRef, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Clock } from 'lucide-react';
-import { Button } from './button';
-import { Popover, PopoverContent, PopoverTrigger } from './popover';
-import { ScrollArea } from './scroll-area';
 import { cn } from '@/lib/utils';
 
 interface TimePickerProps {
@@ -13,84 +13,58 @@ interface TimePickerProps {
   className?: string;
 }
 
-// Generate time slots in 15-minute intervals
-const generateTimeSlots = (): string[] => {
-  const slots: string[] = [];
-  for (let hour = 0; hour < 24; hour++) {
-    for (let minute = 0; minute < 60; minute += 15) {
-      const time = new Date();
-      time.setHours(hour, minute, 0, 0);
-      
-      // Format as 12-hour with AM/PM
-      const timeString = time.toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      }).replace(/\s/g, ''); // Remove spaces between time and AM/PM
-      
-      slots.push(timeString);
-    }
-  }
-  return slots;
-};
-
-const timeSlots = generateTimeSlots();
-
-export function TimePicker({
+export const TimePicker = memo(({
   value,
   onChange,
-  placeholder = "Set a start time",
-  disabled = false,
-  className
-}: TimePickerProps) {
-  const [open, setOpen] = useState(false);
-  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
-  
-  const handleSelect = (time: string) => {
-    onChange(time);
-    setOpen(false);
+  placeholder = "Select time",
+  disabled,
+  className,
+}: TimePickerProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  // Generate time options (15-minute intervals)
+  const timeOptions = [];
+  for (let hour = 0; hour < 24; hour++) {
+    for (let minute = 0; minute < 60; minute += 15) {
+      const timeValue = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+      const timeLabel = new Date(`2000-01-01T${timeValue}`).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+      timeOptions.push({ value: timeValue, label: timeLabel });
+    }
+  }
+
+  const handleTimeSelect = (timeValue: string) => {
+    onChange(timeValue);
+    setIsOpen(false);
   };
 
-  // Auto-scroll to current time when dropdown opens
+  const getCurrentTimeDisplay = () => {
+    if (!value) return placeholder;
+    const option = timeOptions.find(opt => opt.value === value);
+    return option ? option.label : value;
+  };
+
+  // Auto-scroll to current time when opened
   useEffect(() => {
-    if (open && scrollContainerRef.current) {
-      const currentTimeIndex = getCurrentTimeIndex();
-      if (currentTimeIndex >= 0) {
-        const buttonHeight = 40; // Approximate button height with margin
-        const scrollTop = currentTimeIndex * buttonHeight - 120; // Center it
-        scrollContainerRef.current.scrollTo({
-          top: Math.max(0, scrollTop),
-          behavior: 'smooth'
-        });
+    if (isOpen && scrollAreaRef.current && value) {
+      const selectedIndex = timeOptions.findIndex(opt => opt.value === value);
+      if (selectedIndex >= 0) {
+        const scrollTop = selectedIndex * 40; // Approximate item height
+        setTimeout(() => {
+          if (scrollAreaRef.current) {
+            scrollAreaRef.current.scrollTop = scrollTop;
+          }
+        }, 100);
       }
     }
-  }, [open]);
-
-  // Get current time as default scroll position
-  const getCurrentTimeIndex = () => {
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    
-    // Round to nearest 15-minute interval
-    const roundedMinute = Math.ceil(currentMinute / 15) * 15;
-    const adjustedHour = roundedMinute === 60 ? currentHour + 1 : currentHour;
-    const finalMinute = roundedMinute === 60 ? 0 : roundedMinute;
-    
-    const currentTime = new Date();
-    currentTime.setHours(adjustedHour, finalMinute, 0, 0);
-    
-    const timeString = currentTime.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    }).replace(/\s/g, '');
-    
-    return timeSlots.indexOf(timeString);
-  };
+  }, [isOpen, value, timeOptions]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -102,42 +76,29 @@ export function TimePicker({
           disabled={disabled}
         >
           <Clock className="mr-2 h-4 w-4" />
-          {value || placeholder}
+          {getCurrentTimeDisplay()}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-48 p-0" align="start" side="bottom">
-        <div 
-          ref={scrollContainerRef}
-          className="h-60 overflow-y-auto pr-2 time-picker-scroll"
-          style={{
-            maxHeight: '240px',
-            overflowY: 'auto',
-            WebkitOverflowScrolling: 'touch',
-            scrollBehavior: 'smooth',
-            overscrollBehavior: 'contain'
-          }}
-          onWheel={(e) => {
-            // Ensure wheel events are handled properly
-            e.stopPropagation();
-          }}
-        >
-          <div className="p-1 pr-0">
-            {timeSlots.map((time, index) => (
-              <Button
-                key={time}
-                variant={value === time ? "default" : "ghost"}
+      <PopoverContent className="w-64 p-0" align="start">
+        <ScrollArea className="h-60" ref={scrollAreaRef}>
+          <div className="p-1">
+            {timeOptions.map((option) => (
+              <button
+                key={option.value}
                 className={cn(
-                  "w-full justify-start text-left font-normal mb-1 hover:bg-accent hover:text-accent-foreground transition-colors duration-150",
-                  value === time && "bg-primary text-primary-foreground"
+                  "w-full text-left px-3 py-2 text-sm rounded-sm hover:bg-gray-100 transition-colors",
+                  value === option.value && "bg-blue-100 text-blue-900"
                 )}
-                onClick={() => handleSelect(time)}
+                onClick={() => handleTimeSelect(option.value)}
               >
-                {time}
-              </Button>
+                {option.label}
+              </button>
             ))}
           </div>
-        </div>
+        </ScrollArea>
       </PopoverContent>
     </Popover>
   );
-}
+});
+
+TimePicker.displayName = 'TimePicker';
