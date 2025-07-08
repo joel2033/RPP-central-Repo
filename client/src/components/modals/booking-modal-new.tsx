@@ -35,6 +35,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MapPin, Calendar, Clock, Camera, Home, Video, ChevronLeft, ChevronRight, Mail, PlaneTakeoff, UserIcon, AlertCircle } from "lucide-react";
+import { DatePicker } from "@/components/ui/date-picker";
+import { TimePicker } from "@/components/ui/time-picker";
 import { z } from "zod";
 import AddressInput from "@/components/ui/address-input";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
@@ -507,7 +509,11 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
                           <FormItem>
                             <FormLabel>Date *</FormLabel>
                             <FormControl>
-                              <Input type="date" {...field} />
+                              <DatePicker
+                                value={field.value ? new Date(field.value) : undefined}
+                                onChange={(date) => field.onChange(date ? date.toISOString().split('T')[0] : "")}
+                                placeholder="Select a date"
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -521,7 +527,11 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
                           <FormItem>
                             <FormLabel>Time *</FormLabel>
                             <FormControl>
-                              <Input type="time" {...field} />
+                              <TimePicker
+                                value={field.value}
+                                onChange={field.onChange}
+                                placeholder="Set a start time"
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
