@@ -28,6 +28,8 @@ import {
   Send,
   User
 } from "lucide-react";
+import { JobActionButtons } from '@/components/JobActionButtons';
+import { StatusDisplay } from '@/components/StatusDisplay';
 
 interface JobCardWithDetails {
   id: number;
@@ -38,6 +40,17 @@ interface JobCardWithDetails {
   assignedAt?: string;
   completedAt?: string;
   deliveredAt?: string;
+  // Action-based status timestamps
+  uploadedAt?: string | null;
+  acceptedAt?: string | null;
+  readyForQCAt?: string | null;
+  revisionRequestedAt?: string | null;
+  history?: Array<{
+    action: "upload" | "accept" | "readyForQC" | "revision" | "delivered";
+    by: string;
+    at: string;
+    notes?: string;
+  }>;
   createdAt: string;
   updatedAt: string;
   client: {
@@ -328,21 +341,21 @@ const OrderStatus = memo(() => {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Select 
-                          value={order.status} 
-                          onValueChange={(value) => handleStatusChange(order.id, value)}
-                        >
-                          <SelectTrigger className="w-40">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {statusOptions.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="space-y-2">
+                          <StatusDisplay 
+                            jobCard={order} 
+                            showTimestamp={true}
+                            size="sm"
+                          />
+                          <JobActionButtons
+                            jobCard={order}
+                            userRole={user?.role || 'user'}
+                            userId={user?.id}
+                            onActionComplete={() => {
+                              queryClient.invalidateQueries({ queryKey: ["/api/job-cards"] });
+                            }}
+                          />
+                        </div>
                       </TableCell>
                       <TableCell>
                         ${order.booking?.price || "0.00"}

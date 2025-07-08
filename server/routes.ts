@@ -513,7 +513,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Enhanced Order Status API endpoints
+  // Action-based job card management - NEW SYSTEM
+  app.post('/api/job-cards/:id/actions/:action', isAuthenticated, async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const { action } = req.params;
+      const { notes } = req.body;
+      const userId = req.user.claims.sub;
+      const userData = (req as any).userData;
+      
+      // Get current job card
+      const jobCard = await storage.getJobCard(jobCardId, userId);
+      if (!jobCard) {
+        return res.status(404).json({ message: "Job card not found" });
+      }
+
+      const now = new Date();
+      let updateData: any = { updatedAt: now };
+      let activityDescription = "";
+
+      // Handle different actions with role-based permissions
+      switch (action) {
+        case "upload":
+          updateData.uploadedAt = now;
+          activityDescription = "Files uploaded - job ready for assignment";
+          break;
+        
+        case "accept":
+          // Only editors can accept jobs
+          if (userData?.role !== "editor") {
+            return res.status(403).json({ message: "Only editors can accept jobs" });
+          }
+          updateData.acceptedAt = now;
+          updateData.editorId = userId;
+          activityDescription = "Job accepted by editor";
+          break;
+        
+        case "readyForQC":
+          // Only editors can mark ready for QC
+          if (userData?.role !== "editor") {
+            return res.status(403).json({ message: "Only editors can mark jobs ready for QC" });
+          }
+          updateData.readyForQCAt = now;
+          activityDescription = "Edits completed - ready for quality check";
+          break;
+        
+        case "revision":
+          // Only admin/photographer can request revisions
+          if (!["admin", "licensee", "photographer"].includes(userData?.role)) {
+            return res.status(403).json({ message: "Insufficient permissions to request revisions" });
+          }
+          updateData.revisionRequestedAt = now;
+          updateData.revisionNotes = notes;
+          activityDescription = `Revision requested${notes ? `: ${notes}` : ''}`;
+          break;
+        
+        case "delivered":
+          // Only admin/photographer can deliver to client
+          if (!["admin", "licensee", "photographer"].includes(userData?.role)) {
+            return res.status(403).json({ message: "Insufficient permissions to deliver jobs" });
+          }
+          updateData.deliveredAt = now;
+          activityDescription = "Job delivered to client";
+          break;
+        
+        default:
+          return res.status(400).json({ message: "Invalid action" });
+      }
+
+      // Add to history if field exists
+      if (jobCard.history) {
+        const historyEntry = {
+          action,
+          by: userId,
+          at: now.toISOString(),
+          notes
+        };
+        updateData.history = [...(jobCard.history || []), historyEntry];
+      }
+
+      // Update job card using existing storage method
+      const updatedJobCard = await storage.updateJobCard(jobCardId, updateData, userId);
+
+      // Log activity
+      await storage.logJobActivity(jobCardId, userId, `job_${action}`, activityDescription, { action, notes });
+
+      res.json(updatedJobCard);
+    } catch (error) {
+      console.error("Error performing job action:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Enhanced Order Status API endpoints (Legacy support)
   app.put('/api/job-cards/:id/status', isAuthenticated, async (req: any, res) => {
     try {
       const jobCardId = parseInt(req.params.id);

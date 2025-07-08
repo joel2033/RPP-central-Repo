@@ -149,6 +149,18 @@ export const jobCards = pgTable("job_cards", {
   assignedAt: timestamp("assigned_at"),
   completedAt: timestamp("completed_at"),
   deliveredAt: timestamp("delivered_at"),
+  // Action-based status timestamps
+  uploadedAt: timestamp("uploaded_at"),
+  acceptedAt: timestamp("accepted_at"),
+  readyForQCAt: timestamp("ready_for_qc_at"),
+  revisionRequestedAt: timestamp("revision_requested_at"),
+  // Action history tracking
+  history: jsonb("history").$type<Array<{
+    action: "upload" | "accept" | "readyForQC" | "revision" | "delivered";
+    by: string;
+    at: string;
+    notes?: string;
+  }>>().default([]),
   licenseeId: varchar("licensee_id").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
