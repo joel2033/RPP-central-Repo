@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { JobActionButtons } from '@/components/JobActionButtons';
 import { StatusDisplay } from '@/components/StatusDisplay';
+import { StatusPill } from '@/components/StatusPill';
 
 interface JobCardWithDetails {
   id: number;
@@ -338,11 +339,7 @@ const OrderStatus = memo(() => {
                       </TableCell>
                       <TableCell>
                         <div className="space-y-2">
-                          <StatusDisplay 
-                            jobCard={order} 
-                            showTimestamp={true}
-                            size="sm"
-                          />
+                          <StatusPill order={order} />
                           <JobActionButtons
                             jobCard={order}
                             userRole={user?.role || 'user'}
