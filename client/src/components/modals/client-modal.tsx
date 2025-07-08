@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Form,
   FormControl,
@@ -48,6 +55,15 @@ type ClientFormData = z.infer<typeof clientFormSchema>;
 
 export default function ClientModal({ isOpen, onClose, client }: ClientModalProps) {
   const { toast } = useToast();
+  
+  // Fetch offices for the dropdown
+  const { data: offices = [] } = useQuery({
+    queryKey: ['offices'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/offices');
+      return response.json();
+    }
+  });
   const queryClient = useQueryClient();
   const [expandedSections, setExpandedSections] = useState({
     customerDetails: true,
@@ -68,6 +84,7 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
       address: "",
       contactName: "",
       editingPreferences: "",
+      officeId: null,
     },
   });
 
@@ -80,6 +97,7 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
         address: client.address || "",
         contactName: client.contactName || "",
         editingPreferences: client.editingPreferences || "",
+        officeId: client.officeId || null,
       });
     } else {
       form.reset({
@@ -89,6 +107,7 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
         address: "",
         contactName: "",
         editingPreferences: "",
+        officeId: null,
       });
     }
   }, [client, form]);
@@ -259,6 +278,32 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
                       <FormControl>
                         <Input {...field} placeholder="Business address" />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="officeId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Office/Agency</FormLabel>
+                      <Select onValueChange={(value) => field.onChange(value ? parseInt(value) : null)} value={field.value?.toString() || ""}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select office/agency" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">No office assigned</SelectItem>
+                          {offices.map((office: any) => (
+                            <SelectItem key={office.id} value={office.id.toString()}>
+                              {office.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}

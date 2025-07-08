@@ -1,6 +1,7 @@
 import {
   users,
   clients,
+  offices,
   bookings,
   mediaFiles,
   qaChecklists,
@@ -16,6 +17,8 @@ import {
   type UpsertUser,
   type Client,
   type InsertClient,
+  type Office,
+  type InsertOffice,
   type Booking,
   type InsertBooking,
   type MediaFile,
@@ -64,6 +67,13 @@ export interface IStorage {
   // User operations (mandatory for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  
+  // Office operations
+  getOffices(licenseeId: string): Promise<Office[]>;
+  getOffice(id: number, licenseeId: string): Promise<Office | undefined>;
+  createOffice(office: InsertOffice): Promise<Office>;
+  updateOffice(id: number, office: Partial<InsertOffice>, licenseeId: string): Promise<Office>;
+  deleteOffice(id: number, licenseeId: string): Promise<void>;
   
   // Client operations
   getClients(licenseeId: string): Promise<Client[]>;
@@ -193,6 +203,41 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return user;
+  }
+
+  // Office operations
+  async getOffices(licenseeId: string): Promise<Office[]> {
+    return await db
+      .select()
+      .from(offices)
+      .where(eq(offices.licenseeId, licenseeId))
+      .orderBy(desc(offices.createdAt));
+  }
+
+  async getOffice(id: number, licenseeId: string): Promise<Office | undefined> {
+    const [office] = await db
+      .select()
+      .from(offices)
+      .where(and(eq(offices.id, id), eq(offices.licenseeId, licenseeId)));
+    return office;
+  }
+
+  async createOffice(office: InsertOffice): Promise<Office> {
+    const [newOffice] = await db.insert(offices).values(office).returning();
+    return newOffice;
+  }
+
+  async updateOffice(id: number, office: Partial<InsertOffice>, licenseeId: string): Promise<Office> {
+    const [updatedOffice] = await db
+      .update(offices)
+      .set({ ...office, updatedAt: new Date() })
+      .where(and(eq(offices.id, id), eq(offices.licenseeId, licenseeId)))
+      .returning();
+    return updatedOffice;
+  }
+
+  async deleteOffice(id: number, licenseeId: string): Promise<void> {
+    await db.delete(offices).where(and(eq(offices.id, id), eq(offices.licenseeId, licenseeId)));
   }
 
   // Client operations

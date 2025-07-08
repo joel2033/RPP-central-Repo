@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { 
   insertClientSchema, 
+  insertOfficeSchema,
   insertBookingSchema, 
   insertCommunicationSchema,
   insertJobCardSchema,
@@ -50,6 +51,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Office routes
+  app.get('/api/offices', isAuthenticated, async (req: any, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      const offices = await storage.getOffices(licenseeId);
+      res.json(offices);
+    } catch (error) {
+      console.error("Error fetching offices:", error);
+      res.status(500).json({ message: "Failed to fetch offices" });
+    }
+  });
+
+  app.get('/api/offices/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      const officeId = parseInt(req.params.id);
+      const office = await storage.getOffice(officeId, licenseeId);
+      if (!office) {
+        return res.status(404).json({ message: "Office not found" });
+      }
+      res.json(office);
+    } catch (error) {
+      console.error("Error fetching office:", error);
+      res.status(500).json({ message: "Failed to fetch office" });
+    }
+  });
+
+  app.post('/api/offices', isAuthenticated, async (req: any, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      const officeData = insertOfficeSchema.parse({
+        ...req.body,
+        licenseeId,
+      });
+      const office = await storage.createOffice(officeData);
+      res.status(201).json(office);
+    } catch (error) {
+      console.error("Error creating office:", error);
+      res.status(400).json({ message: "Failed to create office" });
+    }
+  });
+
+  app.put('/api/offices/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      const officeId = parseInt(req.params.id);
+      const officeData = insertOfficeSchema.partial().parse(req.body);
+      const office = await storage.updateOffice(officeId, officeData, licenseeId);
+      res.json(office);
+    } catch (error) {
+      console.error("Error updating office:", error);
+      res.status(400).json({ message: "Failed to update office" });
+    }
+  });
+
+  app.delete('/api/offices/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      const officeId = parseInt(req.params.id);
+      await storage.deleteOffice(officeId, licenseeId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting office:", error);
+      res.status(500).json({ message: "Failed to delete office" });
     }
   });
 

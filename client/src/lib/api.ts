@@ -57,3 +57,26 @@ export const bookingApi = {
     return response.json();
   },
 };
+
+export const officeApi = {
+  getAll: async () => {
+    const response = await apiRequest('GET', '/api/offices');
+    return response.json();
+  },
+  getById: async (id: number) => {
+    const response = await apiRequest('GET', `/api/offices/${id}`);
+    return response.json();
+  },
+  create: async (data: any) => {
+    const response = await apiRequest('POST', '/api/offices', data);
+    return response.json();
+  },
+  update: async (id: number, data: any) => {
+    const response = await apiRequest('PUT', `/api/offices/${id}`, data);
+    return response.json();
+  },
+  delete: async (id: number) => {
+    const response = await apiRequest('DELETE', `/api/offices/${id}`);
+    return response.json();
+  },
+};

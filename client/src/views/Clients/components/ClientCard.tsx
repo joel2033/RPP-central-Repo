@@ -2,9 +2,11 @@ import React, { memo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Mail, Phone, MapPin, Edit, Trash2, Eye, MoreVertical } from 'lucide-react';
+import { Mail, Phone, MapPin, Edit, Trash2, Eye, MoreVertical, Building2 } from 'lucide-react';
 import { formatDate, formatPhoneNumber } from '@/utils/formatting';
 import { useLocation } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
+import { officeApi } from '@/lib/api';
 import type { Client } from '@shared/schema';
 
 interface ClientCardProps {
@@ -15,6 +17,13 @@ interface ClientCardProps {
 
 export const ClientCard = memo(({ client, onEdit, onDelete }: ClientCardProps) => {
   const [_, navigate] = useLocation();
+  
+  // Fetch office information if client has an officeId
+  const { data: office } = useQuery({
+    queryKey: ['office', client.officeId],
+    queryFn: () => officeApi.getById(client.officeId!),
+    enabled: !!client.officeId,
+  });
   
   const handleEdit = useCallback(() => {
     onEdit(client);
@@ -65,6 +74,12 @@ export const ClientCard = memo(({ client, onEdit, onDelete }: ClientCardProps) =
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        {office && (
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <Building2 className="h-4 w-4 flex-shrink-0" />
+            <span className="font-medium truncate">{office.name}</span>
+          </div>
+        )}
         <div className="flex items-center gap-2 text-sm text-gray-600">
           <Mail className="h-4 w-4 flex-shrink-0" />
           <span className="truncate">{client.email || "No email"}</span>

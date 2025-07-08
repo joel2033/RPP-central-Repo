@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
   Users, 
+  Building2,
   Calendar, 
   Camera, 
   Download, 
@@ -55,6 +56,7 @@ const getFilteredNavigationSections = (userRole: string): NavSection[] => [
   // Standalone navigation items (no dropdowns)
   { name: "Dashboard", href: "/", icon: Home },
   { name: "Customers", href: "/clients", icon: Users },
+  { name: "Offices", href: "/offices", icon: Building2 },
   { name: "Calendar", href: "/calendar", icon: Calendar },
   { name: "Jobs", href: "/jobs", icon: Camera },
   

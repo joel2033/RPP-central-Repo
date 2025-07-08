@@ -45,6 +45,21 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Offices/Agencies table
+export const offices = pgTable("offices", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }),
+  phone: varchar("phone", { length: 50 }),
+  address: text("address"),
+  website: varchar("website", { length: 255 }),
+  contactName: varchar("contact_name", { length: 255 }),
+  notes: text("notes"),
+  licenseeId: varchar("licensee_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Clients table
 export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
@@ -54,6 +69,7 @@ export const clients = pgTable("clients", {
   address: text("address"),
   contactName: varchar("contact_name", { length: 255 }),
   editingPreferences: jsonb("editing_preferences"), // Client preset preferences for auto-fill
+  officeId: integer("office_id"), // Reference to offices table
   licenseeId: varchar("licensee_id").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -346,7 +362,16 @@ export const usersRelations = relations(users, ({ many }) => ({
   productionNotifications: many(productionNotifications),
 }));
 
-export const clientsRelations = relations(clients, ({ many }) => ({
+// Office relations
+export const officesRelations = relations(offices, ({ many }) => ({
+  clients: many(clients),
+}));
+
+export const clientsRelations = relations(clients, ({ one, many }) => ({
+  office: one(offices, {
+    fields: [clients.officeId],
+    references: [offices.id],
+  }),
   bookings: many(bookings),
   communications: many(communications),
   jobCards: many(jobCards),
@@ -523,6 +548,12 @@ export const insertUserSchema = createInsertSchema(users).pick({
   licenseeId: true,
 });
 
+export const insertOfficeSchema = createInsertSchema(offices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertClientSchema = createInsertSchema(clients).omit({
   id: true,
   createdAt: true,
@@ -610,6 +641,8 @@ export const insertJobCardDeliverySettingsSchema = createInsertSchema(jobCardDel
 // Types
 export type UpsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+export type InsertOffice = z.infer<typeof insertOfficeSchema>;
+export type Office = typeof offices.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
 export type InsertBooking = z.infer<typeof insertBookingSchema>;
