@@ -302,6 +302,15 @@ Changelog:
   - **StatusPill Improvements**: Fixed text wrapping with proper padding and whitespace-nowrap for consistent single-line display
   - **Test Data Creation**: Added comprehensive test job cards across all status types for validation and demonstration
   - **Streamlined Actions**: Removed "Deliver to Client" and "Request Revision" buttons from status level - these will be implemented within individual job cards
+- July 08, 2025. Fixed critical Customer Profile and Client Modal runtime errors:
+  - **Customer Profile Runtime Fixes**: Resolved "Invalid time value" errors with enhanced date validation and null checking
+  - **Client Modal API Corrections**: Fixed apiRequest parameter order (method, url, data) for both creation and update operations
+  - **Data Safety Enhancements**: Added comprehensive null checks for job arrays, property addresses, and pricing data
+  - **Form Validation Updates**: Fixed client form schema to exclude ID field for new client creation
+  - **API Layer Consistency**: Updated all clientApi, jobApi, and bookingApi functions to use consistent async/await patterns
+  - **Customer Profile Features**: Successfully implemented two-column CRM layout with metrics dashboard and job history
+  - **Complete Functionality**: Customer Profile "View" button, "Add Client", and "Edit Client" buttons now working properly
+  - **Error Handling**: Enhanced formatDate function with proper validation and graceful fallbacks for invalid dates
 ```
 
 ## User Preferences
