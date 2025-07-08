@@ -378,7 +378,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Job Cards routes (admin/licensee access)
-  app.get('/api/job-cards', isAuthenticated, requireAdminOrVA, async (req: any, res) => {
+  app.get('/api/job-cards', isAuthenticated, async (req: any, res) => {
     try {
       const licenseeId = req.user.claims.sub;
       const { status, editorId, include_details } = req.query;

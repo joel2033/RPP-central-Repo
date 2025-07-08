@@ -1,4 +1,5 @@
 import { memo, useState, useCallback } from "react";
+import { Layout } from "@/components/layout/Layout";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -232,14 +233,15 @@ const OrderStatus = memo(() => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Order Status</h1>
-          <p className="text-gray-600">Track and manage all orders in production</p>
+    <Layout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Order Status</h1>
+            <p className="text-gray-600">Track and manage all orders in production</p>
+          </div>
         </div>
-      </div>
 
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
@@ -449,7 +451,8 @@ const OrderStatus = memo(() => {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </Layout>
   );
 });
 
