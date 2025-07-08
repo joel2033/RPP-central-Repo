@@ -40,7 +40,7 @@ export function StatusPill({ order }: StatusPillProps) {
   const statusLabel = getStatusLabel(status);
   
   return (
-    <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[statusLabel] || statusColors["Pending"]}`}>
+    <span className={`px-4 py-1 rounded-full text-sm font-medium whitespace-nowrap ${statusColors[statusLabel] || statusColors["Pending"]}`}>
       {statusLabel}
     </span>
   );
