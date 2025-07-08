@@ -321,6 +321,18 @@ Changelog:
   - **Office Management UI**: Built office cards with contact information, edit functionality, and empty state handling
   - **Query Integration**: Added office data fetching to client cards for displaying office associations
   - **Navigation Cleanup**: Removed offices from sidebar menu and integrated into client workflow seamlessly
+- July 08, 2025. Implemented global Job ID system with lifetime-unique numeric identifiers:
+  - **Global Job ID Counter**: Created atomic counter table for safe, lifetime-unique Job ID generation (00001, 00002, etc.)
+  - **Job ID Assignment Logic**: Job IDs are NOT created at job card creation - only assigned when uploaded to editor
+  - **JobIdService**: Built centralized service for atomic Job ID generation and assignment with database transactions
+  - **API Endpoints**: Added /assign-job-id, /has-job-id, and /job-id-counter routes for Job ID management
+  - **File Upload Protection**: Modified file upload system to prevent uploads without Job ID assignment
+  - **Automatic Assignment**: Job IDs are automatically assigned when editors are assigned to jobs (status: in_progress)
+  - **JobIdBadge Component**: Created reusable component displaying Job ID status with assignment functionality
+  - **UI Integration**: Updated job cards, order status pages, and file upload dialogs to show Job ID badges
+  - **Database Schema Updates**: Modified job_cards table to make jobId nullable and added job_id_counter table
+  - **Editor Workflow**: Job IDs are visible to editors and prevent content upload without assignment
+  - **Lifetime Uniqueness**: Counter never resets, ensuring no duplicate Job IDs across the entire system
 ```
 
 ## User Preferences

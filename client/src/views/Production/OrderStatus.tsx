@@ -31,10 +31,11 @@ import {
 import { JobActionButtons } from '@/components/JobActionButtons';
 import { StatusDisplay } from '@/components/StatusDisplay';
 import { StatusPill } from '@/components/StatusPill';
+import { JobIdBadge } from '@/components/JobIdBadge';
 
 interface JobCardWithDetails {
   id: number;
-  jobId: string;
+  jobId: string | null;
   status: string;
   requestedServices: string[];
   editingNotes?: string;
@@ -340,7 +341,12 @@ const OrderStatus = memo(() => {
                       <TableCell className="font-medium">
                         <div className="flex items-center space-x-2">
                           {getStatusIcon(order.status)}
-                          <span>{order.jobId}</span>
+                          <JobIdBadge 
+                            jobCardId={order.id} 
+                            jobId={order.jobId} 
+                            showAssignButton={true}
+                            variant="small"
+                          />
                         </div>
                       </TableCell>
                       <TableCell>

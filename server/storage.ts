@@ -62,6 +62,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, count } from "drizzle-orm";
+import { JobIdService } from "./services/jobIdService";
 
 export interface IStorage {
   // User operations (mandatory for Replit Auth)
@@ -122,6 +123,11 @@ export interface IStorage {
   updateJobCard(id: number, jobCard: Partial<InsertJobCard>, licenseeId: string): Promise<JobCard>;
   getJobCardsByEditor(editorId: string, licenseeId: string): Promise<(JobCard & { client: Client; photographer: User | null })[]>;
   getJobCardsByStatus(status: string, licenseeId: string): Promise<(JobCard & { client: Client; photographer: User | null; editor: User | null })[]>;
+  
+  // Job ID operations
+  assignJobId(jobCardId: number): Promise<string>;
+  hasJobId(jobCardId: number): Promise<boolean>;
+  getCurrentJobIdCounter(): Promise<number>;
   
   // Production files operations
   getProductionFiles(jobCardId: number): Promise<ProductionFile[]>;
@@ -684,12 +690,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createJobCard(jobCard: InsertJobCard): Promise<JobCard> {
-    // Generate unique job ID
-    const jobId = `JOB-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
-    
+    // Job ID is NOT generated here - it will be assigned only when uploaded to editor
     const [newJobCard] = await db
       .insert(jobCards)
-      .values({ ...jobCard, jobId })
+      .values(jobCard)
       .returning();
     
     return newJobCard;
@@ -1239,6 +1243,19 @@ export class DatabaseStorage implements IStorage {
       ...result.jobCard,
       client: result.client,
     } as JobCard & { client: Client };
+  }
+
+  // Job ID operations
+  async assignJobId(jobCardId: number): Promise<string> {
+    return await JobIdService.assignJobId(jobCardId);
+  }
+
+  async hasJobId(jobCardId: number): Promise<boolean> {
+    return await JobIdService.hasJobId(jobCardId);
+  }
+
+  async getCurrentJobIdCounter(): Promise<number> {
+    return await JobIdService.getCurrentCounter();
   }
 }
 

@@ -561,6 +561,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Automatically assign Job ID when editor is assigned for the first time
+      if (updateData.editorId && updateData.status === 'in_progress') {
+        const hasJobId = await storage.hasJobId(jobCardId);
+        if (!hasJobId) {
+          await storage.assignJobId(jobCardId);
+        }
+      }
+      
       const jobCard = await storage.updateJobCard(jobCardId, updateData, licenseeId);
       
       // Create notification for status changes
@@ -578,6 +586,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating job card:", error);
       res.status(400).json({ message: "Failed to update job card" });
+    }
+  });
+
+  // Job ID management routes
+  app.post('/api/job-cards/:id/assign-job-id', isAuthenticated, async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const userData = (req as any).userData;
+      const licenseeId = userData.licenseeId;
+      
+      // Verify job card exists and belongs to licensee
+      const jobCard = await storage.getJobCard(jobCardId, licenseeId);
+      if (!jobCard) {
+        return res.status(404).json({ message: "Job card not found" });
+      }
+      
+      const jobId = await storage.assignJobId(jobCardId);
+      res.json({ jobId, message: "Job ID assigned successfully" });
+    } catch (error) {
+      console.error("Error assigning Job ID:", error);
+      res.status(500).json({ message: "Failed to assign Job ID" });
+    }
+  });
+
+  app.get('/api/job-cards/:id/has-job-id', isAuthenticated, async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const hasJobId = await storage.hasJobId(jobCardId);
+      res.json({ hasJobId });
+    } catch (error) {
+      console.error("Error checking Job ID:", error);
+      res.status(500).json({ message: "Failed to check Job ID" });
+    }
+  });
+
+  app.get('/api/admin/job-id-counter', isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const currentCounter = await storage.getCurrentJobIdCounter();
+      res.json({ currentCounter });
+    } catch (error) {
+      console.error("Error fetching Job ID counter:", error);
+      res.status(500).json({ message: "Failed to fetch Job ID counter" });
     }
   });
 
@@ -778,6 +828,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!files || files.length === 0) {
         return res.status(400).json({ message: "No files uploaded" });
+      }
+
+      // Check if Job ID has been assigned - REQUIRED for uploads
+      const hasJobId = await storage.hasJobId(jobCardId);
+      if (!hasJobId) {
+        return res.status(400).json({ 
+          message: "Job ID must be assigned before uploading files. Please assign a Job ID first." 
+        });
       }
 
       const savedFiles = [];

@@ -149,10 +149,17 @@ export const communications = pgTable("communications", {
   userId: varchar("user_id").notNull(),
 });
 
+// Global Job ID Counter table for atomic ID generation
+export const jobIdCounter = pgTable("job_id_counter", {
+  id: serial("id").primaryKey(),
+  currentValue: integer("current_value").notNull().default(0),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+});
+
 // Job Cards table (Production workflow)
 export const jobCards = pgTable("job_cards", {
   id: serial("id").primaryKey(),
-  jobId: varchar("job_id", { length: 50 }).notNull().unique(), // Generated job ID
+  jobId: varchar("job_id", { length: 50 }).unique(), // Generated job ID - NULL until assigned
   bookingId: integer("booking_id").notNull(),
   clientId: integer("client_id").notNull(),
   photographerId: varchar("photographer_id"),
@@ -732,3 +739,12 @@ export type InsertOrderStatusAudit = z.infer<typeof insertOrderStatusAuditSchema
 export type OrderStatusAudit = typeof orderStatusAudit.$inferSelect;
 export type InsertEmailDeliveryLog = z.infer<typeof insertEmailDeliveryLogSchema>;
 export type EmailDeliveryLog = typeof emailDeliveryLog.$inferSelect;
+
+// Job ID Counter schemas and types
+export const insertJobIdCounterSchema = createInsertSchema(jobIdCounter).omit({
+  id: true,
+  lastUpdated: true,
+});
+
+export type InsertJobIdCounter = z.infer<typeof insertJobIdCounterSchema>;
+export type JobIdCounter = typeof jobIdCounter.$inferSelect;

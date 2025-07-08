@@ -23,10 +23,11 @@ import {
   Activity
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { JobIdBadge } from "@/components/JobIdBadge";
 
 interface JobCardDetails {
   id: number;
-  jobId: string;
+  jobId: string | null;
   bookingId: number;
   clientId: number;
   photographerId?: string;
@@ -266,7 +267,13 @@ export default function JobCardPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{jobCard.booking.propertyAddress}</h1>
-          <p className="text-gray-600 font-mono">Job ID: {jobCard.jobId}</p>
+          <div className="flex items-center gap-2 mt-2">
+            <JobIdBadge 
+              jobCardId={jobCard.id} 
+              jobId={jobCard.jobId} 
+              showAssignButton={true}
+            />
+          </div>
         </div>
         <Badge className={statusColors[jobCard.jobStatus as keyof typeof statusColors]}>
           {statusLabels[jobCard.jobStatus as keyof typeof statusLabels]}
