@@ -157,10 +157,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
     mutationFn: async (data: z.infer<typeof bookingFormSchema>) => {
       console.log("Making API request with data:", data);
       try {
-        const response = await apiRequest("/api/bookings", {
-          method: "POST",
-          body: JSON.stringify(data),
-        });
+        const response = await apiRequest("POST", "/api/bookings", data);
         console.log("API response:", response);
         return response;
       } catch (error) {
