@@ -24,7 +24,16 @@ export function StatusPill({ order }: StatusPillProps) {
   // Use timestamp-based status if available, otherwise fall back to legacy status
   const hasTimestamps = order.uploadedAt || order.acceptedAt || order.readyForQCAt || 
                        order.revisionRequestedAt || order.deliveredAt;
-  const status = hasTimestamps ? getOrderStatus(order) : (order.status || 'pending');
+  let status = hasTimestamps ? getOrderStatus(order) : (order.status || 'pending');
+  
+  // Map legacy statuses to display statuses for correct colors
+  if (status === 'editing') {
+    status = 'in_progress';
+  }
+  if (status === 'ready_for_qa') {
+    status = 'ready_for_qc';
+  }
+  
   const statusLabel = getStatusLabel(status);
   
   return (

@@ -304,9 +304,9 @@ const OrderStatus = memo(() => {
       {/* Status Tabs */}
       <Tabs value={statusFilter} onValueChange={setStatusFilter}>
         <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="all">All ({filteredOrders.length})</TabsTrigger>
+          <TabsTrigger value="all">All ({jobCards.length})</TabsTrigger>
           <TabsTrigger value="pending">Pending ({getOrdersByStatus("pending").length})</TabsTrigger>
-          <TabsTrigger value="in_progress">In Progress ({getOrdersByStatus("in_progress").length + getOrdersByStatus("editing").length})</TabsTrigger>
+          <TabsTrigger value="in_progress">In Progress ({getOrdersByStatus("in_progress").length})</TabsTrigger>
           <TabsTrigger value="ready_for_qc">Ready for QC ({getOrdersByStatus("ready_for_qc").length})</TabsTrigger>
           <TabsTrigger value="in_revision">In Revision ({getOrdersByStatus("in_revision").length})</TabsTrigger>
           <TabsTrigger value="delivered">Delivered ({getOrdersByStatus("delivered").length})</TabsTrigger>
