@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Bell, Menu } from "lucide-react";
 import QuickActions from "@/components/layout/quick-actions";
+import ProfileDropdown from "@/components/layout/profile-dropdown";
 
 interface TopBarProps {
   title: string;
@@ -44,6 +45,9 @@ export default function TopBar({ title }: TopBarProps) {
               3
             </span>
           </Button>
+
+          {/* Profile Dropdown - Temporarily disabled */}
+          {/* <ProfileDropdown /> */}
         </div>
       </div>
     </header>

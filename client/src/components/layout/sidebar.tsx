@@ -28,7 +28,9 @@ import {
   MapPin,
   Truck,
   Package,
-  Box
+  Box,
+  Clock,
+  Home
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -42,37 +44,21 @@ interface NavItem {
 interface NavSection {
   name: string;
   icon: any;
-  items: NavItem[];
+  items?: NavItem[];
+  href?: string;
   defaultExpanded?: boolean;
 }
 
-const mainNavigation = [
-  {
-    name: "Dashboard",
-    icon: LayoutDashboard,
-    items: [
-      { name: "Overview", href: "/", icon: LayoutDashboard },
-    ]
-  },
-];
+// Removed mainNavigation since Dashboard is now a standalone item
 
 const getFilteredNavigationSections = (userRole: string): NavSection[] => [
-  {
-    name: "Clients",
-    icon: Users,
-    items: [
-      { name: "CRM", href: "/clients", icon: Users },
-      { name: "Client Preferences", href: "/clients", icon: UserPlus },
-    ]
-  },
-  {
-    name: "Bookings & Jobs",
-    icon: Briefcase,
-    items: [
-      { name: "Calendar", href: "/calendar", icon: Calendar },
-      { name: "Jobs", href: "/jobs", icon: Camera },
-    ]
-  },
+  // Standalone navigation items (no dropdowns)
+  { name: "Dashboard", href: "/", icon: Home },
+  { name: "Customers", href: "/clients", icon: Users },
+  { name: "Calendar", href: "/calendar", icon: Calendar },
+  { name: "Jobs", href: "/jobs", icon: Camera },
+  
+  // Production Hub with simplified items
   {
     name: "Production Hub",
     icon: FolderOpen,
@@ -80,49 +66,27 @@ const getFilteredNavigationSections = (userRole: string): NavSection[] => [
       { name: "Upload to Editor", href: "/production/upload", icon: Upload },
       // Editor Dashboard - only visible to editors
       ...(userRole === "editor" ? [{ name: "Editor Dashboard", href: "/editor-dashboard", icon: Camera }] : []),
-      { name: "Pre-Delivery Check", href: "/qa-review", icon: Eye },
-      { name: "Revisions", href: "/qa-review", icon: RotateCcw },
+      { name: "Order Status", href: "/production/status", icon: Clock },
     ]
   },
-  {
-    name: "Delivery",
-    icon: Truck,
-    items: [
-      { name: "Delivery Pages", href: "/delivery", icon: Download },
-      { name: "Delivery Settings", href: "/settings", icon: Settings },
-    ]
-  },
+  
+  // Reports section
   {
     name: "Reports",
     icon: BarChart3,
     items: [
       { name: "Job Reports", href: "/reports", icon: FileText },
       { name: "Revenue Overview", href: "/reports", icon: DollarSign },
-      { name: "Licensee Performance", href: "/reports", icon: TrendingUp },
+      { name: "Performance", href: "/reports", icon: TrendingUp },
     ]
   },
+  
+  // Products section
   {
     name: "Products",
     icon: Package,
     items: [
       { name: "Product Management", href: "/products", icon: Package },
-    ]
-  },
-  // Admin Settings - only visible to admin and licensee
-  ...(["admin", "licensee"].includes(userRole) ? [{
-    name: "Admin Settings",
-    icon: Shield,
-    items: [
-      { name: "Business Availability", href: "/settings", icon: MapPin },
-      { name: "User Management", href: "/settings", icon: UserCog },
-      { name: "System Preferences", href: "/settings", icon: Settings },
-    ]
-  }] : []),
-  {
-    name: "Account",
-    icon: User,
-    items: [
-      { name: "My Profile", href: "/profile", icon: User },
     ]
   },
 ];
@@ -175,65 +139,34 @@ export default function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {/* Main Navigation - Dashboard Section */}
-          {mainNavigation.map((section) => {
-            const SectionIcon = section.icon;
-            const isExpanded = expandedSections[section.name] !== undefined 
-              ? expandedSections[section.name] 
-              : true; // Dashboard is expanded by default
-            
-            return (
-              <div key={section.name}>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleSection(section.name);
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 rounded-md transition-colors"
-                >
-                  <div className="flex items-center">
-                    <SectionIcon className="mr-3 h-5 w-5" />
-                    {section.name}
-                  </div>
-                  {isExpanded ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                </button>
-                
-                {isExpanded && (
-                  <div className="ml-6 mt-1 space-y-1">
-                    {section.items.map((item) => {
-                      const ItemIcon = item.icon;
-                      return (
-                        <Link key={item.name} href={item.href}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                            }}
-                            className={cn(
-                              "w-full flex items-center px-3 py-2 text-sm rounded-md transition-colors hover:bg-slate-50",
-                              isActive(item.href)
-                                ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700"
-                                : "text-slate-600 hover:text-slate-900"
-                            )}
-                          >
-                            <ItemIcon className="mr-3 h-4 w-4" />
-                            {item.name}
-                          </button>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {/* Main navigation now handled in navigationSections */}
 
-          {/* Collapsible Sections */}
+          {/* Navigation Sections */}
           {navigationSections.map((section) => {
             const SectionIcon = section.icon;
+            
+            // Handle standalone navigation items (no subitems)
+            if (section.href && !section.items) {
+              return (
+                <div key={section.name} className="mt-2">
+                  <Link href={section.href}>
+                    <button
+                      className={cn(
+                        "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors hover:bg-slate-50",
+                        isActive(section.href)
+                          ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700"
+                          : "text-slate-700 hover:text-slate-900"
+                      )}
+                    >
+                      <SectionIcon className="mr-3 h-5 w-5" />
+                      {section.name}
+                    </button>
+                  </Link>
+                </div>
+              );
+            }
+            
+            // Handle sections with subitems
             const isExpanded = expandedSections[section.name] !== undefined 
               ? expandedSections[section.name] 
               : section.defaultExpanded || false;
@@ -258,7 +191,7 @@ export default function Sidebar() {
                   )}
                 </button>
                 
-                {isExpanded && (
+                {isExpanded && section.items && (
                   <div className="ml-6 mt-1 space-y-1">
                     {section.items.map((item) => {
                       const ItemIcon = item.icon;

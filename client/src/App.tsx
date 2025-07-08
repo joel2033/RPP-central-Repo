@@ -18,6 +18,7 @@ const EditorDashboard = lazy(() => import('@/pages/editor-dashboard'));
 const JobDetail = lazy(() => import('@/pages/job-detail'));
 const DeliveryPage = lazy(() => import('@/pages/delivery-page'));
 const Products = lazy(() => import('@/pages/products'));
+const OrderStatus = lazy(() => import('@/views/Production/OrderStatus'));
 const NotFound = lazy(() => import('@/pages/not-found'));
 
 const PageLoader = () => (
@@ -37,6 +38,7 @@ const AppRoutes = React.memo(() => (
     <Route path="/bookings" component={Bookings} />
     <Route path="/production" component={Production} />
     <Route path="/production/upload" component={UploadToEditor} />
+    <Route path="/production/status" component={OrderStatus} />
     <Route path="/upload-to-editor" component={UploadToEditor} />
     <Route path="/editor-dashboard" component={EditorDashboard} />
     <Route path="/products" component={Products} />
