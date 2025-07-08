@@ -281,12 +281,16 @@ Changelog:
 - July 08, 2025. Completed action-based status system with custom StatusPill component:
   - **Removed "Complete" Status**: Simplified workflow to use only "delivered" status instead of separate "complete" and "delivered" states
   - **Custom StatusPill Component**: Created dedicated component with user-specified colors (gray, yellow, blue, red, green) for clean status display
-  - **Action-Based Workflow**: Implemented role-based action buttons (Accept Job, Mark Ready for QC, Request Revision, Deliver to Client) replacing manual status dropdowns
+  - **Action-Based Workflow**: Implemented role-based action buttons (Accept Job, Mark Ready for QC) with delivery/revision actions moved to job card level
   - **Database Compatibility**: Built backward-compatible system that works with existing schema while preparing for future timestamp-based tracking
   - **Legacy Status Support**: System gracefully handles both new action-based status calculation and existing status fields
   - **Production Interface**: Enhanced Order Status page with StatusPill display and functional action buttons for streamlined workflow management
   - **Database Query Optimization**: Fixed column selection to work with current schema while avoiding non-existent timestamp fields
   - **Status Tab Layout**: Updated from 7-column to 6-column tab layout removing "Complete" section for cleaner interface
+  - **Status Filtering Fixes**: Resolved filtering logic issues and tab count accuracy across all status categories
+  - **StatusPill Improvements**: Fixed text wrapping with proper padding and whitespace-nowrap for consistent single-line display
+  - **Test Data Creation**: Added comprehensive test job cards across all status types for validation and demonstration
+  - **Streamlined Actions**: Removed "Deliver to Client" and "Request Revision" buttons from status level - these will be implemented within individual job cards
 ```
 
 ## User Preferences
