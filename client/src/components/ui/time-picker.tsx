@@ -56,7 +56,10 @@ export const TimePicker = memo(({
         const scrollTop = selectedIndex * 40; // Approximate item height
         setTimeout(() => {
           if (scrollAreaRef.current) {
-            scrollAreaRef.current.scrollTop = scrollTop;
+            scrollAreaRef.current.scrollTo({
+              top: scrollTop,
+              behavior: 'smooth'
+            });
           }
         }, 100);
       }
@@ -80,22 +83,39 @@ export const TimePicker = memo(({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0" align="start">
-        <ScrollArea className="h-60" ref={scrollAreaRef}>
+        <div 
+          className="h-60 overflow-y-auto focus:outline-none time-picker-scroll smooth-scroll"
+          style={{ 
+            maxHeight: '250px',
+            overscrollBehavior: 'contain'
+          }}
+          ref={scrollAreaRef}
+          tabIndex={0}
+          onWheel={(e) => {
+            // Ensure wheel events work when hovering
+            e.stopPropagation();
+          }}
+          onMouseEnter={(e) => {
+            // Focus the scrollable container to enable wheel events
+            e.currentTarget.focus();
+          }}
+        >
           <div className="p-1">
             {timeOptions.map((option) => (
               <button
                 key={option.value}
                 className={cn(
-                  "w-full text-left px-3 py-2 text-sm rounded-sm hover:bg-gray-100 transition-colors",
-                  value === option.value && "bg-blue-100 text-blue-900"
+                  "w-full text-left px-3 py-2 text-sm rounded-sm hover:bg-gray-100 transition-colors focus:outline-none focus:bg-gray-100",
+                  value === option.value && "bg-blue-100 text-blue-900 hover:bg-blue-200"
                 )}
                 onClick={() => handleTimeSelect(option.value)}
+
               >
                 {option.label}
               </button>
             ))}
           </div>
-        </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );
