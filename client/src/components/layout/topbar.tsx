@@ -46,8 +46,8 @@ export default function TopBar({ title }: TopBarProps) {
             </span>
           </Button>
 
-          {/* Profile Dropdown - Temporarily disabled */}
-          {/* <ProfileDropdown /> */}
+          {/* Profile Dropdown */}
+          <ProfileDropdown />
         </div>
       </div>
     </header>
