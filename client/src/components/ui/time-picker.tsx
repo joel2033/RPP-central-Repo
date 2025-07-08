@@ -108,13 +108,20 @@ export function TimePicker({
       <PopoverContent className="w-48 p-0" align="start" side="bottom">
         <div 
           ref={scrollContainerRef}
-          className="max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400"
+          className="h-60 overflow-y-auto pr-2 time-picker-scroll"
           style={{
+            maxHeight: '240px',
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
             scrollBehavior: 'smooth',
-            WebkitOverflowScrolling: 'touch'
+            overscrollBehavior: 'contain'
+          }}
+          onWheel={(e) => {
+            // Ensure wheel events are handled properly
+            e.stopPropagation();
           }}
         >
-          <div className="p-1">
+          <div className="p-1 pr-0">
             {timeSlots.map((time, index) => (
               <Button
                 key={time}
