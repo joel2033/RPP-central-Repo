@@ -159,24 +159,29 @@ const CustomerProfileContent = memo(({ id }: CustomerProfileProps) => {
   // Fetch customer data
   const { data: client, isLoading: clientLoading } = useQuery<Client>({
     queryKey: [API_ENDPOINTS.CLIENTS, id],
-    queryFn: () => apiRequest(`${API_ENDPOINTS.CLIENTS}/${id}`),
+    queryFn: async () => {
+      const response = await apiRequest("GET", `${API_ENDPOINTS.CLIENTS}/${id}`);
+      return response.json();
+    },
     staleTime: 5 * 60 * 1000,
   });
 
   // Fetch customer jobs
   const { data: jobs = [], isLoading: jobsLoading } = useQuery<JobCard[]>({
     queryKey: [API_ENDPOINTS.JOB_CARDS, 'client', id],
-    queryFn: () => apiRequest(`${API_ENDPOINTS.JOB_CARDS}?clientId=${id}`),
+    queryFn: async () => {
+      const response = await apiRequest("GET", `${API_ENDPOINTS.JOB_CARDS}?clientId=${id}`);
+      return response.json();
+    },
     staleTime: 5 * 60 * 1000,
   });
 
   // Update customer mutation
   const updateCustomerMutation = useMutation({
-    mutationFn: (updates: Partial<Client>) => 
-      apiRequest(`${API_ENDPOINTS.CLIENTS}/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(updates),
-      }),
+    mutationFn: async (updates: Partial<Client>) => {
+      const response = await apiRequest("PUT", `${API_ENDPOINTS.CLIENTS}/${id}`, updates);
+      return response.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.CLIENTS, id] });
       toast({
