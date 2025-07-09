@@ -268,23 +268,18 @@ export default function JobsPage() {
               ) : (
                 sortedJobs.map((job) => (
                   <Card key={job.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex justify-between items-start mb-4">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-semibold text-gray-900">
+                          <div className="flex items-center gap-3">
+                            <h3 className="text-base font-medium text-gray-900">
                               {job.booking?.propertyAddress || "Unknown Address"}
                             </h3>
                             <Badge className={cn("text-xs", statusColors[job.jobStatus as keyof typeof statusColors])}>
                               {statusLabels[job.jobStatus as keyof typeof statusLabels]}
                             </Badge>
                           </div>
-                          <p className="text-sm text-gray-600 mb-2">Job ID: {job.jobId}</p>
-                          <div className="flex items-center gap-4 text-sm text-gray-600">
-                            <div className="flex items-center gap-1">
-                              <User className="h-4 w-4" />
-                              <span>{job.client?.name || "Unknown Client"}</span>
-                            </div>
+                          <div className="flex items-center gap-6 mt-2 text-sm text-gray-600">
                             <div className="flex items-center gap-1">
                               <Calendar className="h-4 w-4" />
                               <span>
@@ -298,6 +293,10 @@ export default function JobsPage() {
                                   </span>
                                 )}
                               </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <User className="h-4 w-4" />
+                              <span>{job.client?.name || "Unknown Client"}</span>
                             </div>
                           </div>
                         </div>
@@ -329,43 +328,6 @@ export default function JobsPage() {
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
-                        </div>
-                      </div>
-                      
-                      {/* Services */}
-                      <div className="mb-4">
-                        <p className="text-sm text-gray-600 mb-2">Services:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {job.requestedServices?.map((service: string) => (
-                            <Badge key={service} variant="secondary" className="text-xs">
-                              {service.charAt(0).toUpperCase() + service.slice(1).replace('_', ' ')}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      {/* Quick Status Panel */}
-                      <div className="mb-4">
-                        <JobStatusPanel 
-                          jobId={job.id}
-                          currentStatus={job.status}
-                          jobStatus={job.jobStatus}
-                          compact={true}
-                        />
-                      </div>
-                      
-                      {/* Additional Info */}
-                      <div className="flex items-center justify-between text-sm text-gray-600">
-                        <div>
-                          Created: {formatDate(job.createdAt)}
-                        </div>
-                        <div className="flex items-center gap-4">
-                          {job.photographerId && (
-                            <span>Photographer: {job.photographerId}</span>
-                          )}
-                          {job.editorId && (
-                            <span>Editor: {job.editorId}</span>
-                          )}
                         </div>
                       </div>
                     </CardContent>
