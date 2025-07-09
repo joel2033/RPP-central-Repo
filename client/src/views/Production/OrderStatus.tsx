@@ -32,6 +32,7 @@ import { JobActionButtons } from '@/components/JobActionButtons';
 import { StatusDisplay } from '@/components/StatusDisplay';
 import { StatusPill } from '@/components/StatusPill';
 import { JobIdBadge } from '@/components/JobIdBadge';
+import { getOrderStatus } from '@shared/utils';
 
 interface JobCardWithDetails {
   id: number;
@@ -211,9 +212,9 @@ const OrderStatus = memo(() => {
 
   const filteredOrders = jobCards.filter(order => {
     const matchesSearch = 
-      order.jobId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.booking?.propertyAddress?.toLowerCase().includes(searchTerm.toLowerCase());
+      (order.jobId?.toLowerCase()?.includes(searchTerm.toLowerCase()) ?? false) ||
+      (order.client?.name?.toLowerCase()?.includes(searchTerm.toLowerCase()) ?? false) ||
+      (order.booking?.propertyAddress?.toLowerCase()?.includes(searchTerm.toLowerCase()) ?? false);
     
     if (!matchesSearch) return false;
     if (statusFilter === "all") return true;

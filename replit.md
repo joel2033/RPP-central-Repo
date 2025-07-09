@@ -333,6 +333,13 @@ Changelog:
   - **Database Schema Updates**: Modified job_cards table to make jobId nullable and added job_id_counter table
   - **Editor Workflow**: Job IDs are visible to editors and prevent content upload without assignment
   - **Lifetime Uniqueness**: Counter never resets, ensuring no duplicate Job IDs across the entire system
+- July 09, 2025. Fixed critical Order Status page runtime error:
+  - **Search Filter Fix**: Resolved null reference error where jobId.toLowerCase() was called on null values
+  - **Null Safety**: Added proper null checking for jobId, client name, and property address in search functionality
+  - **Import Fix**: Added missing getOrderStatus function import from shared utilities
+  - **Job ID Badge Integration**: Order Status page now displays Job ID badges with proper "No Job ID" status and assignment functionality
+  - **Search Functionality**: Safe search filtering now works correctly with null Job IDs and supports searching by Job ID, client name, and property address
+  - **Status Display**: StatusPill component properly handles both timestamp-based and legacy status systems
 ```
 
 ## User Preferences
