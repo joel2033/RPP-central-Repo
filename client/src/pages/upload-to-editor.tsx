@@ -27,10 +27,12 @@ import {
   X, 
   Send,
   FileText,
-  Image as ImageIcon
+  Image as ImageIcon,
+  ChevronDown
 } from "lucide-react";
 import LoadingSpinner from "@/components/shared/loading-spinner";
-import type { JobCard, Client, User } from "@shared/schema";
+import type { JobCard, Client, User, EditorServiceCategory, EditorServiceOption } from "@shared/schema";
+import { editorServiceApi } from "@/lib/api/editorServiceApi";
 
 interface JobCardWithDetails extends JobCard {
   client: Client;
@@ -40,6 +42,10 @@ interface JobCardWithDetails extends JobCard {
 interface ServiceBlock {
   id: string;
   service: string;
+  categoryId: number;
+  selectedOptionId?: number;
+  selectedOptionName?: string;
+  selectedOptionPrice?: number;
   quantity: number;
   files: File[];
   fileName: string;
@@ -58,16 +64,7 @@ const exportTypes = [
   "Custom"
 ];
 
-const availableServices = [
-  "Photography Editing",
-  "Color Correction",
-  "Background Removal",
-  "Virtual Staging",
-  "Floor Plan Creation",
-  "HDR Processing",
-  "Drone Video Editing",
-  "360° Tour Processing"
-];
+// Services will be loaded dynamically from editor service categories
 
 function UploadToEditorContent() {
   const { toast } = useToast();
@@ -106,6 +103,13 @@ function UploadToEditorContent() {
   const { data: editors, isLoading: editorsLoading } = useQuery<User[]>({
     queryKey: ["/api/editors"],
     enabled: isAuthenticated,
+  });
+
+  // Fetch editor service categories when editor is selected
+  const { data: editorServiceCategories, isLoading: servicesLoading } = useQuery<(EditorServiceCategory & { options: EditorServiceOption[] })[]>({
+    queryKey: ["/api/editor-services", selectedEditorId],
+    queryFn: () => editorServiceApi.getEditorServices(selectedEditorId),
+    enabled: !!selectedEditorId,
   });
 
   const selectedJob = jobCards?.find(job => job.id.toString() === selectedJobId);
@@ -190,9 +194,11 @@ function UploadToEditorContent() {
     // Create service blocks for new services
     const newBlocks: ServiceBlock[] = services.map(service => {
       const existingBlock = serviceBlocks.find(block => block.service === service);
+      const category = editorServiceCategories?.find(cat => cat.name === service);
       return existingBlock || {
         id: Math.random().toString(),
         service,
+        categoryId: category?.id || 0,
         quantity: 1,
         files: [],
         fileName: "",
@@ -205,10 +211,10 @@ function UploadToEditorContent() {
     setServiceBlocks(newBlocks);
   };
 
-  const updateServiceBlock = (id: string, updates: Partial<ServiceBlock>) => {
+  const updateServiceBlock = (blockId: string, updates: Partial<ServiceBlock>) => {
     setServiceBlocks(blocks => 
       blocks.map(block => 
-        block.id === id ? { ...block, ...updates } : block
+        block.id === blockId ? { ...block, ...updates } : block
       )
     );
   };
@@ -347,27 +353,78 @@ function UploadToEditorContent() {
                   <p className="text-sm text-slate-600">Select the services needed for this job</p>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     <Label>Service Selection *</Label>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      {availableServices.map((service) => (
-                        <label key={service} className="flex items-center space-x-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedServices.includes(service)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                handleServiceSelect([...selectedServices, service]);
-                              } else {
-                                handleServiceSelect(selectedServices.filter(s => s !== service));
-                              }
-                            }}
-                            className="rounded border-slate-300"
-                          />
-                          <span className="text-sm">{service}</span>
-                        </label>
-                      ))}
-                    </div>
+                    {servicesLoading ? (
+                      <div className="flex items-center justify-center p-8">
+                        <LoadingSpinner />
+                        <span className="ml-2">Loading editor services...</span>
+                      </div>
+                    ) : editorServiceCategories && editorServiceCategories.length > 0 ? (
+                      <div className="space-y-4">
+                        {editorServiceCategories.map((category) => (
+                          <Card key={category.id} className="border border-gray-200">
+                            <CardHeader className="pb-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedServices.includes(category.name)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        handleServiceSelect([...selectedServices, category.name]);
+                                      } else {
+                                        handleServiceSelect(selectedServices.filter(s => s !== category.name));
+                                      }
+                                    }}
+                                    className="rounded border-slate-300"
+                                  />
+                                  <CardTitle className="text-base">{category.name}</CardTitle>
+                                </div>
+                                {selectedServices.includes(category.name) && category.options.length > 0 && (
+                                  <Select
+                                    value={serviceBlocks.find(block => block.service === category.name)?.selectedOptionId?.toString() || ""}
+                                    onValueChange={(value) => {
+                                      const option = category.options.find(opt => opt.id.toString() === value);
+                                      if (option) {
+                                        updateServiceBlock(
+                                          serviceBlocks.find(block => block.service === category.name)?.id || "",
+                                          {
+                                            selectedOptionId: option.id,
+                                            selectedOptionName: option.name,
+                                            selectedOptionPrice: parseFloat(option.price)
+                                          }
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    <SelectTrigger className="w-48">
+                                      <SelectValue placeholder="Select pricing option" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {category.options.map((option) => (
+                                        <SelectItem key={option.id} value={option.id.toString()}>
+                                          {option.name} - ${option.price} {option.currency}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                              </div>
+                              {category.description && (
+                                <p className="text-sm text-gray-600 mt-1">{category.description}</p>
+                              )}
+                            </CardHeader>
+                          </Card>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center p-8 text-gray-500">
+                        <ImageIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                        <p>This editor hasn't set up any service categories yet.</p>
+                        <p className="text-sm">Contact the editor to configure their services.</p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
