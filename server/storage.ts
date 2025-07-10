@@ -59,6 +59,19 @@ import {
   products,
   type Product,
   type InsertProduct,
+  jobActivityLog,
+  editorServiceCategories,
+  editorServiceOptions,
+  editorServicePricing,
+  editorServiceChangeLog,
+  type EditorServiceCategory,
+  type InsertEditorServiceCategory,
+  type EditorServiceOption,
+  type InsertEditorServiceOption,
+  type EditorServicePricing,
+  type InsertEditorServicePricing,
+  type EditorServiceChangeLog,
+  type InsertEditorServiceChangeLog,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, count } from "drizzle-orm";
@@ -994,13 +1007,43 @@ export class DatabaseStorage implements IStorage {
     return event;
   }
 
-  // Activity Log operations - placeholder for now, will implement properly once schema is fixed
+  // Activity Log operations - now implemented properly
   async getJobActivityLog(jobCardId: number): Promise<any[]> {
-    return [];
+    return await db
+      .select({
+        id: jobActivityLog.id,
+        jobCardId: jobActivityLog.jobCardId,
+        userId: jobActivityLog.userId,
+        action: jobActivityLog.action,
+        description: jobActivityLog.description,
+        metadata: jobActivityLog.metadata,
+        createdAt: jobActivityLog.createdAt,
+      })
+      .from(jobActivityLog)
+      .where(eq(jobActivityLog.jobCardId, jobCardId))
+      .orderBy(desc(jobActivityLog.createdAt));
   }
 
-  async createJobActivityLog(log: any): Promise<any> {
-    return {};
+  async createJobActivityLog(log: {
+    jobCardId: number;
+    userId: string;
+    action: string;
+    description: string;
+    metadata?: any;
+  }): Promise<any> {
+    const [newLog] = await db
+      .insert(jobActivityLog)
+      .values({
+        jobCardId: log.jobCardId,
+        userId: log.userId,
+        action: log.action,
+        description: log.description,
+        metadata: log.metadata,
+        createdAt: new Date()
+      })
+      .returning();
+    
+    return newLog;
   }
 
   // Delivery functionality implementations

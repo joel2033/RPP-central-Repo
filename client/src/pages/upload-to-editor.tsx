@@ -469,14 +469,25 @@ function UploadToEditorContent() {
 
   const createJobMutation = useMutation({
     mutationFn: async (jobData: any) => {
-      // Update job card with editor assignment
-      await apiRequest("PUT", `/api/job-cards/${selectedJobId}`, {
+      // Step 1: Submit job to editor with comprehensive data
+      const submissionResponse = await apiRequest("POST", `/api/job-cards/${selectedJobId}/submit-to-editor`, {
         editorId: selectedEditorId,
-        status: "in_progress",
-        editingNotes: jobData.instructions
+        serviceBlocks: serviceBlocks.map(block => ({
+          categoryId: block.categoryId,
+          serviceName: block.service,
+          selectedOptionId: block.selectedOptionId,
+          selectedOptionName: block.selectedOptionName,
+          selectedOptionPrice: block.selectedOptionPrice,
+          quantity: block.quantity,
+          instructions: block.instructions,
+          exportType: block.exportType,
+          customDescription: block.customDescription,
+          fileCount: block.files.length
+        })),
+        instructions: jobData.instructions
       });
 
-      // Upload files for each service block
+      // Step 2: Upload files for each service block
       for (const block of serviceBlocks) {
         if (block.files.length > 0) {
           const formData = new FormData();
@@ -493,6 +504,8 @@ function UploadToEditorContent() {
           formData.append('instructions', block.instructions);
           formData.append('exportType', block.exportType);
           formData.append('customDescription', block.customDescription);
+          formData.append('categoryId', block.categoryId.toString());
+          formData.append('selectedOptionId', block.selectedOptionId?.toString() || '');
           
           // Upload files using fetch with FormData
           const response = await fetch(`/api/job-cards/${selectedJobId}/files`, {
@@ -507,13 +520,14 @@ function UploadToEditorContent() {
         }
       }
 
-      return { success: true };
+      return submissionResponse;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/job-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/job-cards", selectedJobId] });
       toast({
         title: "Success",
-        description: "Job submitted to editor successfully",
+        description: `Job submitted to editor successfully. Job ID: ${data.jobId}`,
       });
       // Reset form
       setSelectedJobId("");

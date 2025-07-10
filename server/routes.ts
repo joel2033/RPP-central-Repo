@@ -624,6 +624,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Comprehensive Editor Submission Endpoint
+  app.post('/api/job-cards/:id/submit-to-editor', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const userData = (req as any).userData;
+      const jobCardId = parseInt(req.params.id);
+      const { editorId, serviceBlocks, instructions } = req.body;
+      
+      // Determine licenseeId based on user role
+      const licenseeId = userData?.role === 'editor' ? userData.licenseeId : userId;
+      
+      // Verify job card exists and belongs to licensee
+      const jobCard = await storage.getJobCard(jobCardId, licenseeId);
+      if (!jobCard) {
+        return res.status(404).json({ message: "Job card not found" });
+      }
+      
+      // Step 1: Assign Job ID if not already assigned
+      let jobId = jobCard.jobId;
+      if (!jobId) {
+        jobId = await storage.assignJobId(jobCardId);
+      }
+      
+      // Step 2: Calculate estimated cost from service blocks
+      let totalEstimatedCost = 0;
+      const serviceDetails = serviceBlocks.map((block: any) => {
+        const blockCost = (block.selectedOptionPrice || 0) * (block.quantity || 1);
+        totalEstimatedCost += blockCost;
+        return {
+          serviceName: block.serviceName,
+          optionName: block.selectedOptionName,
+          price: block.selectedOptionPrice,
+          quantity: block.quantity,
+          cost: blockCost,
+          fileCount: block.fileCount
+        };
+      });
+      
+      // Step 3: Update job card with editor assignment and status
+      await storage.updateJobCard(jobCardId, {
+        editorId: editorId,
+        status: "in_progress",
+        editingNotes: instructions,
+        assignedAt: new Date()
+      }, licenseeId);
+      
+      // Step 4: Get editor information for logging
+      const editor = await storage.getUser(editorId);
+      const editorName = editor ? `${editor.firstName} ${editor.lastName}` : editorId;
+      
+      // Step 5: Create comprehensive activity log entry
+      const activityDescription = `Job submitted to editor ${editorName}. Job ID: ${jobId}. ` +
+        `Services: ${serviceDetails.map(s => `${s.serviceName} (${s.optionName}: $${s.price} x ${s.quantity})`).join(', ')}. ` +
+        `Total estimated cost: $${totalEstimatedCost.toFixed(2)}. ` +
+        `Instructions: ${instructions || 'None'}`;
+      
+      await storage.createJobActivityLog({
+        jobCardId: jobCardId,
+        userId: userId,
+        action: "submitted_to_editor",
+        description: activityDescription,
+        metadata: {
+          jobId: jobId,
+          editorId: editorId,
+          editorName: editorName,
+          serviceBlocks: serviceDetails,
+          totalEstimatedCost: totalEstimatedCost,
+          instructions: instructions,
+          submissionTime: new Date().toISOString()
+        }
+      });
+      
+      // Step 6: Create notification for the editor
+      const notificationData = {
+        jobCardId,
+        recipientId: editorId,
+        type: 'assignment',
+        message: `New job assigned: Job ID ${jobId} with ${serviceBlocks.length} service(s). Estimated value: $${totalEstimatedCost.toFixed(2)}`,
+      };
+      await storage.createNotification(notificationData);
+      
+      res.json({ 
+        success: true,
+        jobId: jobId,
+        estimatedCost: totalEstimatedCost,
+        serviceCount: serviceBlocks.length,
+        message: `Job ${jobId} successfully submitted to ${editorName}`
+      });
+      
+    } catch (error) {
+      console.error("Error submitting job to editor:", error);
+      res.status(500).json({ message: "Failed to submit job to editor" });
+    }
+  });
+
   app.get('/api/admin/job-id-counter', isAuthenticated, requireAdmin, async (req: any, res) => {
     try {
       const currentCounter = await storage.getCurrentJobIdCounter();
