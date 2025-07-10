@@ -28,7 +28,8 @@ import {
   Send,
   FileText,
   Image as ImageIcon,
-  ChevronDown
+  ChevronDown,
+  Link as LinkIcon
 } from "lucide-react";
 import LoadingSpinner from "@/components/shared/loading-spinner";
 import type { JobCard, Client, User, EditorServiceCategory, EditorServiceOption } from "@shared/schema";
@@ -52,6 +53,8 @@ interface ServiceBlock {
   instructions: string;
   exportType: string;
   customDescription: string;
+  fileEntries?: Array<{ fileName: string; instruction: string; }>;
+  exportEntries?: Array<{ type: string; description: string; }>;
 }
 
 const exportTypes = [
@@ -63,6 +66,212 @@ const exportTypes = [
   "LinkedIn Banner",
   "Custom"
 ];
+
+// File Upload Modal Component
+function FileUploadModal({ 
+  blockId, 
+  onFilesUpload, 
+  uploadedFiles 
+}: { 
+  blockId: string; 
+  onFilesUpload: (files: File[]) => void; 
+  uploadedFiles: File[]; 
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
+  const [urlLink, setUrlLink] = useState("");
+  const [dragActive, setDragActive] = useState(false);
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    setFiles(prev => [...prev, ...droppedFiles]);
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const selectedFiles = Array.from(e.target.files);
+      setFiles(prev => [...prev, ...selectedFiles]);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpload = () => {
+    onFilesUpload(files);
+    setIsOpen(false);
+    setFiles([]);
+    setUrlLink("");
+  };
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setIsOpen(true)}
+        className="flex items-center gap-2"
+      >
+        <Upload className="h-4 w-4" />
+        Upload
+      </Button>
+
+      {isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Upload Files</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsOpen(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              Include any input files that your supplier may require to carry out this service.
+            </p>
+
+            {/* File Drop Zone */}
+            <div
+              className={`border-2 border-dashed rounded-lg p-8 text-center mb-4 transition-colors ${
+                dragActive ? "border-blue-500 bg-blue-50" : "border-gray-300"
+              }`}
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
+            >
+              <div className="flex flex-col items-center">
+                <div className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
+                  <Upload className="h-6 w-6 text-gray-400" />
+                </div>
+                <p className="mb-2">
+                  Drop your file(s) here, or{" "}
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById(`file-input-${blockId}`)?.click()}
+                    className="text-blue-600 underline"
+                  >
+                    browse.
+                  </button>
+                </p>
+                <p className="text-xs text-gray-500">
+                  Supported formats: JPG, DNG, PNG, PDF. Each file's maximum size is 25MB.
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Maximum upload size: 2GB. If your total input files exceed this limit, please use the URL upload option.
+                </p>
+              </div>
+              <input
+                id={`file-input-${blockId}`}
+                type="file"
+                multiple
+                accept="image/*,video/*,.pdf"
+                onChange={handleFileInput}
+                className="hidden"
+              />
+            </div>
+
+            {/* Selected Files Display */}
+            {files.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-sm font-medium mb-2">Selected Files:</h4>
+                <div className="space-y-1">
+                  {files.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <span className="text-sm">{file.name}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFile(index)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <p className="text-sm text-gray-500 text-center mb-4">
+              Files uploaded will be automatically removed after 14 days.
+            </p>
+
+            <div className="text-center text-gray-500 mb-4">OR</div>
+
+            {/* URL Upload */}
+            <div className="mb-4">
+              <h4 className="text-sm font-medium mb-2">URL Upload</h4>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Paste your URL here"
+                  value={urlLink}
+                  onChange={(e) => setUrlLink(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    // Handle URL upload logic here
+                    console.log("URL Upload:", urlLink);
+                  }}
+                >
+                  Add
+                </Button>
+              </div>
+            </div>
+
+            {/* Confirmation */}
+            <div className="flex items-start gap-2 mb-4">
+              <input
+                type="checkbox"
+                id={`confirm-${blockId}`}
+                className="mt-1"
+              />
+              <label htmlFor={`confirm-${blockId}`} className="text-xs text-gray-600">
+                I confirm the link I am providing has been set to viewable and contains the input files required for this service.
+              </label>
+            </div>
+
+            {/* Upload Button */}
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUpload}
+                disabled={files.length === 0 && !urlLink}
+              >
+                Upload Files
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 // Services will be loaded dynamically from editor service categories
 
@@ -477,91 +686,183 @@ function UploadToEditorContent() {
                         <Plus className="h-4 w-4" />
                       </Button>
                     </div>
+                    <span className="text-sm text-slate-500">final files expected to be delivered.</span>
                   </div>
 
-                  {/* File Upload */}
+                  {/* Instructions Section */}
                   <div className="space-y-2">
-                    <Label>Upload Files</Label>
-                    <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-slate-400 transition-colors">
-                      <Upload className="h-8 w-8 text-slate-400 mx-auto mb-2" />
-                      <p className="text-slate-600 mb-2">Drag and drop files here or click to browse</p>
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/*,video/*"
-                        onChange={(e) => handleFileUpload(block.id, e.target.files)}
-                        className="hidden"
-                        id={`file-upload-${block.id}`}
-                      />
-                      <Button 
-                        variant="outline" 
-                        onClick={() => document.getElementById(`file-upload-${block.id}`)?.click()}
-                      >
-                        Select Files
-                      </Button>
-                      {block.files.length > 0 && (
-                        <div className="mt-3 text-sm text-slate-600">
-                          {block.files.length} file(s) selected
+                    <Label>Instructions</Label>
+                    <p className="text-sm text-slate-600 mb-3">
+                      Offer detailed guidance as needed to help your supplier deliver the expected results for this service.
+                    </p>
+                    
+                    {/* File Names and Instructions */}
+                    <div className="space-y-2">
+                      {block.fileEntries?.map((entry, index) => (
+                        <div key={index} className="flex items-center space-x-2">
+                          <Input
+                            placeholder="File Name"
+                            value={entry.fileName}
+                            onChange={(e) => {
+                              const newEntries = [...(block.fileEntries || [])];
+                              newEntries[index] = { ...entry, fileName: e.target.value };
+                              updateServiceBlock(block.id, { fileEntries: newEntries });
+                            }}
+                            className="flex-1"
+                          />
+                          <Input
+                            placeholder="Detail your instruction"
+                            value={entry.instruction}
+                            onChange={(e) => {
+                              const newEntries = [...(block.fileEntries || [])];
+                              newEntries[index] = { ...entry, instruction: e.target.value };
+                              updateServiceBlock(block.id, { fileEntries: newEntries });
+                            }}
+                            className="flex-[2]"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const newEntries = (block.fileEntries || []).filter((_, i) => i !== index);
+                              updateServiceBlock(block.id, { fileEntries: newEntries });
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )) || (
+                        <div className="flex items-center space-x-2">
+                          <Input
+                            placeholder="File Name"
+                            value={block.fileName}
+                            onChange={(e) => updateServiceBlock(block.id, { fileName: e.target.value })}
+                            className="flex-1"
+                          />
+                          <Input
+                            placeholder="Detail your instruction"
+                            value={block.instructions}
+                            onChange={(e) => updateServiceBlock(block.id, { instructions: e.target.value })}
+                            className="flex-[2]"
+                          />
                         </div>
                       )}
-                    </div>
-                  </div>
-
-                  {/* File Name */}
-                  <div className="space-y-2">
-                    <Label htmlFor={`filename-${block.id}`}>File Name (Optional)</Label>
-                    <Input
-                      id={`filename-${block.id}`}
-                      placeholder="Custom file name..."
-                      value={block.fileName}
-                      onChange={(e) => updateServiceBlock(block.id, { fileName: e.target.value })}
-                    />
-                  </div>
-
-                  {/* Instructions */}
-                  <div className="space-y-2">
-                    <Label htmlFor={`instructions-${block.id}`}>Instructions</Label>
-                    <Textarea
-                      id={`instructions-${block.id}`}
-                      placeholder="Provide detailed instructions for the editor..."
-                      value={block.instructions}
-                      onChange={(e) => updateServiceBlock(block.id, { instructions: e.target.value })}
-                      className="h-24"
-                    />
-                  </div>
-
-                  {/* Export Type */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor={`export-${block.id}`}>Export Type</Label>
-                      <Select 
-                        value={block.exportType} 
-                        onValueChange={(value) => updateServiceBlock(block.id, { exportType: value })}
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const currentEntries = block.fileEntries || [];
+                          const newEntries = [...currentEntries, { fileName: "", instruction: "" }];
+                          updateServiceBlock(block.id, { fileEntries: newEntries });
+                        }}
+                        className="w-full"
                       >
-                        <SelectTrigger id={`export-${block.id}`}>
-                          <SelectValue placeholder="Select export type..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {exportTypes.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {type}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Another File
+                      </Button>
                     </div>
+                  </div>
 
-                    {block.exportType === "Custom" && (
-                      <div className="space-y-2">
-                        <Label htmlFor={`custom-desc-${block.id}`}>Custom Description</Label>
-                        <Input
-                          id={`custom-desc-${block.id}`}
-                          placeholder="Describe custom requirements..."
-                          value={block.customDescription}
-                          onChange={(e) => updateServiceBlock(block.id, { customDescription: e.target.value })}
-                        />
-                      </div>
-                    )}
+                  {/* Export Types */}
+                  <div className="space-y-2">
+                    <Label>Export Types</Label>
+                    <p className="text-sm text-slate-600 mb-3">
+                      Specify output requirements for your order, such as watermarks, folder sizes, and other preferences.
+                    </p>
+                    
+                    <div className="space-y-2">
+                      {block.exportEntries?.map((entry, index) => (
+                        <div key={index} className="flex items-center space-x-2">
+                          <Select 
+                            value={entry.type} 
+                            onValueChange={(value) => {
+                              const newEntries = [...(block.exportEntries || [])];
+                              newEntries[index] = { ...entry, type: value };
+                              updateServiceBlock(block.id, { exportEntries: newEntries });
+                            }}
+                          >
+                            <SelectTrigger className="flex-1">
+                              <SelectValue placeholder="Choose Export Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {exportTypes.map((type) => (
+                                <SelectItem key={type} value={type}>
+                                  {type}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            placeholder="Provide description"
+                            value={entry.description}
+                            onChange={(e) => {
+                              const newEntries = [...(block.exportEntries || [])];
+                              newEntries[index] = { ...entry, description: e.target.value };
+                              updateServiceBlock(block.id, { exportEntries: newEntries });
+                            }}
+                            className="flex-[2]"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const newEntries = (block.exportEntries || []).filter((_, i) => i !== index);
+                              updateServiceBlock(block.id, { exportEntries: newEntries });
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )) || (
+                        <div className="flex items-center space-x-2">
+                          <Select 
+                            value={block.exportType} 
+                            onValueChange={(value) => updateServiceBlock(block.id, { exportType: value })}
+                          >
+                            <SelectTrigger className="flex-1">
+                              <SelectValue placeholder="Choose Export Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {exportTypes.map((type) => (
+                                <SelectItem key={type} value={type}>
+                                  {type}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            placeholder="Provide description"
+                            value={block.customDescription}
+                            onChange={(e) => updateServiceBlock(block.id, { customDescription: e.target.value })}
+                            className="flex-[2]"
+                          />
+                        </div>
+                      )}
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const currentEntries = block.exportEntries || [];
+                          const newEntries = [...currentEntries, { type: "", description: "" }];
+                          updateServiceBlock(block.id, { exportEntries: newEntries });
+                        }}
+                        className="w-full"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Another Export Type
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Upload Button */}
+                  <div className="flex justify-end pt-4">
+                    <FileUploadModal
+                      blockId={block.id}
+                      onFilesUpload={(files) => updateServiceBlock(block.id, { files })}
+                      uploadedFiles={block.files}
+                    />
                   </div>
                 </CardContent>
               </Card>
