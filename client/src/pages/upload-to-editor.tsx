@@ -649,16 +649,11 @@ function UploadToEditorContent() {
                       <ImageIcon className="mr-2 h-5 w-5" />
                       {block.service}
                     </CardTitle>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        const newServices = selectedServices.filter(s => s !== block.service);
-                        handleServiceSelect(newServices);
-                      }}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                    <FileUploadModal
+                      blockId={block.id}
+                      onFilesUpload={(files) => updateServiceBlock(block.id, { files })}
+                      uploadedFiles={block.files}
+                    />
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -856,14 +851,7 @@ function UploadToEditorContent() {
                     </div>
                   </div>
 
-                  {/* Upload Button */}
-                  <div className="flex justify-end pt-4">
-                    <FileUploadModal
-                      blockId={block.id}
-                      onFilesUpload={(files) => updateServiceBlock(block.id, { files })}
-                      uploadedFiles={block.files}
-                    />
-                  </div>
+                  
                 </CardContent>
               </Card>
             ))}
