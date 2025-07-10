@@ -55,10 +55,10 @@ function EditorDashboardContent() {
   }, [isAuthenticated, authLoading, toast]);
 
   const { data: myJobCards, isLoading } = useQuery<JobCardWithDetails[]>({
-    queryKey: ["/api/job-cards", "editor", user?.id],
+    queryKey: ["/api/editor/job-cards", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const response = await fetch(`/api/job-cards?editorId=${user.id}`);
+      const response = await fetch(`/api/editor/job-cards`);
       if (!response.ok) throw new Error("Failed to fetch job cards");
       return response.json();
     },
@@ -82,7 +82,7 @@ function EditorDashboardContent() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/job-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/editor/job-cards"] });
       toast({
         title: "Success",
         description: "Job status updated successfully",
@@ -116,7 +116,7 @@ function EditorDashboardContent() {
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/job-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/editor/job-cards"] });
       toast({
         title: "Success",
         description: `Job completed! Content pieces created with final cost: $${data.finalCost || 0}`,
