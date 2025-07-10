@@ -497,10 +497,26 @@ function UploadToEditorContent() {
             formData.append('files', file);
           });
           
-          // Add metadata
+          // Add metadata with proper service category mapping
+          const serviceCategoryMap: { [key: string]: string } = {
+            'image_enhancement': 'photography',
+            'photo_editing': 'photography',
+            'photography': 'photography',
+            'floor_plan': 'floor_plan',
+            'floor_plans': 'floor_plan',
+            'drone': 'drone',
+            'aerial': 'drone',
+            'video': 'video',
+            'virtual_tour': 'video',
+            'default': 'photography'
+          };
+          
+          const normalizedCategory = block.service.toLowerCase().replace(/\s+/g, '_');
+          const serviceCategory = serviceCategoryMap[normalizedCategory] || serviceCategoryMap['default'];
+          
           formData.append('fileName', block.fileName || '');
           formData.append('mediaType', 'raw');
-          formData.append('serviceCategory', block.service.toLowerCase().replace(/\s+/g, '_'));
+          formData.append('serviceCategory', serviceCategory);
           formData.append('instructions', block.instructions);
           formData.append('exportType', block.exportType);
           formData.append('customDescription', block.customDescription);
