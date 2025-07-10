@@ -974,6 +974,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       switch (action) {
         case "upload":
           updateData.uploadedAt = now;
+          updateData.status = "pending"; // Auto-set to pending after upload
           activityDescription = "Files uploaded - job ready for assignment";
           break;
         
@@ -984,6 +985,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           updateData.acceptedAt = now;
           updateData.editorId = userId;
+          updateData.status = "in_progress"; // Auto-set to in_progress when accepted
           activityDescription = "Job accepted by editor";
           break;
         
@@ -993,6 +995,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.status(403).json({ message: "Only editors can mark jobs ready for QC" });
           }
           updateData.readyForQCAt = now;
+          updateData.status = "ready_for_qc"; // Auto-set to ready_for_qc
           activityDescription = "Edits completed - ready for quality check";
           break;
         
@@ -1003,6 +1006,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           updateData.revisionRequestedAt = now;
           updateData.revisionNotes = notes;
+          updateData.status = "in_revision"; // Auto-set to in_revision
           activityDescription = `Revision requested${notes ? `: ${notes}` : ''}`;
           break;
         
@@ -1012,6 +1016,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.status(403).json({ message: "Insufficient permissions to deliver jobs" });
           }
           updateData.deliveredAt = now;
+          updateData.status = "delivered"; // Auto-set to delivered
           activityDescription = "Job delivered to client";
           break;
         

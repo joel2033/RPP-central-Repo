@@ -454,6 +454,7 @@ const OrderStatus = memo(() => {
                                   size="sm"
                                   onClick={() => handleAcceptJob(order.id)}
                                   disabled={acceptJobMutation.isPending}
+                                  title="Accept Job"
                                 >
                                   <Play className="h-4 w-4" />
                                 </Button>
@@ -465,6 +466,7 @@ const OrderStatus = memo(() => {
                                   size="sm"
                                   onClick={() => handleMarkReadyForQC(order.id)}
                                   disabled={markReadyForQCMutation.isPending}
+                                  title="Mark Ready for QC"
                                 >
                                   <CheckCircle className="h-4 w-4" />
                                 </Button>
@@ -481,6 +483,7 @@ const OrderStatus = memo(() => {
                                     size="sm"
                                     onClick={() => handleRequestRevision(order.id, "Please make the requested changes")}
                                     disabled={requestRevisionMutation.isPending}
+                                    title="Request Revision"
                                   >
                                     <RotateCcw className="h-4 w-4" />
                                   </Button>
@@ -489,6 +492,7 @@ const OrderStatus = memo(() => {
                                     size="sm"
                                     onClick={() => handleDeliverJob(order.id)}
                                     disabled={deliverJobMutation.isPending}
+                                    title="Deliver Job"
                                   >
                                     <Truck className="h-4 w-4" />
                                   </Button>
@@ -503,6 +507,7 @@ const OrderStatus = memo(() => {
                               size="sm"
                               onClick={() => handleSendEmail(order.id)}
                               disabled={sendEmailMutation.isPending}
+                              title="Send Delivery Email"
                             >
                               <Send className="h-4 w-4" />
                             </Button>
