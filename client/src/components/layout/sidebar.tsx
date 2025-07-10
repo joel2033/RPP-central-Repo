@@ -58,6 +58,8 @@ const getFilteredNavigationSections = (userRole: string): NavSection[] => [
   { name: "Customers", href: "/clients", icon: Users },
   { name: "Calendar", href: "/calendar", icon: Calendar },
   { name: "Jobs", href: "/jobs", icon: Camera },
+  // TEMPORARY: Editor Dashboard for testing
+  { name: "Editor Dashboard", href: "/editor-dashboard", icon: Camera },
   
   // Production Hub with simplified items
   {

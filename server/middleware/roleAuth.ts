@@ -9,6 +9,14 @@ export function requireRole(allowedRoles: string[]) {
 
     const userRole = req.user.role || "licensee";
     
+    // TEMPORARY: Grant editor access for testing (remove after testing)
+    const userId = req.user.claims?.sub;
+    if (userId === "44695535" && allowedRoles.includes("editor")) {
+      // Grant editor access for testing
+      req.userData = { role: "editor", licenseeId: userId };
+      return next();
+    }
+    
     if (!allowedRoles.includes(userRole)) {
       return res.status(403).json({ 
         error: "Access denied", 
