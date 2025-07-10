@@ -147,6 +147,23 @@ function EditorDashboardContent() {
   const handleAcceptJob = (jobCard: JobCardWithDetails) => {
     updateJobCardMutation.mutate({
       id: jobCard.id,
+      data: { status: "in_progress" }
+    });
+  };
+
+  const handleDeclineJob = (jobCard: JobCardWithDetails) => {
+    updateJobCardMutation.mutate({
+      id: jobCard.id,
+      data: { 
+        status: "unassigned",
+        editorId: null
+      }
+    });
+  };
+
+  const handleStartEditing = (jobCard: JobCardWithDetails) => {
+    updateJobCardMutation.mutate({
+      id: jobCard.id,
       data: { status: "editing" }
     });
   };
@@ -170,6 +187,7 @@ function EditorDashboardContent() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case "pending": return "bg-purple-500";
       case "in_progress": return "bg-blue-500";
       case "editing": return "bg-yellow-500";
       case "ready_for_qc": return "bg-green-500";
@@ -181,6 +199,7 @@ function EditorDashboardContent() {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
+      case "pending": return "Pending";
       case "in_progress": return "Assigned";
       case "editing": return "Editing";
       case "ready_for_qc": return "Ready for QC";
@@ -349,13 +368,33 @@ function EditorDashboardContent() {
                         />
                         
                         <div className="flex gap-2">
+                          {jobCard.status === "pending" && (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => handleAcceptJob(jobCard)}
+                                className="flex-1"
+                              >
+                                Accept Order
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDeclineJob(jobCard)}
+                                className="flex-1"
+                              >
+                                Decline
+                              </Button>
+                            </>
+                          )}
+                          
                           {jobCard.status === "in_progress" && (
                             <Button
                               size="sm"
-                              onClick={() => handleAcceptJob(jobCard)}
+                              onClick={() => handleStartEditing(jobCard)}
                               className="flex-1"
                             >
-                              Accept Job
+                              Start Editing
                             </Button>
                           )}
                           
