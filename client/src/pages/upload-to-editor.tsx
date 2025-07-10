@@ -81,6 +81,8 @@ function FileUploadModal({
   const [files, setFiles] = useState<File[]>([]);
   const [urlLink, setUrlLink] = useState("");
   const [dragActive, setDragActive] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState<Map<string, number>>(new Map());
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -112,9 +114,49 @@ function FileUploadModal({
     setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleUpload = () => {
-    onFilesUpload(files);
-    setIsOpen(false);
+  const removeUploadedFile = (index: number) => {
+    const newUploadedFiles = uploadedFiles.filter((_, i) => i !== index);
+    onFilesUpload(newUploadedFiles);
+  };
+
+  const simulateUpload = async (file: File): Promise<void> => {
+    return new Promise((resolve) => {
+      const fileName = file.name;
+      const duration = 2000; // 2 seconds for demo
+      const steps = 100;
+      const stepDuration = duration / steps;
+      
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += 1;
+        setUploadingFiles(prev => new Map(prev.set(fileName, progress)));
+        
+        if (progress >= 100) {
+          clearInterval(interval);
+          setUploadingFiles(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(fileName);
+            return newMap;
+          });
+          resolve();
+        }
+      }, stepDuration);
+    });
+  };
+
+  const handleUpload = async () => {
+    if (files.length === 0) return;
+    
+    setIsUploading(true);
+    
+    // Simulate upload progress for each file
+    const uploadPromises = files.map(file => simulateUpload(file));
+    await Promise.all(uploadPromises);
+    
+    // Add files to uploaded files
+    onFilesUpload([...uploadedFiles, ...files]);
+    
+    setIsUploading(false);
     setFiles([]);
     setUrlLink("");
   };
@@ -135,14 +177,33 @@ function FileUploadModal({
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Upload Files</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsOpen(false)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              <div>
+                <h3 className="text-lg font-semibold">Upload Files</h3>
+                {isUploading && (
+                  <p className="text-sm text-gray-600">
+                    Uploading files {uploadedFiles.length + Array.from(uploadingFiles.keys()).length} of {uploadedFiles.length + files.length}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {!isUploading && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById(`file-input-${blockId}`)?.click()}
+                  >
+                    Add
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsOpen(false)}
+                  disabled={isUploading}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
             <p className="text-sm text-gray-600 mb-4">
@@ -190,20 +251,71 @@ function FileUploadModal({
               />
             </div>
 
-            {/* Selected Files Display */}
-            {files.length > 0 && (
-              <div className="mb-4">
-                <h4 className="text-sm font-medium mb-2">Selected Files:</h4>
-                <div className="space-y-1">
-                  {files.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                      <span className="text-sm">{file.name}</span>
+            {/* Uploaded Files Display */}
+            {(uploadedFiles.length > 0 || uploadingFiles.size > 0 || files.length > 0) && (
+              <div className="mb-4 max-h-64 overflow-y-auto">
+                <div className="space-y-2">
+                  {/* Already uploaded files */}
+                  {uploadedFiles.map((file, index) => (
+                    <div key={`uploaded-${index}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="text-sm font-medium">{file.name}</div>
+                        <div className="flex items-center space-x-2">
+                          <div className="text-xs text-green-600">100%</div>
+                          <div className="w-32 h-2 bg-gray-200 rounded-full">
+                            <div className="w-full h-2 bg-black rounded-full"></div>
+                          </div>
+                        </div>
+                      </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => removeFile(index)}
+                        onClick={() => removeUploadedFile(index)}
+                        disabled={isUploading}
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  
+                  {/* Currently uploading files */}
+                  {Array.from(uploadingFiles.entries()).map(([fileName, progress]) => (
+                    <div key={`uploading-${fileName}`} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="text-sm font-medium">{fileName}</div>
+                        <div className="flex items-center space-x-2">
+                          <div className="text-xs text-blue-600">{progress}%</div>
+                          <div className="w-32 h-2 bg-gray-200 rounded-full">
+                            <div 
+                              className="h-2 bg-black rounded-full transition-all duration-100"
+                              style={{ width: `${progress}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+                      <X className="h-4 w-4 text-gray-400" />
+                    </div>
+                  ))}
+                  
+                  {/* Pending files (not yet uploading) */}
+                  {files.filter(file => !uploadingFiles.has(file.name)).map((file, index) => (
+                    <div key={`pending-${index}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="text-sm font-medium">{file.name}</div>
+                        <div className="flex items-center space-x-2">
+                          <div className="text-xs text-gray-500">0%</div>
+                          <div className="w-32 h-2 bg-gray-200 rounded-full">
+                            <div className="w-0 h-2 bg-black rounded-full"></div>
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFile(files.indexOf(file))}
+                        disabled={isUploading}
+                      >
+                        <X className="h-4 w-4" />
                       </Button>
                     </div>
                   ))}
@@ -256,14 +368,15 @@ function FileUploadModal({
               <Button
                 variant="outline"
                 onClick={() => setIsOpen(false)}
+                disabled={isUploading}
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleUpload}
-                disabled={files.length === 0 && !urlLink}
+                disabled={(files.length === 0 && !urlLink) || isUploading}
               >
-                Upload Files
+                {isUploading ? "Uploading..." : "Upload Files"}
               </Button>
             </div>
           </div>
