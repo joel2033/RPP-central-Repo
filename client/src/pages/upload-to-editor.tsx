@@ -210,54 +210,75 @@ function FileUploadModal({
               Include any input files that your supplier may require to carry out this service.
             </p>
 
-            {/* File Drop Zone */}
-            <div
-              className={`border-2 border-dashed rounded-lg p-8 text-center mb-4 transition-colors ${
-                dragActive ? "border-blue-500 bg-blue-50" : "border-gray-300"
-              }`}
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
-            >
-              <div className="flex flex-col items-center">
-                <div className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
-                  <Upload className="h-6 w-6 text-gray-400" />
+            {/* Conditional Display: Drop Zone OR File List */}
+            {(uploadedFiles.length === 0 && uploadingFiles.size === 0 && files.length === 0) ? (
+              /* File Drop Zone - Only show when no files */
+              <div
+                className={`border-2 border-dashed rounded-lg p-8 text-center mb-4 transition-colors ${
+                  dragActive ? "border-blue-500 bg-blue-50" : "border-gray-300"
+                }`}
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+              >
+                <div className="flex flex-col items-center">
+                  <div className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
+                    <Upload className="h-6 w-6 text-gray-400" />
+                  </div>
+                  <p className="mb-2">
+                    Drop your file(s) here, or{" "}
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById(`file-input-${blockId}`)?.click()}
+                      className="text-blue-600 underline"
+                    >
+                      browse.
+                    </button>
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Supported formats: JPG, DNG, PNG, PDF. Each file's maximum size is 25MB.
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Maximum upload size: 2GB. If your total input files exceed this limit, please use the URL upload option.
+                  </p>
                 </div>
-                <p className="mb-2">
-                  Drop your file(s) here, or{" "}
-                  <button
-                    type="button"
-                    onClick={() => document.getElementById(`file-input-${blockId}`)?.click()}
-                    className="text-blue-600 underline"
-                  >
-                    browse.
-                  </button>
-                </p>
-                <p className="text-xs text-gray-500">
-                  Supported formats: JPG, DNG, PNG, PDF. Each file's maximum size is 25MB.
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Maximum upload size: 2GB. If your total input files exceed this limit, please use the URL upload option.
-                </p>
+                <input
+                  id={`file-input-${blockId}`}
+                  type="file"
+                  multiple
+                  accept="image/*,video/*,.pdf"
+                  onChange={handleFileInput}
+                  className="hidden"
+                />
               </div>
-              <input
-                id={`file-input-${blockId}`}
-                type="file"
-                multiple
-                accept="image/*,video/*,.pdf"
-                onChange={handleFileInput}
-                className="hidden"
-              />
-            </div>
-
-            {/* Uploaded Files Display */}
-            {(uploadedFiles.length > 0 || uploadingFiles.size > 0 || files.length > 0) && (
-              <div className="mb-4 max-h-64 overflow-y-auto">
-                <div className="space-y-2">
+            ) : (
+              /* File List Display - Show when files are present */
+              <div 
+                className="mb-4"
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+              >
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="text-sm font-medium">
+                    Files ({uploadedFiles.length + uploadingFiles.size + files.length})
+                  </h4>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById(`file-input-${blockId}`)?.click()}
+                    disabled={isUploading}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add More
+                  </Button>
+                </div>
+                <div className="max-h-64 overflow-y-auto space-y-2 border rounded-lg p-3 bg-gray-50">
                   {/* Already uploaded files */}
                   {uploadedFiles.map((file, index) => (
-                    <div key={`uploaded-${index}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div key={`uploaded-${index}`} className="flex items-center justify-between p-3 bg-white rounded-lg">
                       <div className="flex items-center space-x-3">
                         <div className="text-sm font-medium">{file.name}</div>
                         <div className="flex items-center space-x-2">
@@ -299,7 +320,7 @@ function FileUploadModal({
                   
                   {/* Pending files (not yet uploading) */}
                   {files.filter(file => !uploadingFiles.has(file.name)).map((file, index) => (
-                    <div key={`pending-${index}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div key={`pending-${index}`} className="flex items-center justify-between p-3 bg-white rounded-lg">
                       <div className="flex items-center space-x-3">
                         <div className="text-sm font-medium">{file.name}</div>
                         <div className="flex items-center space-x-2">
@@ -320,8 +341,18 @@ function FileUploadModal({
                     </div>
                   ))}
                 </div>
+                <input
+                  id={`file-input-${blockId}`}
+                  type="file"
+                  multiple
+                  accept="image/*,video/*,.pdf"
+                  onChange={handleFileInput}
+                  className="hidden"
+                />
               </div>
             )}
+
+            
 
             <p className="text-sm text-gray-500 text-center mb-4">
               Files uploaded will be automatically removed after 14 days.
