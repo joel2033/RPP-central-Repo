@@ -17,11 +17,14 @@ import {
   CheckCircle, 
   Clock, 
   Camera,
-  FileText
+  FileText,
+  DollarSign
 } from "lucide-react";
 import JobStatusPanel from "@/components/job-status-panel";
 import EmptyState from "@/components/shared/empty-state";
 import LoadingSpinner from "@/components/shared/loading-spinner";
+import EditorServicePricing from "@/components/editor/service-pricing";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { JobCard, Client, User, ProductionFile } from "@shared/schema";
 
 interface JobCardWithDetails extends JobCard {
@@ -35,6 +38,7 @@ function EditorDashboardContent() {
   const queryClient = useQueryClient();
   const [selectedJobCard, setSelectedJobCard] = useState<JobCardWithDetails | null>(null);
   const [completionNotes, setCompletionNotes] = useState("");
+  const [activeTab, setActiveTab] = useState("jobs");
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -231,99 +235,120 @@ function EditorDashboardContent() {
             </Card>
           </div>
 
-          {/* Job Cards */}
-          {!myJobCards || myJobCards.length === 0 ? (
-            <EmptyState
-              icon={Camera}
-              title="No Jobs Assigned"
-              description="You don't have any jobs assigned to you yet."
-            />
-          ) : (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {myJobCards.map((jobCard) => (
-                <Card key={jobCard.id} className="hover:shadow-lg transition-shadow">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg font-semibold">
-                        {jobCard.jobId}
-                      </CardTitle>
-                      <Badge 
-                        className={`text-white ${getStatusColor(jobCard.status || "unassigned")}`}
-                      >
-                        {getStatusLabel(jobCard.status || "unassigned")}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  
-                  <CardContent className="space-y-4">
-                    <div>
-                      <p className="font-medium text-slate-900">{jobCard.client.name}</p>
-                      <p className="text-sm text-slate-600">{jobCard.client.email}</p>
-                    </div>
-                    
-                    <div>
-                      <p className="text-sm font-medium text-slate-700">Services:</p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {(jobCard.requestedServices as string[])?.map((service) => (
-                          <Badge key={service} variant="outline" className="text-xs">
-                            {service}
+          {/* Main Content Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="jobs" className="flex items-center gap-2">
+                <Camera className="h-4 w-4" />
+                My Jobs
+              </TabsTrigger>
+              <TabsTrigger value="services" className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Service Pricing
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="jobs">
+              {/* Job Cards */}
+              {!myJobCards || myJobCards.length === 0 ? (
+                <EmptyState
+                  icon={Camera}
+                  title="No Jobs Assigned"
+                  description="You don't have any jobs assigned to you yet."
+                />
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {myJobCards.map((jobCard) => (
+                    <Card key={jobCard.id} className="hover:shadow-lg transition-shadow">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-lg font-semibold">
+                            {jobCard.jobId}
+                          </CardTitle>
+                          <Badge 
+                            className={`text-white ${getStatusColor(jobCard.status || "unassigned")}`}
+                          >
+                            {getStatusLabel(jobCard.status || "unassigned")}
                           </Badge>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    {jobCard.editingNotes && (
-                      <div>
-                        <p className="text-sm font-medium text-slate-700">Notes:</p>
-                        <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded">
-                          {jobCard.editingNotes}
-                        </p>
-                      </div>
-                    )}
-                    
-                    {/* Quick Status Panel */}
-                    <JobStatusPanel 
-                      jobId={jobCard.id}
-                      currentStatus={jobCard.status}
-                      jobStatus={jobCard.jobStatus || jobCard.status}
-                      compact={true}
-                    />
-                    
-                    <div className="flex gap-2">
-                      {jobCard.status === "in_progress" && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleAcceptJob(jobCard)}
-                          className="flex-1"
-                        >
-                          Accept Job
-                        </Button>
-                      )}
+                        </div>
+                      </CardHeader>
                       
-                      {jobCard.status === "editing" && (
-                        <Button
-                          size="sm"
-                          onClick={() => setSelectedJobCard(jobCard)}
-                          className="flex-1"
-                        >
-                          Mark Complete
-                        </Button>
-                      )}
-                      
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setSelectedJobCard(jobCard)}
-                        className="flex-1"
-                      >
-                        View Files
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+                      <CardContent className="space-y-4">
+                        <div>
+                          <p className="font-medium text-slate-900">{jobCard.client.name}</p>
+                          <p className="text-sm text-slate-600">{jobCard.client.email}</p>
+                        </div>
+                        
+                        <div>
+                          <p className="text-sm font-medium text-slate-700">Services:</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {(jobCard.requestedServices as string[])?.map((service) => (
+                              <Badge key={service} variant="outline" className="text-xs">
+                                {service}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        {jobCard.editingNotes && (
+                          <div>
+                            <p className="text-sm font-medium text-slate-700">Notes:</p>
+                            <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded">
+                              {jobCard.editingNotes}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Quick Status Panel */}
+                        <JobStatusPanel 
+                          jobId={jobCard.id}
+                          currentStatus={jobCard.status}
+                          jobStatus={jobCard.jobStatus || jobCard.status}
+                          compact={true}
+                        />
+                        
+                        <div className="flex gap-2">
+                          {jobCard.status === "in_progress" && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleAcceptJob(jobCard)}
+                              className="flex-1"
+                            >
+                              Accept Job
+                            </Button>
+                          )}
+                          
+                          {jobCard.status === "editing" && (
+                            <Button
+                              size="sm"
+                              onClick={() => setSelectedJobCard(jobCard)}
+                              className="flex-1"
+                            >
+                              Mark Complete
+                            </Button>
+                          )}
+                          
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setSelectedJobCard(jobCard)}
+                            className="flex-1"
+                            
+                          >
+                            View Files
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="services">
+              <EditorServicePricing />
+            </TabsContent>
+          </Tabs>
 
           {/* Job Details Modal */}
           {selectedJobCard && (

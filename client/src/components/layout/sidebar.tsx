@@ -91,14 +91,7 @@ const getFilteredNavigationSections = (userRole: string): NavSection[] => [
     ]
   },
   
-  // Admin-only section for editor service pricing
-  ...(userRole === "admin" ? [{
-    name: "Editor Services",
-    icon: Settings,
-    items: [
-      { name: "Service Pricing", href: "/editor-services", icon: DollarSign },
-    ]
-  }] : []),
+
 ];
 
 const additionalNavigation = [
