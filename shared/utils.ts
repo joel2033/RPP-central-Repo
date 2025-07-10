@@ -2,14 +2,24 @@
 
 export interface JobCardWithTimestamps {
   deliveredAt?: string | null;
+  status?: string;
+  editorId?: string;
+  assignedAt?: string | null;
 }
 
 /**
- * Get the current status of an order based on action timestamps
- * This replaces manual status dropdown with automatic status calculation
+ * Get the current status of an order based on action timestamps and status field
+ * This supports both new lifecycle and legacy status systems
  */
 export function getOrderStatus(order: JobCardWithTimestamps): string {
+  // Use explicit status field if available
+  if (order.status) {
+    return order.status;
+  }
+  
+  // Fallback to timestamp-based calculation
   if (order.deliveredAt) return "delivered";
+  if (order.assignedAt && order.editorId) return "in_progress";
   return "pending";
 }
 

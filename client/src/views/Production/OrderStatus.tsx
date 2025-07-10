@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { 
   Clock, 
   CheckCircle, 
@@ -26,7 +26,11 @@ import {
   FileUp,
   CheckCheck,
   Send,
-  User
+  User,
+  Play,
+  Pause,
+  RotateCcw,
+  Truck
 } from "lucide-react";
 import { JobActionButtons } from '@/components/JobActionButtons';
 import { StatusDisplay } from '@/components/StatusDisplay';
@@ -97,23 +101,56 @@ const OrderStatus = memo(() => {
     },
   });
 
-  // Status update mutation
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status, reason }: { id: number; status: string; reason?: string }) => {
-      const response = await fetch(`/api/job-cards/${id}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, reason, changedBy: user?.id }),
-      });
-      if (!response.ok) throw new Error("Failed to update status");
-      return response.json();
+  // Status lifecycle mutations
+  const acceptJobMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("POST", `/api/job-cards/${id}/accept`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/job-cards"] });
-      toast({ title: "Success", description: "Order status updated successfully" });
+      toast({ title: "Success", description: "Job accepted successfully" });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to update status", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to accept job", variant: "destructive" });
+    },
+  });
+
+  const markReadyForQCMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: number; notes?: string }) => {
+      return apiRequest("POST", `/api/job-cards/${id}/mark-ready-qc`, { notes });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/job-cards"] });
+      toast({ title: "Success", description: "Job marked as ready for QC" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to mark job ready for QC", variant: "destructive" });
+    },
+  });
+
+  const requestRevisionMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: number; notes: string }) => {
+      return apiRequest("POST", `/api/job-cards/${id}/request-revision`, { notes });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/job-cards"] });
+      toast({ title: "Success", description: "Revision requested successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to request revision", variant: "destructive" });
+    },
+  });
+
+  const deliverJobMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: number; notes?: string }) => {
+      return apiRequest("POST", `/api/job-cards/${id}/deliver`, { notes });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/job-cards"] });
+      toast({ title: "Success", description: "Job delivered successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to deliver job", variant: "destructive" });
     },
   });
 
@@ -235,9 +272,22 @@ const OrderStatus = memo(() => {
     return currentStatus === statusFilter || order.status === statusFilter;
   });
 
-  const handleStatusChange = useCallback((orderId: number, newStatus: string) => {
-    updateStatusMutation.mutate({ id: orderId, status: newStatus });
-  }, [updateStatusMutation]);
+  // Action handlers
+  const handleAcceptJob = useCallback((orderId: number) => {
+    acceptJobMutation.mutate(orderId);
+  }, [acceptJobMutation]);
+
+  const handleMarkReadyForQC = useCallback((orderId: number, notes?: string) => {
+    markReadyForQCMutation.mutate({ id: orderId, notes });
+  }, [markReadyForQCMutation]);
+
+  const handleRequestRevision = useCallback((orderId: number, notes: string) => {
+    requestRevisionMutation.mutate({ id: orderId, notes });
+  }, [requestRevisionMutation]);
+
+  const handleDeliverJob = useCallback((orderId: number, notes?: string) => {
+    deliverJobMutation.mutate({ id: orderId, notes });
+  }, [deliverJobMutation]);
 
   const handleFileUpload = useCallback((event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -394,17 +444,60 @@ const OrderStatus = memo(() => {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedOrder(order);
-                              setUploadDialogOpen(true);
-                            }}
-                          >
-                            <Upload className="h-4 w-4" />
-                          </Button>
-                          {order.status === "complete" && (
+                          
+                          {/* Status-specific action buttons */}
+                          {(user?.role === 'editor' || user?.role === 'admin') && (
+                            <>
+                              {order.status === "pending" && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleAcceptJob(order.id)}
+                                  disabled={acceptJobMutation.isPending}
+                                >
+                                  <Play className="h-4 w-4" />
+                                </Button>
+                              )}
+                              
+                              {order.status === "in_progress" && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleMarkReadyForQC(order.id)}
+                                  disabled={markReadyForQCMutation.isPending}
+                                >
+                                  <CheckCircle className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </>
+                          )}
+                          
+                          {(user?.role === 'admin' || user?.role === 'va') && (
+                            <>
+                              {order.status === "ready_for_qc" && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRequestRevision(order.id, "Please make the requested changes")}
+                                    disabled={requestRevisionMutation.isPending}
+                                  >
+                                    <RotateCcw className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeliverJob(order.id)}
+                                    disabled={deliverJobMutation.isPending}
+                                  >
+                                    <Truck className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
+                            </>
+                          )}
+                          
+                          {order.status === "delivered" && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -412,15 +505,6 @@ const OrderStatus = memo(() => {
                               disabled={sendEmailMutation.isPending}
                             >
                               <Send className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {(order.status === "in_progress" || order.status === "editing") && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleStatusChange(order.id, "complete")}
-                            >
-                              <CheckCheck className="h-4 w-4" />
                             </Button>
                           )}
                         </div>

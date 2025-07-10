@@ -624,6 +624,228 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Order status lifecycle management endpoints
+  app.post("/api/job-cards/:id/status-change", isAuthenticated, async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      const { newStatus, notes } = req.body;
+      
+      // Validate status transition
+      const validStatuses = ["pending", "in_progress", "ready_for_qc", "in_revision", "delivered"];
+      if (!validStatuses.includes(newStatus)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+
+      // Get current job card
+      const jobCard = await storage.getJobCard(jobCardId);
+      if (!jobCard) {
+        return res.status(404).json({ message: "Job card not found" });
+      }
+
+      const oldStatus = jobCard.status;
+      
+      // Update job card status
+      await storage.updateJobCard(jobCardId, { status: newStatus });
+      
+      // Create activity log entry
+      const activityData = {
+        jobCardId,
+        userId,
+        action: `status_change_${newStatus}`,
+        description: `Status changed from ${oldStatus} to ${newStatus}${notes ? ` - ${notes}` : ''}`,
+        metadata: {
+          oldStatus, 
+          newStatus, 
+          notes,
+          timestamp: new Date().toISOString()
+        }
+      };
+      
+      await storage.createJobActivityLog(activityData);
+      
+      // Send notification if needed
+      if (newStatus === "ready_for_qc" && jobCard.editorId) {
+        await storage.createNotification({
+          jobCardId,
+          recipientId: jobCard.editorId,
+          type: "status_change",
+          message: `Job ${jobCard.jobId || `#${jobCard.id}`} is ready for QC`
+        });
+      }
+      
+      res.json({ 
+        success: true, 
+        jobCard: await storage.getJobCard(jobCardId),
+        message: `Status updated to ${newStatus}` 
+      });
+    } catch (error) {
+      console.error("Error updating job status:", error);
+      res.status(500).json({ message: "Failed to update job status" });
+    }
+  });
+
+  // Editor action: Accept job
+  app.post("/api/job-cards/:id/accept", isAuthenticated, async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      
+      // Update job card status to in_progress
+      await storage.updateJobCard(jobCardId, { 
+        status: "in_progress",
+        editorId: userId,
+        assignedAt: new Date()
+      });
+      
+      // Create activity log entry
+      const activityData = {
+        jobCardId,
+        userId,
+        action: "job_accepted",
+        description: "Job accepted by editor and moved to In Progress",
+        metadata: {
+          action: "accept",
+          timestamp: new Date().toISOString()
+        }
+      };
+      
+      await storage.createJobActivityLog(activityData);
+      
+      res.json({ 
+        success: true, 
+        message: "Job accepted successfully" 
+      });
+    } catch (error) {
+      console.error("Error accepting job:", error);
+      res.status(500).json({ message: "Failed to accept job" });
+    }
+  });
+
+  // Editor action: Mark ready for QC
+  app.post("/api/job-cards/:id/mark-ready-qc", isAuthenticated, async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      const { notes } = req.body;
+      
+      // Update job card status to ready_for_qc
+      await storage.updateJobCard(jobCardId, { 
+        status: "ready_for_qc"
+      });
+      
+      // Create activity log entry
+      const activityData = {
+        jobCardId,
+        userId,
+        action: "ready_for_qc",
+        description: `Job marked as ready for QC${notes ? ` - ${notes}` : ''}`,
+        metadata: {
+          action: "ready_for_qc",
+          notes,
+          timestamp: new Date().toISOString()
+        }
+      };
+      
+      await storage.createJobActivityLog(activityData);
+      
+      res.json({ 
+        success: true, 
+        message: "Job marked as ready for QC" 
+      });
+    } catch (error) {
+      console.error("Error marking job ready for QC:", error);
+      res.status(500).json({ message: "Failed to mark job ready for QC" });
+    }
+  });
+
+  // QC action: Request revision
+  app.post("/api/job-cards/:id/request-revision", isAuthenticated, async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      const { notes } = req.body;
+      
+      // Update job card status to in_revision
+      await storage.updateJobCard(jobCardId, { 
+        status: "in_revision",
+        revisionNotes: notes
+      });
+      
+      // Create activity log entry
+      const activityData = {
+        jobCardId,
+        userId,
+        action: "revision_requested",
+        description: `Revision requested: ${notes || 'No additional notes'}`,
+        metadata: {
+          action: "revision",
+          notes,
+          timestamp: new Date().toISOString()
+        }
+      };
+      
+      await storage.createJobActivityLog(activityData);
+      
+      // Notify editor
+      const jobCard = await storage.getJobCard(jobCardId);
+      if (jobCard?.editorId) {
+        await storage.createNotification({
+          jobCardId,
+          recipientId: jobCard.editorId,
+          type: "revision_requested",
+          message: `Revision requested for Job ${jobCard.jobId || `#${jobCard.id}`}`
+        });
+      }
+      
+      res.json({ 
+        success: true, 
+        message: "Revision requested successfully" 
+      });
+    } catch (error) {
+      console.error("Error requesting revision:", error);
+      res.status(500).json({ message: "Failed to request revision" });
+    }
+  });
+
+  // Final action: Deliver job
+  app.post("/api/job-cards/:id/deliver", isAuthenticated, async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      const { notes } = req.body;
+      
+      // Update job card status to delivered
+      await storage.updateJobCard(jobCardId, { 
+        status: "delivered",
+        deliveredAt: new Date()
+      });
+      
+      // Create activity log entry
+      const activityData = {
+        jobCardId,
+        userId,
+        action: "delivered",
+        description: `Job delivered to client${notes ? ` - ${notes}` : ''}`,
+        metadata: {
+          action: "delivered",
+          notes,
+          timestamp: new Date().toISOString()
+        }
+      };
+      
+      await storage.createJobActivityLog(activityData);
+      
+      res.json({ 
+        success: true, 
+        message: "Job delivered successfully" 
+      });
+    } catch (error) {
+      console.error("Error delivering job:", error);
+      res.status(500).json({ message: "Failed to deliver job" });
+    }
+  });
+
   // Comprehensive Editor Submission Endpoint
   app.post('/api/job-cards/:id/submit-to-editor', isAuthenticated, async (req: any, res) => {
     try {
@@ -665,7 +887,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Step 3: Update job card with editor assignment and status
       await storage.updateJobCard(jobCardId, {
         editorId: editorId,
-        status: "in_progress",
+        status: "pending", // Start as pending, editor will accept to move to in_progress
         editingNotes: instructions,
         assignedAt: new Date()
       }, licenseeId);
