@@ -359,6 +359,7 @@ Changelog:
   - **Real-time Loading**: Added loading states and empty states for editor service categories
   - **Service Block Integration**: Updated service blocks to store category IDs and selected pricing options
   - **Complete Workflow**: Upload to Editor page now fully integrates with editor's custom service pricing structure
+  - **Fully Functional**: Confirmed working pricing option selection with proper service block creation and dropdown functionality
 ```
 
 ## User Preferences

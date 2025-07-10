@@ -189,14 +189,12 @@ function UploadToEditorContent() {
   });
 
   const handleServiceSelect = (services: string[]) => {
-    console.log('handleServiceSelect called with:', services);
     setSelectedServices(services);
     
     // Create service blocks for new services
     const newBlocks: ServiceBlock[] = services.map(service => {
       const existingBlock = serviceBlocks.find(block => block.service === service);
       const category = editorServiceCategories?.find(cat => cat.categoryName === service);
-      console.log('Creating block for service:', service, 'category found:', category);
       return existingBlock || {
         id: Math.random().toString(),
         service,
@@ -210,7 +208,6 @@ function UploadToEditorContent() {
       };
     });
     
-    console.log('Setting service blocks:', newBlocks);
     setServiceBlocks(newBlocks);
   };
 
@@ -391,10 +388,8 @@ function UploadToEditorContent() {
                                   <Select
                                     value={serviceBlocks.find(block => block.service === category.categoryName)?.selectedOptionId?.toString() || ""}
                                     onValueChange={(value) => {
-                                      console.log('Dropdown value changed:', value, 'for category:', category.categoryName);
                                       const option = category.options.find(opt => opt.id.toString() === value);
                                       const targetBlock = serviceBlocks.find(block => block.service === category.categoryName);
-                                      console.log('Found option:', option, 'target block:', targetBlock);
                                       if (option && targetBlock) {
                                         updateServiceBlock(targetBlock.id, {
                                           selectedOptionId: option.id,
