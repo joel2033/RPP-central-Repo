@@ -723,7 +723,7 @@ export class DatabaseStorage implements IStorage {
         eq(jobCards.editorId, editorId), 
         eq(jobCards.licenseeId, licenseeId)
       ))
-      .orderBy(desc(jobCards.createdAt));
+      .orderBy(desc(jobCards.updatedAt));
 
     return results.map(result => ({
       ...result.jobCard,

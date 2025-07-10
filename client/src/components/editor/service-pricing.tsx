@@ -48,14 +48,14 @@ export default function EditorServicePricing() {
   });
 
   // Fetch editor's service structure
-  const { data: serviceStructure, isLoading, error } = useQuery({
+  const { data: serviceStructure = [], isLoading, error } = useQuery({
     queryKey: ["editor-services", user?.id],
     queryFn: () => editorServiceApi.getEditorServices(user?.id || ""),
     enabled: !!user?.id,
   });
 
   // Fetch service templates
-  const { data: serviceTemplates } = useQuery({
+  const { data: serviceTemplates = [] } = useQuery({
     queryKey: ["service-templates"],
     queryFn: () => editorServiceApi.getServiceTemplates(),
     enabled: showTemplates,
