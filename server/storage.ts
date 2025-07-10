@@ -845,6 +845,19 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(productionFiles.uploadedAt));
   }
 
+  async updateProductionFile(id: number, data: Partial<ProductionFile>): Promise<ProductionFile> {
+    const [updatedFile] = await db
+      .update(productionFiles)
+      .set({
+        ...data,
+        updatedAt: new Date()
+      })
+      .where(eq(productionFiles.id, id))
+      .returning();
+    
+    return updatedFile;
+  }
+
   // Notifications
   async getNotifications(userId: string): Promise<ProductionNotification[]> {
     return await db

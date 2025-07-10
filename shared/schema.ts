@@ -192,7 +192,9 @@ export const productionFiles = pgTable("production_files", {
   instructions: text("instructions"),
   exportType: varchar("export_type", { length: 100 }),
   customDescription: text("custom_description"),
+  metadata: jsonb("metadata"), // Additional metadata for completion tracking
   uploadedAt: timestamp("uploaded_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
   isActive: boolean("is_active").default(true),
 });
 

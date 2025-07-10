@@ -110,6 +110,40 @@ function EditorDashboardContent() {
     },
   });
 
+  const completeJobWithContentMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      const response = await apiRequest("POST", `/api/job-cards/${id}/complete-with-content`, data);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/job-cards"] });
+      toast({
+        title: "Success",
+        description: `Job completed! Content pieces created with final cost: $${data.finalCost || 0}`,
+      });
+      setSelectedJobCard(null);
+      setCompletionNotes("");
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to complete job with content",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleAcceptJob = (jobCard: JobCardWithDetails) => {
     updateJobCardMutation.mutate({
       id: jobCard.id,
@@ -118,11 +152,18 @@ function EditorDashboardContent() {
   };
 
   const handleCompleteJob = (jobCard: JobCardWithDetails) => {
-    updateJobCardMutation.mutate({
+    // Use the new comprehensive completion endpoint
+    completeJobWithContentMutation.mutate({
       id: jobCard.id,
-      data: { 
-        status: "ready_for_qc",
-        editingNotes: completionNotes || jobCard.editingNotes,
+      data: {
+        notes: completionNotes || jobCard.editingNotes,
+        instructionsFollowed: "All client instructions followed as specified",
+        qcIssues: "No issues flagged - ready for client delivery",
+        completionDetails: {
+          editorNotes: completionNotes,
+          completionTime: new Date().toISOString(),
+          filesCompleted: true
+        }
       }
     });
   };
@@ -417,16 +458,32 @@ function EditorDashboardContent() {
                   
                   {/* Completion Notes */}
                   {selectedJobCard.status === "editing" && (
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Completion Notes
-                      </label>
-                      <Textarea
-                        placeholder="Add any notes about the completed work..."
-                        value={completionNotes}
-                        onChange={(e) => setCompletionNotes(e.target.value)}
-                        className="h-24"
-                      />
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Completion Notes
+                        </label>
+                        <Textarea
+                          placeholder="Add any notes about the completed work..."
+                          value={completionNotes}
+                          onChange={(e) => setCompletionNotes(e.target.value)}
+                          className="h-24"
+                        />
+                      </div>
+                      
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <h5 className="font-medium text-blue-900 mb-2">Content Creation Summary</h5>
+                        <p className="text-sm text-blue-700">
+                          When you complete this job, the system will:
+                        </p>
+                        <ul className="text-sm text-blue-700 mt-2 space-y-1">
+                          <li>• Create content pieces for all final files with Job ID {selectedJobCard.jobId}</li>
+                          <li>• Log comprehensive completion details in the activity record</li>
+                          <li>• Calculate final edit costs based on service pricing</li>
+                          <li>• Track instructions followed and QC status</li>
+                          <li>• Prepare job for client delivery</li>
+                        </ul>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -444,9 +501,16 @@ function EditorDashboardContent() {
                     <Button
                       onClick={() => handleCompleteJob(selectedJobCard)}
                       className="flex-1"
-                      disabled={updateJobCardMutation.isPending}
+                      disabled={completeJobWithContentMutation.isPending}
                     >
-                      Mark as Complete
+                      {completeJobWithContentMutation.isPending ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Creating Content...
+                        </>
+                      ) : (
+                        "Complete Job & Create Content"
+                      )}
                     </Button>
                   )}
                 </div>

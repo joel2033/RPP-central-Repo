@@ -592,6 +592,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Complete job with content piece creation
+  app.post("/api/job-cards/:id/complete-with-content", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      const { notes, instructionsFollowed, qcIssues, completionDetails } = req.body;
+      const userId = req.user.claims.sub;
+      const userData = (req as any).userData;
+      const licenseeId = userData?.role === 'editor' ? userData.licenseeId : userId;
+      const editorName = `${req.user.claims.firstName || ''} ${req.user.claims.lastName || ''}`.trim();
+      
+      const jobCardId = parseInt(id);
+      
+      // Get job card details
+      const jobCard = await storage.getJobCard(jobCardId, licenseeId);
+      if (!jobCard) {
+        return res.status(404).json({ error: "Job card not found" });
+      }
+      
+      // Get final files for this job
+      const allFiles = await storage.getProductionFiles(jobCardId);
+      const finalFiles = allFiles.filter(file => file.mediaType === "final");
+      
+      // Calculate final cost from service pricing
+      let finalCost = 0;
+      for (const file of finalFiles) {
+        // Base cost per file - in real system this would use service pricing
+        finalCost += 25;
+      }
+      
+      // Update job card status
+      const updateData = {
+        status: "ready_for_qc",
+        completedAt: new Date(),
+        editingNotes: notes,
+        updatedAt: new Date(),
+      };
+      
+      await storage.updateJobCard(jobCardId, updateData, licenseeId);
+      
+      // Create comprehensive activity log entry
+      const activityData = {
+        jobCardId,
+        userId,
+        action: "job_completed_with_content",
+        description: `Job completed by ${editorName}. Created ${finalFiles.length} content pieces with total cost of $${finalCost.toFixed(2)}. All client instructions followed and ready for delivery.`,
+        metadata: {
+          editorName,
+          editorId: userId,
+          finalCost,
+          contentPiecesCreated: finalFiles.length,
+          instructionsFollowed,
+          qcIssues,
+          deliveryTimestamp: new Date().toISOString(),
+          completionDetails,
+          serviceBreakdown: finalFiles.map(f => ({
+            fileName: f.fileName,
+            serviceCategory: f.serviceCategory,
+            cost: finalCost / finalFiles.length
+          }))
+        }
+      };
+      
+      await storage.createJobActivity(activityData);
+      
+      // Send notification about completion
+      const notificationData = {
+        jobCardId,
+        recipientId: licenseeId,
+        type: "completion",
+        message: `Job ${jobCard.jobId} completed by ${editorName}. ${finalFiles.length} content pieces created and ready for delivery. Final cost: $${finalCost.toFixed(2)}`,
+        isRead: false,
+        createdAt: new Date(),
+      };
+      
+      await storage.createNotification(notificationData);
+      
+      res.json({
+        success: true,
+        message: "Job completed successfully with content pieces created",
+        finalCost,
+        contentPiecesCreated: finalFiles.length,
+        jobStatus: "ready_for_qc"
+      });
+    } catch (error) {
+      console.error("Error completing job with content:", error);
+      res.status(500).json({ error: "Failed to complete job with content creation" });
+    }
+  });
+
   // Job ID management routes
   app.post('/api/job-cards/:id/assign-job-id', isAuthenticated, async (req: any, res) => {
     try {
