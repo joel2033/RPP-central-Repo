@@ -54,11 +54,6 @@ export default function EditorServicePricing() {
     enabled: !!user?.id,
   });
 
-  // Debug logging
-  console.log("Service structure:", serviceStructure);
-  console.log("Service structure length:", serviceStructure?.length);
-  console.log("Is array:", Array.isArray(serviceStructure));
-
   // Fetch service templates
   const { data: serviceTemplates = [] } = useQuery({
     queryKey: ["service-templates"],
