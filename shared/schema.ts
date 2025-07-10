@@ -544,6 +544,34 @@ export const jobCardDeliverySettingsRelations = relations(jobCardDeliverySetting
   }),
 }));
 
+// Editor Services relations
+export const editorServicesRelations = relations(editorServices, ({ one }) => ({
+  editor: one(users, {
+    fields: [editorServices.editorId],
+    references: [users.id],
+  }),
+}));
+
+// Service Templates relations
+export const serviceTemplatesRelations = relations(serviceTemplates, ({ one }) => ({
+  createdByUser: one(users, {
+    fields: [serviceTemplates.createdBy],
+    references: [users.id],
+  }),
+}));
+
+// Service Change Logs relations
+export const serviceChangeLogsRelations = relations(serviceChangeLogs, ({ one }) => ({
+  editor: one(users, {
+    fields: [serviceChangeLogs.editorId],
+    references: [users.id],
+  }),
+  changedByUser: one(users, {
+    fields: [serviceChangeLogs.changedBy],
+    references: [users.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   id: true,
@@ -690,6 +718,31 @@ export type DeliveryTracking = typeof deliveryTracking.$inferSelect;
 export type InsertJobCardDeliverySettings = z.infer<typeof insertJobCardDeliverySettingsSchema>;
 export type JobCardDeliverySettings = typeof jobCardDeliverySettings.$inferSelect;
 
+// Editor Services schemas and types
+export const insertEditorServicesSchema = createInsertSchema(editorServices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertServiceTemplatesSchema = createInsertSchema(serviceTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertServiceChangeLogsSchema = createInsertSchema(serviceChangeLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertEditorServices = z.infer<typeof insertEditorServicesSchema>;
+export type EditorServices = typeof editorServices.$inferSelect;
+export type InsertServiceTemplates = z.infer<typeof insertServiceTemplatesSchema>;
+export type ServiceTemplates = typeof serviceTemplates.$inferSelect;
+export type InsertServiceChangeLogs = z.infer<typeof insertServiceChangeLogsSchema>;
+export type ServiceChangeLogs = typeof serviceChangeLogs.$inferSelect;
+
 // Products
 export const products = pgTable("products", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -722,6 +775,69 @@ export const insertProductSchema = createInsertSchema(products).omit({
 // Product types
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
+
+// Editor Services table - stores custom services and pricing per editor
+export const editorServices = pgTable("editor_services", {
+  id: serial("id").primaryKey(),
+  editorId: varchar("editor_id").notNull().references(() => users.id),
+  services: jsonb("services").$type<Array<{
+    category: string;
+    categoryId: string;
+    isActive: boolean;
+    options: Array<{
+      id: string;
+      name: string;
+      price: number;
+      currency: string;
+      isActive: boolean;
+      description?: string;
+    }>;
+  }>>().notNull().default([]),
+  currency: varchar("currency", { length: 3 }).notNull().default("AUD"),
+  isActive: boolean("is_active").default(true),
+  licenseeId: varchar("licensee_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Service Templates - admin-defined templates that editors can use as starting points
+export const serviceTemplates = pgTable("service_templates", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  services: jsonb("services").$type<Array<{
+    category: string;
+    categoryId: string;
+    options: Array<{
+      id: string;
+      name: string;
+      price: number;
+      currency: string;
+      description?: string;
+    }>;
+  }>>().notNull().default([]),
+  currency: varchar("currency", { length: 3 }).notNull().default("AUD"),
+  isDefault: boolean("is_default").default(false),
+  licenseeId: varchar("licensee_id").notNull(),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Service Change Logs - track all edits for audit purposes
+export const serviceChangeLogs = pgTable("service_change_logs", {
+  id: serial("id").primaryKey(),
+  editorId: varchar("editor_id").notNull().references(() => users.id),
+  changeType: varchar("change_type", { length: 50 }).notNull(), // create, update, delete, activate, deactivate
+  serviceCategory: varchar("service_category", { length: 255 }),
+  serviceName: varchar("service_name", { length: 255 }),
+  oldData: jsonb("old_data"),
+  newData: jsonb("new_data"),
+  changedBy: varchar("changed_by").notNull(),
+  reason: text("reason"),
+  licenseeId: varchar("licensee_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
 // Add missing schema types for audit tables
 export const insertOrderStatusAuditSchema = createInsertSchema(orderStatusAudit).omit({

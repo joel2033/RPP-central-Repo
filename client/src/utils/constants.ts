@@ -57,6 +57,8 @@ export const ROUTES = {
   SETTINGS: '/settings',
   PRODUCTS: '/products',
   EDITOR_PORTAL: '/editor-portal',
+  EDITOR_SERVICES: '/editor-services',
+  SERVICE_TEMPLATES: '/service-templates',
 } as const;
 
 export const API_ENDPOINTS = {
@@ -74,4 +76,7 @@ export const API_ENDPOINTS = {
   EDITORS: '/api/editors',
   CALENDAR: '/api/calendar',
   DASHBOARD: '/api/dashboard',
+  EDITOR_SERVICES: '/api/editor-services',
+  SERVICE_TEMPLATES: '/api/service-templates',
+  SERVICE_CHANGE_LOGS: '/api/service-change-logs',
 } as const;

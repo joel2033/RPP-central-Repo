@@ -1,7 +1,8 @@
 import {
+  sessions,
   users,
-  clients,
   offices,
+  clients,
   bookings,
   mediaFiles,
   qaChecklists,
@@ -13,52 +14,17 @@ import {
   businessSettings,
   googleCalendarIntegrations,
   calendarSyncLogs,
-  type User,
-  type UpsertUser,
-  type Client,
-  type InsertClient,
-  type Office,
-  type InsertOffice,
-  type Booking,
-  type InsertBooking,
-  type MediaFile,
-  type InsertMediaFile,
-  type QaChecklist,
-  type InsertQaChecklist,
-  type Communication,
-  type InsertCommunication,
-  type JobCard,
-  type InsertJobCard,
-  type ProductionFile,
-  type InsertProductionFile,
-  type ProductionNotification,
-  type InsertProductionNotification,
-  type CalendarEvent,
-  type InsertCalendarEvent,
-  type BusinessSettings,
-  type InsertBusinessSettings,
-  type GoogleCalendarIntegration,
-  type InsertGoogleCalendarIntegration,
-  type CalendarSyncLog,
-  type InsertCalendarSyncLog,
   deliveryComments,
   deliveryTracking,
   jobCardDeliverySettings,
+  jobActivityLog,
   orderStatusAudit,
   emailDeliveryLog,
-  type DeliveryComment,
-  type InsertDeliveryComment,
-  type DeliveryTracking,
-  type InsertDeliveryTracking,
-  type JobCardDeliverySettings,
-  type InsertJobCardDeliverySettings,
-  type OrderStatusAudit,
-  type InsertOrderStatusAudit,
-  type EmailDeliveryLog,
-  type InsertEmailDeliveryLog,
+  jobIdCounter,
   products,
-  type Product,
-  type InsertProduct,
+  editorServices,
+  serviceTemplates,
+  serviceChangeLogs,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, count } from "drizzle-orm";
@@ -68,42 +34,42 @@ export interface IStorage {
   // User operations (mandatory for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
-  
+
   // Office operations
   getOffices(licenseeId: string): Promise<Office[]>;
   getOffice(id: number, licenseeId: string): Promise<Office | undefined>;
   createOffice(office: InsertOffice): Promise<Office>;
   updateOffice(id: number, office: Partial<InsertOffice>, licenseeId: string): Promise<Office>;
   deleteOffice(id: number, licenseeId: string): Promise<void>;
-  
+
   // Client operations
   getClients(licenseeId: string): Promise<Client[]>;
   getClient(id: number, licenseeId: string): Promise<Client | undefined>;
   createClient(client: InsertClient): Promise<Client>;
   updateClient(id: number, client: Partial<InsertClient>, licenseeId: string): Promise<Client>;
   deleteClient(id: number, licenseeId: string): Promise<void>;
-  
+
   // Booking operations
   getBookings(licenseeId: string): Promise<(Booking & { client: Client; photographer: User | null })[]>;
   getBooking(id: number, licenseeId: string): Promise<(Booking & { client: Client; photographer: User | null }) | undefined>;
   createBooking(booking: InsertBooking): Promise<Booking>;
   updateBooking(id: number, booking: Partial<InsertBooking>, licenseeId: string): Promise<Booking>;
   deleteBooking(id: number, licenseeId: string): Promise<void>;
-  
+
   // Media file operations
   getMediaFiles(bookingId: number): Promise<MediaFile[]>;
   createMediaFile(mediaFile: InsertMediaFile): Promise<MediaFile>;
   deleteMediaFile(id: number): Promise<void>;
-  
+
   // QA checklist operations
   getQaChecklist(bookingId: number): Promise<QaChecklist | undefined>;
   createQaChecklist(qaChecklist: InsertQaChecklist): Promise<QaChecklist>;
   updateQaChecklist(id: number, qaChecklist: Partial<InsertQaChecklist>): Promise<QaChecklist>;
-  
+
   // Communication operations
   getCommunications(clientId: number): Promise<Communication[]>;
   createCommunication(communication: InsertCommunication): Promise<Communication>;
-  
+
   // Dashboard statistics
   getDashboardStats(licenseeId: string): Promise<{
     totalClients: number;
@@ -111,11 +77,11 @@ export interface IStorage {
     completedJobs: number;
     monthlyRevenue: number;
   }>;
-  
+
   // Photographers and Editors
   getPhotographers(licenseeId: string): Promise<User[]>;
   getEditors(licenseeId: string): Promise<User[]>;
-  
+
   // Production workflow operations
   getJobCards(licenseeId: string): Promise<(JobCard & { client: Client; photographer: User | null; editor: User | null })[]>;
   getJobCard(id: number, licenseeId: string): Promise<(JobCard & { client: Client; photographer: User | null; editor: User | null }) | undefined>;
@@ -123,70 +89,86 @@ export interface IStorage {
   updateJobCard(id: number, jobCard: Partial<InsertJobCard>, licenseeId: string): Promise<JobCard>;
   getJobCardsByEditor(editorId: string, licenseeId: string): Promise<(JobCard & { client: Client; photographer: User | null })[]>;
   getJobCardsByStatus(status: string, licenseeId: string): Promise<(JobCard & { client: Client; photographer: User | null; editor: User | null })[]>;
-  
+
   // Job ID operations
   assignJobId(jobCardId: number): Promise<string>;
   hasJobId(jobCardId: number): Promise<boolean>;
   getCurrentJobIdCounter(): Promise<number>;
-  
+
   // Production files operations
   getProductionFiles(jobCardId: number): Promise<ProductionFile[]>;
   createProductionFile(file: InsertProductionFile): Promise<ProductionFile>;
   deleteProductionFile(id: number): Promise<void>;
   getProductionFilesByType(jobCardId: number, mediaType: string, serviceCategory?: string): Promise<ProductionFile[]>;
-  
+
   // Notifications
   getNotifications(userId: string): Promise<ProductionNotification[]>;
   createNotification(notification: InsertProductionNotification): Promise<ProductionNotification>;
   markNotificationAsRead(id: number): Promise<void>;
-  
+
   // Activity Log - simplified for now
   getJobActivityLog(jobCardId: number): Promise<any[]>;
   createJobActivityLog(log: any): Promise<any>;
-  
+
   // Calendar Events
   getCalendarEvents(licenseeId: string, photographerId?: string): Promise<CalendarEvent[]>;
   createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent>;
   updateCalendarEvent(id: number, event: Partial<InsertCalendarEvent>): Promise<CalendarEvent>;
   deleteCalendarEvent(id: number): Promise<void>;
-  
+
   // Business Settings
   getBusinessSettings(licenseeId: string): Promise<BusinessSettings | undefined>;
   upsertBusinessSettings(settings: InsertBusinessSettings): Promise<BusinessSettings>;
-  
+
   // Google Calendar Integration
   getGoogleCalendarIntegration(userId: string): Promise<GoogleCalendarIntegration | undefined>;
   createGoogleCalendarIntegration(integration: InsertGoogleCalendarIntegration): Promise<GoogleCalendarIntegration>;
   updateGoogleCalendarIntegration(id: number, integration: Partial<InsertGoogleCalendarIntegration>): Promise<GoogleCalendarIntegration>;
   deleteGoogleCalendarIntegration(userId: string): Promise<void>;
-  
+
   // Calendar Sync Logs
   createCalendarSyncLog(log: InsertCalendarSyncLog): Promise<CalendarSyncLog>;
   getCalendarSyncLogByEventId(eventId: string): Promise<CalendarSyncLog | undefined>;
   getCalendarEventByGoogleId(googleEventId: string): Promise<CalendarEvent | undefined>;
-  
+
   // Delivery functionality
   getJobCardDeliverySettings(jobCardId: number): Promise<JobCardDeliverySettings | undefined>;
   createJobCardDeliverySettings(settings: InsertJobCardDeliverySettings): Promise<JobCardDeliverySettings>;
   updateJobCardDeliverySettings(jobCardId: number, settings: Partial<InsertJobCardDeliverySettings>): Promise<JobCardDeliverySettings>;
-  
+
   getDeliveryComments(jobCardId: number): Promise<DeliveryComment[]>;
   createDeliveryComment(comment: InsertDeliveryComment): Promise<DeliveryComment>;
   updateDeliveryComment(id: number, comment: Partial<InsertDeliveryComment>): Promise<DeliveryComment>;
-  
+
   createDeliveryTracking(tracking: InsertDeliveryTracking): Promise<DeliveryTracking>;
   getDeliveryTracking(jobCardId: number): Promise<DeliveryTracking[]>;
-  
+
   // Public delivery page access (no authentication required)
   getJobCardForDelivery(jobCardId: number): Promise<(JobCard & { client: Client; deliverySettings?: JobCardDeliverySettings }) | undefined>;
   getJobCardByDeliveryUrl(deliveryUrl: string): Promise<(JobCard & { client: Client; deliverySettings?: JobCardDeliverySettings }) | undefined>;
-  
+
   // Product operations
   getProducts(licenseeId: string): Promise<Product[]>;
   getProduct(id: string, licenseeId: string): Promise<Product | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: string, product: Partial<InsertProduct>, licenseeId: string): Promise<Product>;
   deleteProduct(id: string, licenseeId: string): Promise<void>;
+
+  // Editor Services methods
+  getEditorServices(editorId: string): Promise<EditorServices | null>;
+  createEditorServices(data: InsertEditorServices): Promise<EditorServices>;
+  updateEditorServices(editorId: string, data: Partial<InsertEditorServices>): Promise<EditorServices>;
+  getAllEditorServices(licenseeId: string): Promise<(EditorServices & { editor: User })[]>;
+
+  // Service Templates methods
+  getServiceTemplates(licenseeId: string): Promise<ServiceTemplates[]>;
+  createServiceTemplate(data: InsertServiceTemplates): Promise<ServiceTemplates>;
+  updateServiceTemplate(id: number, data: Partial<InsertServiceTemplates>): Promise<ServiceTemplates>;
+  deleteServiceTemplate(id: number): Promise<void>;
+
+  // Service Change Logs methods
+  createServiceChangeLog(data: InsertServiceChangeLogs): Promise<ServiceChangeLogs>;
+  getServiceChangeLogs(editorId: string, limit:number): Promise<ServiceChangeLogs[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -311,7 +293,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(users, eq(bookings.photographerId, users.id))
       .where(eq(bookings.licenseeId, licenseeId))
       .orderBy(desc(bookings.scheduledDate));
-    
+
     return results as (Booking & { client: Client; photographer: User | null })[];
   }
 
@@ -346,7 +328,7 @@ export class DatabaseStorage implements IStorage {
       .insert(bookings)
       .values(booking)
       .returning();
-    
+
     // Auto-generate job card when booking is created
     const jobCardData: InsertJobCard = {
       bookingId: newBooking.id,
@@ -371,7 +353,7 @@ export class DatabaseStorage implements IStorage {
 
     const jobCard = await this.createJobCard(jobCardData);
     console.log("Created job card:", jobCard);
-    
+
     // Create calendar event for the booking
     try {
       // Parse the time string (e.g., "2:15PM") to 24-hour format
@@ -379,16 +361,16 @@ export class DatabaseStorage implements IStorage {
         const [time, period] = timeStr.split(/([AP]M)/);
         const [hours, minutes] = time.split(':');
         let hour = parseInt(hours);
-        
+
         if (period === 'PM' && hour !== 12) {
           hour += 12;
         } else if (period === 'AM' && hour === 12) {
           hour = 0;
         }
-        
+
         return `${hour.toString().padStart(2, '0')}:${minutes || '00'}`;
       };
-      
+
       const timeString = parseTime(newBooking.scheduledTime);
       const startDateTime = new Date(`${newBooking.scheduledDate}T${timeString}:00`);
       const endDateTime = new Date(startDateTime);
@@ -408,7 +390,7 @@ export class DatabaseStorage implements IStorage {
       };
 
       await this.createCalendarEvent(calendarEventData);
-      
+
       // Create initial activity log entry
       await this.createJobActivityLog({
         jobCardId: jobCard.id,
@@ -416,14 +398,14 @@ export class DatabaseStorage implements IStorage {
         action: "booking_created",
         description: "Job created from booking and added to calendar"
       });
-      
+
     } catch (error) {
       console.error("Failed to create calendar event or activity log:", error);
       // Don't fail the booking creation if calendar event fails
     }
-    
+
     console.log("Booking creation completed, returning booking:", newBooking);
-    
+
     return newBooking;
   }
 
@@ -695,7 +677,7 @@ export class DatabaseStorage implements IStorage {
       .insert(jobCards)
       .values(jobCard)
       .returning();
-    
+
     return newJobCard;
   }
 
@@ -705,7 +687,7 @@ export class DatabaseStorage implements IStorage {
       .set({ ...jobCard, updatedAt: new Date() })
       .where(and(eq(jobCards.id, id), eq(jobCards.licenseeId, licenseeId)))
       .returning();
-    
+
     return updatedJobCard;
   }
 
@@ -803,7 +785,7 @@ export class DatabaseStorage implements IStorage {
       .insert(productionFiles)
       .values(file)
       .returning();
-    
+
     return newFile;
   }
 
@@ -820,7 +802,7 @@ export class DatabaseStorage implements IStorage {
       sql`${productionFiles.mediaType} = ${mediaType}`,
       eq(productionFiles.isActive, true)
     ];
-    
+
     if (serviceCategory) {
       conditions.push(sql`${productionFiles.serviceCategory} = ${serviceCategory}`);
     }
@@ -846,7 +828,7 @@ export class DatabaseStorage implements IStorage {
       .insert(productionNotifications)
       .values(notification)
       .returning();
-    
+
     return newNotification;
   }
 
@@ -860,7 +842,7 @@ export class DatabaseStorage implements IStorage {
   // Calendar Events
   async getCalendarEvents(licenseeId: string, photographerId?: string): Promise<CalendarEvent[]> {
     const whereConditions = [eq(calendarEvents.licenseeId, licenseeId)];
-    
+
     if (photographerId) {
       whereConditions.push(eq(calendarEvents.photographerId, photographerId));
     }
@@ -906,7 +888,7 @@ export class DatabaseStorage implements IStorage {
 
   async upsertBusinessSettings(settings: InsertBusinessSettings): Promise<BusinessSettings> {
     const existing = await this.getBusinessSettings(settings.licenseeId);
-    
+
     if (existing) {
       const [updated] = await db
         .update(businessSettings)
@@ -983,14 +965,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(calendarSyncLogs)
       .where(eq(calendarSyncLogs.googleEventId, googleEventId));
-    
+
     if (!log || !log.eventId) return undefined;
-    
+
     const [event] = await db
       .select()
       .from(calendarEvents)
       .where(eq(calendarEvents.id, parseInt(log.eventId)));
-    
+
     return event;
   }
 
@@ -1042,14 +1024,14 @@ export class DatabaseStorage implements IStorage {
       .insert(deliveryComments)
       .values(comment)
       .returning();
-    
+
     // If this is a revision request, update job status
     if (comment.requestRevision) {
       await db
         .update(jobCards)
         .set({ status: "in_revision" })
         .where(eq(jobCards.id, comment.jobCardId));
-        
+
       // Log the revision request
       await this.createJobActivityLog({
         jobCardId: comment.jobCardId,
@@ -1058,7 +1040,7 @@ export class DatabaseStorage implements IStorage {
         timestamp: new Date(),
       });
     }
-    
+
     return newComment;
   }
 
@@ -1158,122 +1140,105 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(products.id, id), eq(products.licenseeId, licenseeId)));
   }
 
-  // Order Status Audit operations
-  async createOrderStatusAudit(audit: InsertOrderStatusAudit): Promise<OrderStatusAudit> {
-    const [newAudit] = await db
-      .insert(orderStatusAudit)
-      .values(audit)
-      .returning();
-    return newAudit;
+  // Editor Services methods
+  async getEditorServices(editorId: string): Promise<EditorServices | null> {
+    const [services] = await db
+      .select()
+      .from(editorServices)
+      .where(eq(editorServices.editorId, editorId))
+      .limit(1);
+
+    return services || null;
   }
 
-  async getOrderStatusAuditLog(jobCardId: number): Promise<OrderStatusAudit[]> {
+  async createEditorServices(data: InsertEditorServices): Promise<EditorServices> {
+    const [services] = await db
+      .insert(editorServices)
+      .values(data)
+      .returning();
+
+    return services;
+  }
+
+  async updateEditorServices(editorId: string, data: Partial<InsertEditorServices>): Promise<EditorServices> {
+    const [services] = await db
+      .update(editorServices)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(editorServices.editorId, editorId))
+      .returning();
+
+    return services;
+  }
+
+  async getAllEditorServices(licenseeId: string): Promise<(EditorServices & { editor: User })[]> {
     return await db
-      .select()
-      .from(orderStatusAudit)
-      .where(eq(orderStatusAudit.jobCardId, jobCardId))
-      .orderBy(desc(orderStatusAudit.createdAt));
-  }
-
-  // Email Delivery Log operations
-  async createEmailDeliveryLog(log: InsertEmailDeliveryLog): Promise<EmailDeliveryLog> {
-    const [newLog] = await db
-      .insert(emailDeliveryLog)
-      .values(log)
-      .returning();
-    return newLog;
-  }
-
-  async getEmailDeliveryLogs(jobCardId: number): Promise<EmailDeliveryLog[]> {
-    return await db
-      .select()
-      .from(emailDeliveryLog)
-      .where(eq(emailDeliveryLog.jobCardId, jobCardId))
-      .orderBy(desc(emailDeliveryLog.createdAt));
-  }
-
-  // Enhanced job card operations for order status
-  async updateJobCardStatus(id: number, status: string, changedBy: string, reason?: string): Promise<JobCard> {
-    // First get the current job card to record the old status
-    const [currentJobCard] = await db
-      .select()
-      .from(jobCards)
-      .where(eq(jobCards.id, id));
-
-    if (!currentJobCard) {
-      throw new Error("Job card not found");
-    }
-
-    // Update the job card status
-    const [updated] = await db
-      .update(jobCards)
-      .set({ 
-        status: status as any, 
-        updatedAt: new Date(),
-        ...(status === "complete" && { completedAt: new Date() }),
-        ...(status === "delivered" && { deliveredAt: new Date() })
-      })
-      .where(eq(jobCards.id, id))
-      .returning();
-
-    // Create audit log entry
-    await this.createOrderStatusAudit({
-      jobCardId: id,
-      previousStatus: currentJobCard.status,
-      newStatus: status,
-      changedBy,
-      changeReason: reason,
-      metadata: { timestamp: new Date().toISOString() }
-    });
-
-    return updated;
-  }
-
-  async sendDeliveryEmail(jobCardId: number, recipientEmail: string): Promise<EmailDeliveryLog> {
-    // Create email delivery log
-    const emailLog = await this.createEmailDeliveryLog({
-      jobCardId,
-      recipientEmail,
-      emailType: "delivery_notification",
-      emailStatus: "sent",
-      deliveredAt: new Date()
-    });
-
-    // Update job card status to delivered
-    await this.updateJobCardStatus(jobCardId, "delivered", "system", "Delivery email sent to client");
-
-    return emailLog;
-  }
-
-  async getJobCardWithClient(jobCardId: number): Promise<(JobCard & { client: Client }) | undefined> {
-    const [result] = await db
       .select({
-        jobCard: jobCards,
-        client: clients,
+        id: editorServices.id,
+        editorId: editorServices.editorId,
+        services: editorServices.services,
+        currency: editorServices.currency,
+        isActive: editorServices.isActive,
+        licenseeId: editorServices.licenseeId,
+        createdAt: editorServices.createdAt,
+        updatedAt: editorServices.updatedAt,
+        editor: users,
       })
-      .from(jobCards)
-      .innerJoin(clients, eq(jobCards.clientId, clients.id))
-      .where(eq(jobCards.id, jobCardId));
-
-    if (!result) return undefined;
-
-    return {
-      ...result.jobCard,
-      client: result.client,
-    } as JobCard & { client: Client };
+      .from(editorServices)
+      .leftJoin(users, eq(editorServices.editorId, users.id))
+      .where(eq(editorServices.licenseeId, licenseeId));
   }
 
-  // Job ID operations
-  async assignJobId(jobCardId: number): Promise<string> {
-    return await JobIdService.assignJobId(jobCardId);
+  // Service Templates methods
+  async getServiceTemplates(licenseeId: string): Promise<ServiceTemplates[]> {
+    return await db
+      .select()
+      .from(serviceTemplates)
+      .where(eq(serviceTemplates.licenseeId, licenseeId))
+      .orderBy(serviceTemplates.isDefault, serviceTemplates.name);
   }
 
-  async hasJobId(jobCardId: number): Promise<boolean> {
-    return await JobIdService.hasJobId(jobCardId);
+  async createServiceTemplate(data: InsertServiceTemplates): Promise<ServiceTemplates> {
+    const [template] = await db
+      .insert(serviceTemplates)
+      .values(data)
+      .returning();
+
+    return template;
   }
 
-  async getCurrentJobIdCounter(): Promise<number> {
-    return await JobIdService.getCurrentCounter();
+  async updateServiceTemplate(id: number, data: Partial<InsertServiceTemplates>): Promise<ServiceTemplates> {
+    const [template] = await db
+      .update(serviceTemplates)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(serviceTemplates.id, id))
+      .returning();
+
+    return template;
+  }
+
+  async deleteServiceTemplate(id: number): Promise<void> {
+    await db
+      .delete(serviceTemplates)
+      .where(eq(serviceTemplates.id, id));
+  }
+
+  // Service Change Logs methods
+  async createServiceChangeLog(data: InsertServiceChangeLogs): Promise<ServiceChangeLogs> {
+    const [log] = await db
+      .insert(serviceChangeLogs)
+      .values(data)
+      .returning();
+
+    return log;
+  }
+
+  async getServiceChangeLogs(editorId: string, limit: number = 50): Promise<ServiceChangeLogs[]> {
+    return await db
+      .select()
+      .from(serviceChangeLogs)
+      .where(eq(serviceChangeLogs.editorId, editorId))
+      .orderBy(desc(serviceChangeLogs.createdAt))
+      .limit(limit);
   }
 }
 
