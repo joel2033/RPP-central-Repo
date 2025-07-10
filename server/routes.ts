@@ -539,7 +539,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // For editors, only allow certain status updates
       if (userData?.role === 'editor') {
-        const allowedStatuses = ['editing', 'ready_for_qa'];
+        const allowedStatuses = ['in_progress', 'editing', 'ready_for_qa'];
         if (updateData.status && !allowedStatuses.includes(updateData.status)) {
           return res.status(403).json({ message: "Editors cannot set this status" });
         }
