@@ -54,6 +54,11 @@ export default function EditorServicePricing() {
     enabled: !!user?.id,
   });
 
+  // Debug logging
+  console.log("Service structure:", serviceStructure);
+  console.log("Service structure length:", serviceStructure?.length);
+  console.log("Is array:", Array.isArray(serviceStructure));
+
   // Fetch service templates
   const { data: serviceTemplates = [] } = useQuery({
     queryKey: ["service-templates"],
@@ -266,7 +271,7 @@ export default function EditorServicePricing() {
       </CardHeader>
       <CardContent>
         {/* Service Categories */}
-        {serviceStructure && serviceStructure.length > 0 ? (
+        {serviceStructure && Array.isArray(serviceStructure) && serviceStructure.length > 0 ? (
           <div className="space-y-4">
             {serviceStructure.map((category) => (
               <div key={category.id} className="border rounded-lg p-4">
@@ -360,7 +365,7 @@ export default function EditorServicePricing() {
         )}
 
         {/* Service Templates */}
-        {showTemplates && serviceTemplates && (
+        {showTemplates && serviceTemplates && Array.isArray(serviceTemplates) && (
           <div className="mt-6 pt-6 border-t">
             <h3 className="font-semibold mb-4">Service Templates</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
