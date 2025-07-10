@@ -12,11 +12,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Upload, ImageIcon, X, Plus, Minus, Calendar, Clock, Send } from "lucide-react";
-import Layout from "@/components/layout/Layout";
-import ServiceSelection from "@/components/ui/service-selection";
+import { 
+  Plus, 
+  Minus, 
+  Upload, 
+  X, 
+  Send,
+  FileText,
+  Image as ImageIcon
+} from "lucide-react";
 import LoadingSpinner from "@/components/shared/loading-spinner";
 import type { JobCard, Client, User } from "@shared/schema";
 
@@ -61,7 +73,7 @@ function UploadToEditorContent() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
-
+  
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [selectedEditorId, setSelectedEditorId] = useState<string>("");
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
@@ -111,12 +123,12 @@ function UploadToEditorContent() {
       for (const block of serviceBlocks) {
         if (block.files.length > 0) {
           const formData = new FormData();
-
+          
           // Add files to FormData
           block.files.forEach(file => {
             formData.append('files', file);
           });
-
+          
           // Add metadata
           formData.append('fileName', block.fileName || '');
           formData.append('mediaType', 'raw');
@@ -124,14 +136,14 @@ function UploadToEditorContent() {
           formData.append('instructions', block.instructions);
           formData.append('exportType', block.exportType);
           formData.append('customDescription', block.customDescription);
-
+          
           // Upload files using fetch with FormData
           const response = await fetch(`/api/job-cards/${selectedJobId}/files`, {
             method: 'POST',
             body: formData,
             credentials: 'include',
           });
-
+          
           if (!response.ok) {
             throw new Error(`Failed to upload files for ${block.service}`);
           }
@@ -174,7 +186,7 @@ function UploadToEditorContent() {
 
   const handleServiceSelect = (services: string[]) => {
     setSelectedServices(services);
-
+    
     // Create service blocks for new services
     const newBlocks: ServiceBlock[] = services.map(service => {
       const existingBlock = serviceBlocks.find(block => block.service === service);
@@ -189,7 +201,7 @@ function UploadToEditorContent() {
         customDescription: ""
       };
     });
-
+    
     setServiceBlocks(newBlocks);
   };
 
@@ -203,7 +215,7 @@ function UploadToEditorContent() {
 
   const handleFileUpload = (blockId: string, files: FileList | null) => {
     if (!files) return;
-
+    
     const fileArray = Array.from(files);
     updateServiceBlock(blockId, { files: fileArray });
   };
@@ -255,7 +267,7 @@ function UploadToEditorContent() {
       <Sidebar />
       <div className="flex-1 ml-64">
         <TopBar title="Upload to Editor" />
-
+        
         <div className="p-6 max-w-4xl mx-auto">
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-slate-900 mb-2">New Order Information</h1>

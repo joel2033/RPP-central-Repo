@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,168 +8,146 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Camera, Home, Video, PlaneTakeoff, Package, ChevronDown, Search, Check, DollarSign } from "lucide-react";
+import { Camera, Home, Video, PlaneTakeoff, Package, ChevronDown, Search, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { type Product } from "@shared/schema";
 
 interface SelectedService {
-  serviceId: string;
-  categoryId: string;
-  categoryName: string;
-  serviceName: string;
+  productId: string;
+  variantId?: string;
+  productTitle: string;
+  variantName?: string;
   price: number;
-  currency: string;
 }
 
 interface ServiceSelectionProps {
   value: string[];
   onChange: (services: string[]) => void;
-  onServicesChange?: (services: SelectedService[]) => void;
+  onProductsChange?: (products: SelectedService[]) => void;
   onTotalPriceChange?: (totalPrice: number) => void;
-  editorId?: string; // If provided, shows editor-specific services
-  showProducts?: boolean; // If true, shows product-based services (fallback)
 }
 
-export default function ServiceSelection({ 
-  value, 
-  onChange, 
-  onServicesChange, 
-  onTotalPriceChange, 
-  editorId,
-  showProducts = true 
-}: ServiceSelectionProps) {
+export default function ServiceSelection({ value, onChange, onProductsChange, onTotalPriceChange }: ServiceSelectionProps) {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
-  const [selectedServices, setSelectedServices] = useState<SelectedService[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<SelectedService[]>([]);
 
-  // Fetch editor-specific services if editorId is provided
-  const { data: editorServices, isLoading: loadingEditorServices } = useQuery({
-    queryKey: [`/api/editor-services/${editorId}`],
-    enabled: !!editorId,
-  });
-
-  // Fetch products as fallback
-  const { data: products, isLoading: loadingProducts } = useQuery({
+  // Fetch products from API
+  const { data: products, isLoading } = useQuery<Product[]>({
     queryKey: ["/api/products"],
-    enabled: showProducts && !editorId,
   });
 
-  const isLoading = loadingEditorServices || loadingProducts;
-
-  // Get available services based on context
-  const getAvailableServices = () => {
-    if (editorId && editorServices?.services) {
-      return editorServices.services.filter((category: any) => category.isActive);
-    }
-    return [];
-  };
-
-  // Get available products (fallback)
-  const getAvailableProducts = () => {
-    if (!editorId && products) {
-      return products.filter((product: any) => product.isActive);
-    }
-    return [];
-  };
-
-  // Filter services based on search
-  const getFilteredServices = () => {
-    const services = getAvailableServices();
-    if (!searchValue) return services;
-    
-    return services.filter((category: any) =>
-      category.category.toLowerCase().includes(searchValue.toLowerCase()) ||
-      category.options.some((option: any) => 
-        option.name.toLowerCase().includes(searchValue.toLowerCase())
-      )
-    );
-  };
+  // For internal booking form, show all products (no filtering)
+  const availableProducts = products || [];
 
   // Filter products based on search
-  const getFilteredProducts = () => {
-    const availableProducts = getAvailableProducts();
-    if (!searchValue) return availableProducts;
+  const filteredProducts = availableProducts.filter(product =>
+    product.title.toLowerCase().includes(searchValue.toLowerCase()) ||
+    (product.category && product.category.toLowerCase().includes(searchValue.toLowerCase()))
+  );
+
+  // Map product categories to service enum values
+  const getServiceTypeFromProduct = (product: Product): string => {
+    // For now, since the product title shows "photography", map all to photography
+    // This can be expanded when products have proper categories
+    if (product.title.toLowerCase().includes('photography')) return 'photography';
+    if (product.title.toLowerCase().includes('drone') || product.title.toLowerCase().includes('aerial')) return 'drone';
+    if (product.title.toLowerCase().includes('floor') || product.title.toLowerCase().includes('plan')) return 'floor_plans';
+    if (product.title.toLowerCase().includes('video')) return 'video';
     
-    return availableProducts.filter((product: any) =>
-      product.title.toLowerCase().includes(searchValue.toLowerCase()) ||
-      (product.category && product.category.toLowerCase().includes(searchValue.toLowerCase()))
-    );
+    // Default fallback based on category if available
+    if (product.category) {
+      switch (product.category.toLowerCase()) {
+        case 'photography':
+          return 'photography';
+        case 'drone':
+        case 'aerial':
+          return 'drone';
+        case 'floor_plans':
+        case 'floorplans':
+        case 'floor plans':
+          return 'floor_plans';
+        case 'video':
+        case 'videography':
+          return 'video';
+        default:
+          return 'photography';
+      }
+    }
+    
+    return 'photography'; // final fallback
   };
 
-  const handleServiceSelect = (categoryId: string, serviceId: string, serviceName: string, price: number, currency: string, categoryName: string) => {
-    const serviceKey = `${categoryId}-${serviceId}`;
-    const isSelected = selectedServices.some(s => s.serviceId === serviceKey);
-    
-    if (isSelected) {
-      // Remove service
-      const newServices = selectedServices.filter(s => s.serviceId !== serviceKey);
-      setSelectedServices(newServices);
-      onChange(newServices.map(s => s.serviceId));
-      onServicesChange?.(newServices);
-      
-      const totalPrice = newServices.reduce((sum, s) => sum + s.price, 0);
-      onTotalPriceChange?.(totalPrice);
-    } else {
-      // Add service
-      const newService: SelectedService = {
-        serviceId: serviceKey,
-        categoryId,
-        categoryName,
-        serviceName,
-        price,
-        currency,
-      };
-      
-      const newServices = [...selectedServices, newService];
-      setSelectedServices(newServices);
-      onChange(newServices.map(s => s.serviceId));
-      onServicesChange?.(newServices);
-      
-      const totalPrice = newServices.reduce((sum, s) => sum + s.price, 0);
-      onTotalPriceChange?.(totalPrice);
+  const getProductIcon = (type: string) => {
+    switch (type.toLowerCase()) {
+      case "photography": return Camera;
+      case "drone": return PlaneTakeoff;
+      case "floor_plans": return Home;
+      case "video": return Video;
+      default: return Package;
     }
   };
 
-  const handleProductSelect = (product: any) => {
-    // Fallback to original product selection logic
+  const handleProductSelect = (product: Product) => {
     const productId = product.id;
-    const isSelected = selectedServices.some(s => s.serviceId === productId);
+    const isSelected = selectedProducts.some(p => p.productId === productId);
     
     if (isSelected) {
-      const newServices = selectedServices.filter(s => s.serviceId !== productId);
-      setSelectedServices(newServices);
-      onChange(newServices.map(s => s.serviceId));
-      onServicesChange?.(newServices);
-      
-      const totalPrice = newServices.reduce((sum, s) => sum + s.price, 0);
+      // Remove product
+      const newProducts = selectedProducts.filter(p => p.productId !== productId);
+      setSelectedProducts(newProducts);
+      // Send service type enum values instead of product IDs
+      const serviceTypes = newProducts.map(p => {
+        const matchingProduct = availableProducts.find(prod => prod.id === p.productId);
+        return matchingProduct ? getServiceTypeFromProduct(matchingProduct) : 'photography';
+      });
+      onChange(serviceTypes);
+      onProductsChange?.(newProducts);
+      // Calculate total price and notify parent
+      const totalPrice = newProducts.reduce((sum, p) => sum + p.price, 0);
       onTotalPriceChange?.(totalPrice);
     } else {
-      const newService: SelectedService = {
-        serviceId: productId,
-        categoryId: product.category || 'general',
-        categoryName: product.category || 'General',
-        serviceName: product.title,
+      // Add product
+      const newProduct: SelectedService = {
+        productId: productId,
+        productTitle: product.title,
         price: parseFloat(product.price),
-        currency: 'AUD', // Default currency for products
       };
       
-      const newServices = [...selectedServices, newService];
-      setSelectedServices(newServices);
-      onChange(newServices.map(s => s.serviceId));
-      onServicesChange?.(newServices);
-      
-      const totalPrice = newServices.reduce((sum, s) => sum + s.price, 0);
+      const newProducts = [...selectedProducts, newProduct];
+      setSelectedProducts(newProducts);
+      // Send service type enum values instead of product IDs
+      const serviceTypes = newProducts.map(p => {
+        const matchingProduct = availableProducts.find(prod => prod.id === p.productId);
+        return matchingProduct ? getServiceTypeFromProduct(matchingProduct) : 'photography';
+      });
+      onChange(serviceTypes);
+      onProductsChange?.(newProducts);
+      // Calculate total price and notify parent
+      const totalPrice = newProducts.reduce((sum, p) => sum + p.price, 0);
       onTotalPriceChange?.(totalPrice);
     }
   };
 
-  const isServiceSelected = (categoryId: string, serviceId: string) => {
-    const serviceKey = `${categoryId}-${serviceId}`;
-    return selectedServices.some(s => s.serviceId === serviceKey);
+  const handleVariantSelect = (productId: string, variantId: string, variantName: string, variantPrice: number) => {
+    const newProducts = selectedProducts.map(p => 
+      p.productId === productId 
+        ? { ...p, variantId, variantName, price: variantPrice }
+        : p
+    );
+    setSelectedProducts(newProducts);
+    onProductsChange?.(newProducts);
+    // Calculate total price and notify parent
+    const totalPrice = newProducts.reduce((sum, p) => sum + p.price, 0);
+    onTotalPriceChange?.(totalPrice);
   };
 
   const isProductSelected = (productId: string) => {
-    return selectedServices.some(s => s.serviceId === productId);
+    return selectedProducts.some(p => p.productId === productId);
+  };
+
+  const getSelectedVariant = (productId: string) => {
+    return selectedProducts.find(p => p.productId === productId)?.variantId;
   };
 
   return (
@@ -186,8 +163,8 @@ export default function ServiceSelection({
               aria-expanded={open}
               className="w-full justify-between"
             >
-              {selectedServices.length > 0 
-                ? `${selectedServices.length} service${selectedServices.length > 1 ? 's' : ''} selected`
+              {selectedProducts.length > 0 
+                ? `${selectedProducts.length} service${selectedProducts.length > 1 ? 's' : ''} selected`
                 : "Select services..."
               }
               <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -206,72 +183,8 @@ export default function ServiceSelection({
                 </CommandEmpty>
                 <CommandGroup>
                   <ScrollArea className="h-64">
-                    {/* Editor-specific services */}
-                    {editorId && (
-                      <Accordion type="multiple" className="w-full">
-                        {getFilteredServices().map((category: any) => (
-                          <AccordionItem key={category.categoryId} value={category.categoryId}>
-                            <AccordionTrigger className="px-3 py-2 text-sm">
-                              <div className="flex items-center space-x-2">
-                                <Package className="h-4 w-4" />
-                                <span>{category.category}</span>
-                                <Badge variant="outline" className="text-xs">
-                                  {category.options.filter((opt: any) => opt.isActive).length}
-                                </Badge>
-                              </div>
-                            </AccordionTrigger>
-                            <AccordionContent className="px-3">
-                              <div className="space-y-1">
-                                {category.options
-                                  .filter((option: any) => option.isActive)
-                                  .map((option: any) => {
-                                    const isSelected = isServiceSelected(category.categoryId, option.id);
-                                    
-                                    return (
-                                      <CommandItem
-                                        key={option.id}
-                                        onSelect={() => handleServiceSelect(
-                                          category.categoryId,
-                                          option.id,
-                                          option.name,
-                                          option.price,
-                                          option.currency,
-                                          category.category
-                                        )}
-                                      >
-                                        <div className="flex items-center justify-between w-full">
-                                          <div className="flex items-center space-x-3">
-                                            <Check
-                                              className={cn(
-                                                "h-4 w-4",
-                                                isSelected ? "opacity-100" : "opacity-0"
-                                              )}
-                                            />
-                                            <div>
-                                              <div className="font-medium">{option.name}</div>
-                                              {option.description && (
-                                                <div className="text-xs text-gray-500">{option.description}</div>
-                                              )}
-                                            </div>
-                                          </div>
-                                          <div className="flex items-center space-x-1 text-sm">
-                                            <DollarSign className="h-3 w-3" />
-                                            <span className="font-medium">{option.price.toFixed(2)}</span>
-                                            <span className="text-gray-500">{option.currency}</span>
-                                          </div>
-                                        </div>
-                                      </CommandItem>
-                                    );
-                                  })}
-                              </div>
-                            </AccordionContent>
-                          </AccordionItem>
-                        ))}
-                      </Accordion>
-                    )}
-                    
-                    {/* Product-based services (fallback) */}
-                    {!editorId && getFilteredProducts().map((product: any) => {
+                    {filteredProducts.map((product) => {
+                      const Icon = getProductIcon(product.category || product.type);
                       const isSelected = isProductSelected(product.id);
                       
                       return (
@@ -287,21 +200,18 @@ export default function ServiceSelection({
                                   isSelected ? "opacity-100" : "opacity-0"
                                 )}
                               />
-                              <Camera className="h-4 w-4" />
+                              <Icon className="h-4 w-4" />
                               <div>
                                 <div className="font-medium">{product.title}</div>
                                 <div className="text-sm text-gray-500">
                                   {product.category && (
-                                    <Badge variant="outline" className="mr-2 text-xs">
+                                    <Badge variant="outline" className="mr-2">
                                       {product.category}
                                     </Badge>
                                   )}
-                                  {product.description}
+                                  From ${product.price}
                                 </div>
                               </div>
-                            </div>
-                            <div className="text-sm font-medium">
-                              ${product.price}
                             </div>
                           </div>
                         </CommandItem>
@@ -315,64 +225,81 @@ export default function ServiceSelection({
         </Popover>
       </div>
 
-      {/* Selected Services */}
-      {selectedServices.length > 0 && (
+      {/* Selected Services with Variant Selection */}
+      {selectedProducts.length > 0 && (
         <div className="space-y-3">
           <h4 className="text-sm font-medium">Selected Services</h4>
           <div className="grid grid-cols-1 gap-3">
-            {selectedServices.map((service) => (
-              <Card key={service.serviceId} className="border-brand-blue bg-blue-50">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <Package className="h-5 w-5" />
-                      <div>
-                        <div className="font-medium">{service.serviceName}</div>
-                        <div className="text-sm text-gray-600">{service.categoryName}</div>
-                        <div className="text-sm font-medium text-brand-blue mt-1 flex items-center">
-                          <DollarSign className="h-3 w-3 mr-1" />
-                          {service.price.toFixed(2)} {service.currency}
+            {selectedProducts.map((selectedProduct) => {
+              const product = availableProducts.find(p => p.id === selectedProduct.productId);
+              if (!product) return null;
+              
+              const Icon = getProductIcon(product.category || product.type);
+              const hasVariants = Array.isArray(product.variations) && product.variations.length > 0;
+              
+              return (
+                <Card key={selectedProduct.productId} className="border-brand-blue bg-blue-50">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <Icon className="h-5 w-5" />
+                        <div>
+                          <div className="font-medium">{product.title}</div>
+                          <div className="text-sm text-gray-600">
+                            {product.description}
+                          </div>
+                          <div className="text-sm font-medium text-brand-blue mt-1">
+                            ${selectedProduct.price}
+                            {selectedProduct.variantName && (
+                              <span className="ml-2 text-gray-500">
+                                ({selectedProduct.variantName})
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
+                      <div className="flex items-center space-x-2">
+                        {hasVariants && (
+                          <Select 
+                            value={selectedProduct.variantId || ""}
+                            onValueChange={(variantId) => {
+                              const variant = product.variations[parseInt(variantId)];
+                              if (variant) {
+                                handleVariantSelect(
+                                  product.id, 
+                                  variantId, 
+                                  variant.name, 
+                                  parseFloat(variant.price || product.price)
+                                );
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue placeholder="Select variant" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {product.variations.map((variant: any, index: number) => (
+                                <SelectItem key={index} value={index.toString()}>
+                                  {variant.name} - ${variant.price || product.price}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleProductSelect(product)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (editorId) {
-                          const [categoryId, optionId] = service.serviceId.split('-');
-                          handleServiceSelect(categoryId, optionId, service.serviceName, service.price, service.currency, service.categoryName);
-                        } else {
-                          const product = getAvailableProducts().find(p => p.id === service.serviceId);
-                          if (product) handleProductSelect(product);
-                        }
-                      }}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
-          
-          {/* Total Price */}
-          <Card className="border-green-200 bg-green-50">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <span className="font-medium">Total Price</span>
-                <div className="text-lg font-bold text-green-600 flex items-center">
-                  <DollarSign className="h-4 w-4 mr-1" />
-                  {selectedServices.reduce((sum, s) => sum + s.price, 0).toFixed(2)}
-                  {selectedServices.length > 0 && (
-                    <span className="ml-1 text-sm">
-                      {selectedServices[0].currency}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       )}
     </div>

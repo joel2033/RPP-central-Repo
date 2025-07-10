@@ -219,14 +219,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const licenseeId = req.user.claims.sub;
       console.log("Received booking data:", req.body);
-
+      
       const bookingData = insertBookingSchema.parse({
         ...req.body,
         licenseeId,
       });
-
+      
       console.log("Parsed booking data:", bookingData);
-
+      
       const booking = await storage.createBooking(bookingData);
       res.status(201).json(booking);
     } catch (error) {
@@ -365,7 +365,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Fetching jobs for licensee:", userId);
       const jobCards = await storage.getJobCards(userId);
       console.log("Found job cards:", jobCards.length);
-
+      
       // Enhance job cards with booking details for the jobs page
       const jobsWithBookings = await Promise.all(
         jobCards.map(async (jobCard) => {
@@ -384,7 +384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         })
       );
-
+      
       console.log("Returning jobs with bookings:", jobsWithBookings.length);
       res.json(jobsWithBookings);
     } catch (error) {
@@ -398,14 +398,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const jobId = parseInt(req.params.id);
       const userId = req.user!.id || req.user!.claims?.sub;
       const jobCard = await storage.getJobCard(jobId, userId);
-
+      
       if (!jobCard) {
         return res.status(404).json({ message: "Job not found" });
       }
-
+      
       // Get booking details
       const booking = await storage.getBooking(jobCard.bookingId, userId);
-
+      
       res.json({
         ...jobCard,
         booking: booking || {
@@ -450,7 +450,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const licenseeId = req.user.claims.sub;
       const { status, editorId, include_details } = req.query;
-
+      
       let jobCards;
       if (status) {
         jobCards = await storage.getJobCardsByStatus(status as string, licenseeId);
@@ -500,7 +500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const editorId = req.user.claims.sub;
       const userData = (req as any).userData;
       const licenseeId = userData.licenseeId;
-
+      
       const jobCards = await storage.getJobCardsByEditor(editorId, licenseeId);
       res.json(jobCards);
     } catch (error) {
@@ -530,24 +530,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userData = (req as any).userData;
       const jobCardId = parseInt(req.params.id);
       const updateData = req.body;
-
+      
       // Determine licenseeId based on user role
       const licenseeId = userData?.role === 'editor' ? userData.licenseeId : userId;
-
+      
       // For editors, only allow certain status updates
       if (userData?.role === 'editor') {
         const allowedStatuses = ['editing', 'ready_for_qa'];
         if (updateData.status && !allowedStatuses.includes(updateData.status)) {
           return res.status(403).json({ message: "Editors cannot set this status" });
         }
-
+        
         // Ensure editor can only update their own jobs
         const jobCard = await storage.getJobCard(jobCardId, licenseeId);
         if (!jobCard || jobCard.editorId !== userId) {
           return res.status(403).json({ message: "Cannot update job not assigned to you" });
         }
       }
-
+      
       // Handle status updates with automatic timestamp setting
       if (updateData.status) {
         if (updateData.status === 'in_progress' && !updateData.assignedAt) {
@@ -560,7 +560,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updateData.completedAt = new Date();
         }
       }
-
+      
       // Automatically assign Job ID when editor is assigned for the first time
       if (updateData.editorId && updateData.status === 'in_progress') {
         const hasJobId = await storage.hasJobId(jobCardId);
@@ -568,9 +568,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.assignJobId(jobCardId);
         }
       }
-
+      
       const jobCard = await storage.updateJobCard(jobCardId, updateData, licenseeId);
-
+      
       // Create notification for status changes
       if (updateData.status && updateData.editorId) {
         const notificationData = insertProductionNotificationSchema.parse({
@@ -581,7 +581,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         await storage.createNotification(notificationData);
       }
-
+      
       res.json(jobCard);
     } catch (error) {
       console.error("Error updating job card:", error);
@@ -595,13 +595,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const jobCardId = parseInt(req.params.id);
       const userData = (req as any).userData;
       const licenseeId = userData.licenseeId;
-
+      
       // Verify job card exists and belongs to licensee
       const jobCard = await storage.getJobCard(jobCardId, licenseeId);
       if (!jobCard) {
         return res.status(404).json({ message: "Job card not found" });
       }
-
+      
       const jobId = await storage.assignJobId(jobCardId);
       res.json({ jobId, message: "Job ID assigned successfully" });
     } catch (error) {
@@ -639,7 +639,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { notes } = req.body;
       const userId = req.user.claims.sub;
       const userData = (req as any).userData;
-
+      
       // Get current job card
       const jobCard = await storage.getJobCard(jobCardId, userId);
       if (!jobCard) {
@@ -656,7 +656,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updateData.uploadedAt = now;
           activityDescription = "Files uploaded - job ready for assignment";
           break;
-
+        
         case "accept":
           // Only editors can accept jobs
           if (userData?.role !== "editor") {
@@ -666,7 +666,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updateData.editorId = userId;
           activityDescription = "Job accepted by editor";
           break;
-
+        
         case "readyForQC":
           // Only editors can mark ready for QC
           if (userData?.role !== "editor") {
@@ -675,7 +675,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updateData.readyForQCAt = now;
           activityDescription = "Edits completed - ready for quality check";
           break;
-
+        
         case "revision":
           // Only admin/photographer can request revisions
           if (!["admin", "licensee", "photographer"].includes(userData?.role)) {
@@ -685,7 +685,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updateData.revisionNotes = notes;
           activityDescription = `Revision requested${notes ? `: ${notes}` : ''}`;
           break;
-
+        
         case "delivered":
           // Only admin/photographer can deliver to client
           if (!["admin", "licensee", "photographer"].includes(userData?.role)) {
@@ -694,7 +694,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updateData.deliveredAt = now;
           activityDescription = "Job delivered to client";
           break;
-
+        
         default:
           return res.status(400).json({ message: "Invalid action" });
       }
@@ -723,7 +723,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // If timestamp columns don't exist, fall back to legacy status update
         console.log("Timestamp columns not available, using legacy status update");
         let legacyStatus = jobCard.status;
-
+        
         switch (action) {
           case "accept":
             legacyStatus = "in_progress";
@@ -735,12 +735,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           case "delivered":
             return res.status(400).json({ message: "This action is handled within job cards" });
         }
-
+        
         const updatedJobCard = await storage.updateJobCardStatus(jobCardId, legacyStatus, userId, notes);
-
+        
         // Log activity
         await storage.logJobActivity(jobCardId, userId, `job_${action}`, activityDescription, { action, notes });
-
+        
         res.json(updatedJobCard);
         return;
       }
@@ -758,7 +758,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const jobCardId = parseInt(req.params.id);
       const { status, reason, changedBy } = req.body;
-
+      
       const jobCard = await storage.updateJobCardStatus(jobCardId, status, changedBy || req.user.claims.sub, reason);
       res.json(jobCard);
     } catch (error) {
@@ -770,7 +770,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/job-cards/:id/send-delivery-email', isAuthenticated, async (req: any, res) => {
     try {
       const jobCardId = parseInt(req.params.id);
-
+      
       // Get job card and client details
       const jobCard = await storage.getJobCardWithClient(jobCardId);
       if (!jobCard) {
@@ -801,7 +801,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const jobCardId = parseInt(req.params.id);
       const { mediaType, serviceCategory } = req.query;
-
+      
       let files;
       if (mediaType) {
         files = await storage.getProductionFilesByType(
@@ -812,7 +812,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         files = await storage.getProductionFiles(jobCardId);
       }
-
+      
       res.json(files);
     } catch (error) {
       console.error("Error fetching production files:", error);
@@ -825,7 +825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const jobCardId = parseInt(req.params.id);
       const userId = req.user.claims.sub;
       const files = req.files as Express.Multer.File[];
-
+      
       if (!files || files.length === 0) {
         return res.status(400).json({ message: "No files uploaded" });
       }
@@ -839,11 +839,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const savedFiles = [];
-
+      
       for (const file of files) {
         // Save file to storage
         const fileName = await fileStorage.saveFile(file.buffer, file.originalname, jobCardId);
-
+        
         // Create database record
         const fileData = insertProductionFileSchema.parse({
           originalName: req.body.fileName || file.originalname,
@@ -858,11 +858,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           exportType: req.body.exportType || "",
           customDescription: req.body.customDescription || "",
         });
-
+        
         const savedFile = await storage.createProductionFile(fileData);
         savedFiles.push(savedFile);
       }
-
+      
       res.status(201).json(savedFiles);
     } catch (error) {
       console.error("Error uploading files:", error);
@@ -909,7 +909,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const fileName = req.params.fileName;
       const fileBuffer = await fileStorage.getFile(fileName);
-
+      
       // Set appropriate headers
       res.setHeader('Content-Type', 'application/octet-stream');
       res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
@@ -925,7 +925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const licenseeId = req.user.claims.sub;
       const { photographerId } = req.query;
-
+      
       const events = await storage.getCalendarEvents(licenseeId, photographerId as string);
       res.json(events);
     } catch (error) {
@@ -938,13 +938,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const licenseeId = req.user.claims.sub;
       const userId = req.user.claims.sub;
-
+      
       const eventData = insertCalendarEventSchema.parse({
         ...req.body,
         licenseeId,
         createdBy: userId,
       });
-
+      
       const event = await storage.createCalendarEvent(eventData);
       res.status(201).json(event);
     } catch (error) {
@@ -957,7 +957,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const eventId = parseInt(req.params.id);
       const updateData = req.body;
-
+      
       const event = await storage.updateCalendarEvent(eventId, updateData);
       res.json(event);
     } catch (error) {
@@ -982,7 +982,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const licenseeId = req.user.claims.sub;
       const settings = await storage.getBusinessSettings(licenseeId);
-
+      
       if (!settings) {
         // Return default settings
         const defaultSettings = {
@@ -1002,7 +1002,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
         return res.json(defaultSettings);
       }
-
+      
       res.json(settings);
     } catch (error) {
       console.error("Error fetching business settings:", error);
@@ -1013,12 +1013,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/business-settings', isAuthenticated, async (req: any, res) => {
     try {
       const licenseeId = req.user.claims.sub;
-
+      
       const settingsData = insertBusinessSettingsSchema.parse({
         ...req.body,
         licenseeId,
       });
-
+      
       const settings = await storage.upsertBusinessSettings(settingsData);
       res.json(settings);
     } catch (error) {
@@ -1077,7 +1077,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const integration = await storage.getGoogleCalendarIntegration(userId);
-
+      
       res.json({
         connected: !!integration,
         lastSync: integration?.lastSyncAt,
@@ -1104,14 +1104,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const integration = await storage.getGoogleCalendarIntegration(userId);
-
+      
       if (!integration) {
         return res.status(404).json({ message: "Google Calendar not connected" });
       }
 
       // Trigger inbound sync
       await googleCalendarService.syncInboundEvents(integration);
-
+      
       res.json({ message: "Sync completed successfully" });
     } catch (error) {
       console.error("Error syncing Google Calendar:", error);
@@ -1123,7 +1123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/delivery/:jobCardId", async (req, res) => {
     try {
       const jobCardId = parseInt(req.params.jobCardId);
-
+      
       if (isNaN(jobCardId)) {
         return res.status(400).json({ message: "Invalid job card ID" });
       }
@@ -1135,7 +1135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get production files for this job
       const files = await storage.getProductionFiles(jobCardId);
-
+      
       // Track page view
       await storage.createDeliveryTracking({
         jobCardId,
@@ -1218,7 +1218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/jobs/:id/delivery-settings", isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const jobCardId = parseInt(req.params.id);
-
+      
       if (isNaN(jobCardId)) {
         return res.status(400).json({ message: "Invalid job card ID" });
       }
@@ -1291,7 +1291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update job status
       const updateData: any = { status };
-
+      
       // Set automatic timestamps based on status
       if (status === 'in_progress' && !currentJob.assignedAt) {
         updateData.assignedAt = new Date();
@@ -1392,198 +1392,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting product:", error);
       res.status(500).json({ message: "Failed to delete product" });
-    }
-  });
-
-  // Products routes
-  app.get("/api/products", async (req, res) => {
-    try {
-      const { licenseeId } = await ensureAuthenticated(req);
-      const products = await storage.getProductsByLicenseeId(licenseeId);
-      res.json(products);
-    } catch (error) {
-      console.error("Error fetching products:", error);
-      res.status(500).json({ error: "Failed to fetch products" });
-    }
-  });
-
-  // Editor Services routes
-  app.get("/api/editor-services/:editorId", async (req, res) => {
-    try {
-      const { licenseeId, role } = await ensureAuthenticated(req);
-      const { editorId } = req.params;
-
-      // Check if user can access this editor's services
-      if (role !== 'admin' && req.user?.id !== editorId) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      const services = await storage.getEditorServices(editorId);
-      res.json(services);
-    } catch (error) {
-      console.error("Error fetching editor services:", error);
-      res.status(500).json({ error: "Failed to fetch editor services" });
-    }
-  });
-
-  app.post("/api/editor-services", async (req, res) => {
-    try {
-      const { licenseeId, role } = await ensureAuthenticated(req);
-      const { editorId, services, currency } = req.body;
-
-      // Check if user can create/update services for this editor
-      if (role !== 'admin' && req.user?.id !== editorId) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      const existingServices = await storage.getEditorServices(editorId);
-
-      let result;
-      if (existingServices) {
-        result = await storage.updateEditorServices(editorId, {
-          services,
-          currency: currency || 'AUD',
-        });
-
-        // Log the change
-        await storage.createServiceChangeLog({
-          editorId,
-          changeType: 'update',
-          oldData: existingServices.services,
-          newData: services,
-          changedBy: req.user?.id || '',
-          licenseeId,
-        });
-      } else {
-        result = await storage.createEditorServices({
-          editorId,
-          services,
-          currency: currency || 'AUD',
-          licenseeId,
-        });
-
-        // Log the creation
-        await storage.createServiceChangeLog({
-          editorId,
-          changeType: 'create',
-          newData: services,
-          changedBy: req.user?.id || '',
-          licenseeId,
-        });
-      }
-
-      res.json(result);
-    } catch (error) {
-      console.error("Error saving editor services:", error);
-      res.status(500).json({ error: "Failed to save editor services" });
-    }
-  });
-
-  app.get("/api/all-editor-services", async (req, res) => {
-    try {
-      const { licenseeId, role } = await ensureAuthenticated(req);
-
-      // Only admins can view all editor services
-      if (role !== 'admin') {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      const services = await storage.getAllEditorServices(licenseeId);
-      res.json(services);
-    } catch (error) {
-      console.error("Error fetching all editor services:", error);
-      res.status(500).json({ error: "Failed to fetch editor services" });
-    }
-  });
-
-  // Service Templates routes
-  app.get("/api/service-templates", async (req, res) => {
-    try {
-      const { licenseeId } = await ensureAuthenticated(req);
-      const templates = await storage.getServiceTemplates(licenseeId);
-      res.json(templates);
-    } catch (error) {
-      console.error("Error fetching service templates:", error);
-      res.status(500).json({ error: "Failed to fetch service templates" });
-    }
-  });
-
-  app.post("/api/service-templates", async (req, res) => {
-    try {
-      const { licenseeId, role } = await ensureAuthenticated(req);
-
-      // Only admins can create templates
-      if (role !== 'admin') {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      const template = await storage.createServiceTemplate({
-        ...req.body,
-        licenseeId,
-        createdBy: req.user?.id || '',
-      });
-
-      res.json(template);
-    } catch (error) {
-      console.error("Error creating service template:", error);
-      res.status(500).json({ error: "Failed to create service template" });
-    }
-  });
-
-  app.put("/api/service-templates/:id", async (req, res) => {
-    try {
-      const { role } = await ensureAuthenticated(req);
-
-      // Only admins can update templates
-      if (role !== 'admin') {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      const template = await storage.updateServiceTemplate(
-        parseInt(req.params.id),
-        req.body
-      );
-
-      res.json(template);
-    } catch (error) {
-      console.error("Error updating service template:", error);
-      res.status(500).json({ error: "Failed to update service template" });
-    }
-  });
-
-  app.delete("/api/service-templates/:id", async (req, res) => {
-    try {
-      const { role } = await ensureAuthenticated(req);
-
-      // Only admins can delete templates
-      if (role !== 'admin') {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      await storage.deleteServiceTemplate(parseInt(req.params.id));
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error deleting service template:", error);
-      res.status(500).json({ error: "Failed to delete service template" });
-    }
-  });
-
-  // Service Change Logs
-  app.get("/api/service-change-logs/:editorId", async (req, res) => {
-    try {
-      const { role } = await ensureAuthenticated(req);
-      const { editorId } = req.params;
-
-      // Check access permissions
-      if (role !== 'admin' && req.user?.id !== editorId) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      const logs = await storage.getServiceChangeLogs(editorId);
-      res.json(logs);
-    } catch (error) {
-      console.error("Error fetching service change logs:", error);
-      res.status(500).json({ error: "Failed to fetch change logs" });
     }
   });
 
