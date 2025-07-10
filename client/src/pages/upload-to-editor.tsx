@@ -194,7 +194,7 @@ function UploadToEditorContent() {
     // Create service blocks for new services
     const newBlocks: ServiceBlock[] = services.map(service => {
       const existingBlock = serviceBlocks.find(block => block.service === service);
-      const category = editorServiceCategories?.find(cat => cat.name === service);
+      const category = editorServiceCategories?.find(cat => cat.categoryName === service);
       return existingBlock || {
         id: Math.random().toString(),
         service,
@@ -369,29 +369,30 @@ function UploadToEditorContent() {
                                 <div className="flex items-center space-x-2">
                                   <input
                                     type="checkbox"
-                                    checked={selectedServices.includes(category.name)}
+                                    id={`category-${category.id}`}
+                                    checked={selectedServices.includes(category.categoryName)}
                                     onChange={(e) => {
                                       if (e.target.checked) {
-                                        handleServiceSelect([...selectedServices, category.name]);
+                                        setSelectedServices(prev => [...prev, category.categoryName]);
                                       } else {
-                                        handleServiceSelect(selectedServices.filter(s => s !== category.name));
+                                        setSelectedServices(prev => prev.filter(s => s !== category.categoryName));
                                       }
                                     }}
                                     className="rounded border-slate-300"
                                   />
-                                  <CardTitle className="text-base">{category.name}</CardTitle>
+                                  <CardTitle className="text-base">{category.categoryName}</CardTitle>
                                 </div>
-                                {selectedServices.includes(category.name) && category.options.length > 0 && (
+                                {selectedServices.includes(category.categoryName) && category.options.length > 0 && (
                                   <Select
-                                    value={serviceBlocks.find(block => block.service === category.name)?.selectedOptionId?.toString() || ""}
+                                    value={serviceBlocks.find(block => block.service === category.categoryName)?.selectedOptionId?.toString() || ""}
                                     onValueChange={(value) => {
                                       const option = category.options.find(opt => opt.id.toString() === value);
                                       if (option) {
                                         updateServiceBlock(
-                                          serviceBlocks.find(block => block.service === category.name)?.id || "",
+                                          serviceBlocks.find(block => block.service === category.categoryName)?.id || "",
                                           {
                                             selectedOptionId: option.id,
-                                            selectedOptionName: option.name,
+                                            selectedOptionName: option.optionName,
                                             selectedOptionPrice: parseFloat(option.price)
                                           }
                                         );
@@ -404,7 +405,7 @@ function UploadToEditorContent() {
                                     <SelectContent>
                                       {category.options.map((option) => (
                                         <SelectItem key={option.id} value={option.id.toString()}>
-                                          {option.name} - ${option.price} {option.currency}
+                                          {option.optionName} - ${option.price} {option.currency}
                                         </SelectItem>
                                       ))}
                                     </SelectContent>
