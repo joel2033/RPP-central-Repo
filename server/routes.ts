@@ -654,7 +654,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
       
-      await storage.createJobActivity(activityData);
+      await storage.createJobActivityLog(activityData);
       
       // Send notification about completion
       const notificationData = {
