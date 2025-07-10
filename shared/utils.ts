@@ -1,17 +1,7 @@
 // Utility functions for action-based status system
 
 export interface JobCardWithTimestamps {
-  uploadedAt?: string | null;
-  acceptedAt?: string | null;
-  readyForQCAt?: string | null;
-  revisionRequestedAt?: string | null;
   deliveredAt?: string | null;
-  history?: Array<{
-    action: "upload" | "accept" | "readyForQC" | "revision" | "delivered";
-    by: string;
-    at: string;
-    notes?: string;
-  }>;
 }
 
 /**
@@ -20,10 +10,6 @@ export interface JobCardWithTimestamps {
  */
 export function getOrderStatus(order: JobCardWithTimestamps): string {
   if (order.deliveredAt) return "delivered";
-  if (order.revisionRequestedAt) return "in_revision";
-  if (order.readyForQCAt) return "ready_for_qc";
-  if (order.acceptedAt) return "in_progress";
-  if (order.uploadedAt) return "pending";
   return "pending";
 }
 
@@ -92,10 +78,8 @@ export function getAvailableActions(
   label: string;
   variant: "default" | "destructive" | "outline" | "secondary";
 }> {
-  // Use timestamp-based status if available, otherwise fall back to legacy status
-  const hasTimestamps = order.uploadedAt || order.acceptedAt || order.readyForQCAt || 
-                       order.revisionRequestedAt || order.deliveredAt;
-  const status = hasTimestamps ? getOrderStatus(order) : (order.status || 'pending');
+  // Use existing status field
+  const status = order.status || 'pending';
   
   const actions: Array<{
     action: "upload" | "accept" | "readyForQC" | "revision" | "delivered";
@@ -105,10 +89,10 @@ export function getAvailableActions(
 
   // Editor actions
   if (userRole === "editor") {
-    if ((status === "pending" || status === "unassigned") && !order.acceptedAt) {
+    if (status === "pending" || status === "unassigned") {
       actions.push({ action: "accept", label: "Accept Job", variant: "default" });
     }
-    if ((status === "in_progress" || status === "editing") && !order.readyForQCAt) {
+    if (status === "in_progress" || status === "editing") {
       actions.push({ action: "readyForQC", label: "Mark Ready for QC", variant: "default" });
     }
   }
