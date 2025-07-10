@@ -219,6 +219,66 @@ export const productionNotifications = pgTable("production_notifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Editor Service Pricing tables
+export const editorServiceCategories = pgTable("editor_service_categories", {
+  id: serial("id").primaryKey(),
+  editorId: varchar("editor_id").notNull(),
+  categoryName: varchar("category_name", { length: 255 }).notNull(),
+  isActive: boolean("is_active").default(true),
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const editorServiceOptions = pgTable("editor_service_options", {
+  id: serial("id").primaryKey(),
+  categoryId: integer("category_id").notNull(),
+  optionName: varchar("option_name", { length: 255 }).notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).default("AUD"),
+  isActive: boolean("is_active").default(true),
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Service Templates for admins to create default templates
+export const serviceTemplates = pgTable("service_templates", {
+  id: serial("id").primaryKey(),
+  templateName: varchar("template_name", { length: 255 }).notNull(),
+  templateData: jsonb("template_data").$type<{
+    categories: Array<{
+      categoryName: string;
+      displayOrder: number;
+      options: Array<{
+        optionName: string;
+        price: number;
+        currency: string;
+        displayOrder: number;
+      }>;
+    }>;
+  }>().notNull(),
+  createdBy: varchar("created_by").notNull(),
+  isDefault: boolean("is_default").default(false),
+  licenseeId: varchar("licensee_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Change logs for service modifications
+export const editorServiceChangeLogs = pgTable("editor_service_change_logs", {
+  id: serial("id").primaryKey(),
+  editorId: varchar("editor_id").notNull(),
+  changeType: varchar("change_type", { length: 50 }).notNull(), // 'category_added', 'option_modified', 'price_changed', etc.
+  categoryId: integer("category_id"),
+  optionId: integer("option_id"),
+  oldValue: jsonb("old_value"),
+  newValue: jsonb("new_value"),
+  changedBy: varchar("changed_by").notNull(),
+  changeReason: text("change_reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Order status audit log for tracking status changes
 export const orderStatusAudit = pgTable("order_status_audit", {
   id: serial("id").primaryKey(),
@@ -544,6 +604,48 @@ export const jobCardDeliverySettingsRelations = relations(jobCardDeliverySetting
   }),
 }));
 
+// Editor Service Pricing relations
+export const editorServiceCategoriesRelations = relations(editorServiceCategories, ({ one, many }) => ({
+  editor: one(users, {
+    fields: [editorServiceCategories.editorId],
+    references: [users.id],
+  }),
+  options: many(editorServiceOptions),
+}));
+
+export const editorServiceOptionsRelations = relations(editorServiceOptions, ({ one }) => ({
+  category: one(editorServiceCategories, {
+    fields: [editorServiceOptions.categoryId],
+    references: [editorServiceCategories.id],
+  }),
+}));
+
+export const serviceTemplatesRelations = relations(serviceTemplates, ({ one }) => ({
+  creator: one(users, {
+    fields: [serviceTemplates.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const editorServiceChangeLogsRelations = relations(editorServiceChangeLogs, ({ one }) => ({
+  editor: one(users, {
+    fields: [editorServiceChangeLogs.editorId],
+    references: [users.id],
+  }),
+  changedBy: one(users, {
+    fields: [editorServiceChangeLogs.changedBy],
+    references: [users.id],
+  }),
+  category: one(editorServiceCategories, {
+    fields: [editorServiceChangeLogs.categoryId],
+    references: [editorServiceCategories.id],
+  }),
+  option: one(editorServiceOptions, {
+    fields: [editorServiceChangeLogs.optionId],
+    references: [editorServiceOptions.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   id: true,
@@ -645,6 +747,30 @@ export const insertJobCardDeliverySettingsSchema = createInsertSchema(jobCardDel
   updatedAt: true,
 });
 
+// Editor Service Pricing schemas
+export const insertEditorServiceCategorySchema = createInsertSchema(editorServiceCategories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEditorServiceOptionSchema = createInsertSchema(editorServiceOptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertServiceTemplateSchema = createInsertSchema(serviceTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEditorServiceChangeLogSchema = createInsertSchema(editorServiceChangeLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type UpsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -689,6 +815,16 @@ export type InsertDeliveryTracking = z.infer<typeof insertDeliveryTrackingSchema
 export type DeliveryTracking = typeof deliveryTracking.$inferSelect;
 export type InsertJobCardDeliverySettings = z.infer<typeof insertJobCardDeliverySettingsSchema>;
 export type JobCardDeliverySettings = typeof jobCardDeliverySettings.$inferSelect;
+
+// Editor Service Pricing types
+export type InsertEditorServiceCategory = z.infer<typeof insertEditorServiceCategorySchema>;
+export type EditorServiceCategory = typeof editorServiceCategories.$inferSelect;
+export type InsertEditorServiceOption = z.infer<typeof insertEditorServiceOptionSchema>;
+export type EditorServiceOption = typeof editorServiceOptions.$inferSelect;
+export type InsertServiceTemplate = z.infer<typeof insertServiceTemplateSchema>;
+export type ServiceTemplate = typeof serviceTemplates.$inferSelect;
+export type InsertEditorServiceChangeLog = z.infer<typeof insertEditorServiceChangeLogSchema>;
+export type EditorServiceChangeLog = typeof editorServiceChangeLogs.$inferSelect;
 
 // Products
 export const products = pgTable("products", {

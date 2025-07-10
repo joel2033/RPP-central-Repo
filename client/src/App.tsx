@@ -23,6 +23,7 @@ const Products = lazy(() => import('@/pages/products'));
 const OrderStatus = lazy(() => import('@/views/Production/OrderStatus'));
 const Profile = lazy(() => import('@/pages/profile'));
 const BusinessSettings = lazy(() => import('@/pages/business-settings'));
+const EditorServicePricing = lazy(() => import('@/pages/editor-service-pricing'));
 const NotFound = lazy(() => import('@/pages/not-found'));
 
 const PageLoader = () => (
@@ -50,6 +51,7 @@ const AppRoutes = React.memo(() => (
     <Route path="/products" component={Products} />
     <Route path="/profile" component={Profile} />
     <Route path="/business-settings" component={BusinessSettings} />
+    <Route path="/editor-services" component={EditorServicePricing} />
     <Route path="/delivery/:jobId" component={DeliveryPage} />
     <Route component={NotFound} />
   </Switch>

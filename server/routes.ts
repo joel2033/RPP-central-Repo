@@ -15,7 +15,10 @@ import {
   insertGoogleCalendarIntegrationSchema,
   insertProductSchema,
   insertOrderStatusAuditSchema,
-  insertEmailDeliveryLogSchema
+  insertEmailDeliveryLogSchema,
+  insertEditorServiceCategorySchema,
+  insertEditorServiceOptionSchema,
+  insertServiceTemplateSchema
 } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
@@ -1392,6 +1395,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting product:", error);
       res.status(500).json({ message: "Failed to delete product" });
+    }
+  });
+
+  // Editor Service Pricing Routes
+  app.get("/api/editor-services/:editorId", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const editorId = req.params.editorId;
+      const { editorServiceService } = await import("./services/editorServiceService");
+      const serviceStructure = await editorServiceService.getEditorServiceStructure(editorId);
+      res.json(serviceStructure);
+    } catch (error) {
+      console.error("Error fetching editor services:", error);
+      res.status(500).json({ message: "Failed to fetch editor services" });
+    }
+  });
+
+  app.post("/api/editor-services/:editorId/categories", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const editorId = req.params.editorId;
+      const { editorServiceService } = await import("./services/editorServiceService");
+      const category = await editorServiceService.createCategory({
+        editorId,
+        ...req.body
+      });
+      res.json(category);
+    } catch (error) {
+      console.error("Error creating category:", error);
+      res.status(500).json({ message: "Failed to create category" });
+    }
+  });
+
+  app.put("/api/editor-services/categories/:categoryId", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const categoryId = parseInt(req.params.categoryId);
+      const { editorServiceService } = await import("./services/editorServiceService");
+      const category = await editorServiceService.updateCategory(categoryId, req.body);
+      res.json(category);
+    } catch (error) {
+      console.error("Error updating category:", error);
+      res.status(500).json({ message: "Failed to update category" });
+    }
+  });
+
+  app.delete("/api/editor-services/categories/:categoryId", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const categoryId = parseInt(req.params.categoryId);
+      const { editorServiceService } = await import("./services/editorServiceService");
+      await editorServiceService.deleteCategory(categoryId);
+      res.json({ message: "Category deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      res.status(500).json({ message: "Failed to delete category" });
+    }
+  });
+
+  app.post("/api/editor-services/categories/:categoryId/options", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const categoryId = parseInt(req.params.categoryId);
+      const { editorServiceService } = await import("./services/editorServiceService");
+      const option = await editorServiceService.createOption({
+        categoryId,
+        ...req.body
+      });
+      res.json(option);
+    } catch (error) {
+      console.error("Error creating option:", error);
+      res.status(500).json({ message: "Failed to create option" });
+    }
+  });
+
+  app.put("/api/editor-services/options/:optionId", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const optionId = parseInt(req.params.optionId);
+      const { editorServiceService } = await import("./services/editorServiceService");
+      const option = await editorServiceService.updateOption(optionId, req.body);
+      res.json(option);
+    } catch (error) {
+      console.error("Error updating option:", error);
+      res.status(500).json({ message: "Failed to update option" });
+    }
+  });
+
+  app.delete("/api/editor-services/options/:optionId", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const optionId = parseInt(req.params.optionId);
+      const { editorServiceService } = await import("./services/editorServiceService");
+      await editorServiceService.deleteOption(optionId);
+      res.json({ message: "Option deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting option:", error);
+      res.status(500).json({ message: "Failed to delete option" });
+    }
+  });
+
+  // Service Templates Routes
+  app.get("/api/service-templates", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      const { editorServiceService } = await import("./services/editorServiceService");
+      const templates = await editorServiceService.getServiceTemplates(licenseeId);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching service templates:", error);
+      res.status(500).json({ message: "Failed to fetch service templates" });
+    }
+  });
+
+  app.post("/api/service-templates", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const licenseeId = req.user.claims.sub;
+      const { editorServiceService } = await import("./services/editorServiceService");
+      const template = await editorServiceService.createServiceTemplate({
+        licenseeId,
+        createdBy: licenseeId,
+        ...req.body
+      });
+      res.json(template);
+    } catch (error) {
+      console.error("Error creating service template:", error);
+      res.status(500).json({ message: "Failed to create service template" });
+    }
+  });
+
+  app.post("/api/service-templates/:templateId/apply/:editorId", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const templateId = parseInt(req.params.templateId);
+      const editorId = req.params.editorId;
+      const { editorServiceService } = await import("./services/editorServiceService");
+      await editorServiceService.applyTemplateToEditor(templateId, editorId);
+      res.json({ message: "Template applied successfully" });
+    } catch (error) {
+      console.error("Error applying template:", error);
+      res.status(500).json({ message: "Failed to apply template" });
+    }
+  });
+
+  app.get("/api/editor-services/:editorId/change-history", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const editorId = req.params.editorId;
+      const { editorServiceService } = await import("./services/editorServiceService");
+      const history = await editorServiceService.getChangeHistory(editorId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching change history:", error);
+      res.status(500).json({ message: "Failed to fetch change history" });
+    }
+  });
+
+  // Bulk ordering routes
+  app.put("/api/editor-services/categories/order", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { categoryIds } = req.body;
+      const { editorServiceService } = await import("./services/editorServiceService");
+      await editorServiceService.updateCategoryOrder(categoryIds);
+      res.json({ message: "Category order updated successfully" });
+    } catch (error) {
+      console.error("Error updating category order:", error);
+      res.status(500).json({ message: "Failed to update category order" });
+    }
+  });
+
+  app.put("/api/editor-services/options/order", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { optionIds } = req.body;
+      const { editorServiceService } = await import("./services/editorServiceService");
+      await editorServiceService.updateOptionOrder(optionIds);
+      res.json({ message: "Option order updated successfully" });
+    } catch (error) {
+      console.error("Error updating option order:", error);
+      res.status(500).json({ message: "Failed to update option order" });
     }
   });
 
