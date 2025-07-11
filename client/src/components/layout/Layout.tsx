@@ -4,7 +4,6 @@ import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import Sidebar from './sidebar';
 import TopBar from './topbar';
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -43,17 +42,15 @@ export const Layout = memo(({ children, title, requireAuth = true }: LayoutProps
   }
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen bg-gray-50">
-        <Sidebar />
-        <SidebarInset>
-          <TopBar title={title} />
-          <main className="p-6">
-            {children}
-          </main>
-        </SidebarInset>
+    <div className="flex min-h-screen bg-gray-50">
+      <Sidebar />
+      <div className="flex-1 ml-64">
+        <TopBar title={title} />
+        <main className="p-6">
+          {children}
+        </main>
       </div>
-    </SidebarProvider>
+    </div>
   );
 });
 

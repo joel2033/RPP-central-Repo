@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
-import { Layout } from "@/components/layout/Layout";
+import Sidebar from "@/components/layout/sidebar";
+import TopBar from "@/components/layout/topbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -152,17 +153,25 @@ export default function JobsPage() {
 
   if (isLoading) {
     return (
-      <Layout title="Jobs">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-lg">Loading jobs...</div>
+      <div className="flex h-screen bg-slate-50">
+        <Sidebar />
+        <div className="flex-1 flex flex-col ml-64">
+          <TopBar />
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-lg">Loading jobs...</div>
+          </div>
         </div>
-      </Layout>
+      </div>
     );
   }
 
   return (
-    <Layout title="Jobs">
-      <div className="container mx-auto max-w-7xl">
+    <div className="flex h-screen bg-slate-50">
+      <Sidebar />
+      <div className="flex-1 flex flex-col ml-64">
+        <TopBar />
+        <div className="flex-1 overflow-auto">
+          <div className="container mx-auto p-6">
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
               <div>
@@ -329,6 +338,6 @@ export default function JobsPage() {
           </div>
         </div>
       </div>
-    </Layout>
+    </div>
   );
 }
