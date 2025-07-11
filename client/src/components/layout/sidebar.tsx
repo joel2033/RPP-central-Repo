@@ -274,10 +274,8 @@ function SidebarContent_() {
 
 export default function Sidebar() {
   return (
-    <SidebarProvider>
-      <UISidebar>
-        <SidebarContent_ />
-      </UISidebar>
-    </SidebarProvider>
+    <UISidebar>
+      <SidebarContent_ />
+    </UISidebar>
   );
 }
