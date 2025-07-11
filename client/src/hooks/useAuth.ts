@@ -7,14 +7,8 @@ export function useAuth() {
   });
 
   return {
-    user: user || {
-      id: "demo-user",
-      email: "demo@example.com",
-      firstName: "Demo",
-      lastName: "User",
-      role: "admin"
-    },
-    isLoading: false,
-    isAuthenticated: true,
+    user,
+    isLoading,
+    isAuthenticated: !!user,
   };
 }
