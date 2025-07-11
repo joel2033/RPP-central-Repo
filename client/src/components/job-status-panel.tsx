@@ -83,10 +83,7 @@ export default function JobStatusPanel({
 
   const updateStatusMutation = useMutation({
     mutationFn: async (data: { status: string; notes?: string }) => {
-      return apiRequest(`/api/jobs/${jobId}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("PATCH", `/api/jobs/${jobId}`, data);
     },
     onSuccess: () => {
       toast({

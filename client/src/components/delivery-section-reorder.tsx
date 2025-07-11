@@ -93,22 +93,16 @@ export default function DeliverySectionReorder({ jobCardId }: DeliverySectionReo
     mutationFn: async (data: SectionOrderConfig) => {
       // If no delivery settings exist, create them first
       if (!deliverySettings) {
-        return apiRequest(`/api/jobs/${jobCardId}/delivery-settings`, {
-          method: "POST",
-          body: JSON.stringify({
-            jobCardId,
-            enableComments: true,
-            enableDownloads: true,
-            isPublic: true,
-            passwordProtected: false,
-            ...data
-          }),
+        return apiRequest("POST", `/api/jobs/${jobCardId}/delivery-settings`, {
+          jobCardId,
+          enableComments: true,
+          enableDownloads: true,
+          isPublic: true,
+          passwordProtected: false,
+          ...data
         });
       } else {
-        return apiRequest(`/api/jobs/${jobCardId}/delivery-settings`, {
-          method: "PUT",
-          body: JSON.stringify(data),
-        });
+        return apiRequest("PUT", `/api/jobs/${jobCardId}/delivery-settings`, data);
       }
     },
     onSuccess: () => {

@@ -66,10 +66,7 @@ export default function DeliverySettingsModal({ jobCardId, files }: DeliverySett
   const settingsMutation = useMutation({
     mutationFn: async (data: DeliverySettings) => {
       const method = existingSettings ? "PUT" : "POST";
-      return apiRequest(`/api/jobs/${jobCardId}/delivery-settings`, {
-        method,
-        body: JSON.stringify(data),
-      });
+      return apiRequest(method, `/api/jobs/${jobCardId}/delivery-settings`, data);
     },
     onSuccess: () => {
       toast({

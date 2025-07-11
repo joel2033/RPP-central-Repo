@@ -201,10 +201,7 @@ export default function BookingModal({ isOpen, onClose, booking }: BookingModalP
 
   const updateBookingMutation = useMutation({
     mutationFn: async (data: z.infer<typeof bookingFormSchema>) => {
-      return apiRequest(`/api/bookings/${booking?.id}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("PUT", `/api/bookings/${booking?.id}`, data);
     },
     onSuccess: () => {
       toast({
