@@ -1,3 +1,4 @@
 export function isUnauthorizedError(error: Error): boolean {
-  return /^401: .*Unauthorized/.test(error.message);
+  // Authentication disabled - never treat errors as unauthorized
+  return false;
 }

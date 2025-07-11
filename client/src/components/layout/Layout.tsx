@@ -15,31 +15,9 @@ export const Layout = memo(({ children, title, requireAuth = true }: LayoutProps
   const { isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
 
-  // Handle authentication redirect
-  React.useEffect(() => {
-    if (requireAuth && !isLoading && !isAuthenticated) {
-      toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-    }
-  }, [isAuthenticated, isLoading, requireAuth, toast]);
+  // Authentication disabled - no redirects needed
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
-  if (requireAuth && !isAuthenticated) {
-    return null;
-  }
+  // Always show the layout in no-auth mode
 
   return (
     <div className="flex min-h-screen bg-gray-50">
