@@ -4,8 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import Sidebar from "@/components/layout/sidebar";
-import TopBar from "@/components/layout/topbar";
+import { Layout } from "@/components/layout/Layout";
 import { RoleProtectedRoute } from "@/components/auth/RoleProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -639,23 +638,16 @@ function UploadToEditorContent() {
 
   if (authLoading || jobsLoading || editorsLoading) {
     return (
-      <div className="flex min-h-screen">
-        <Sidebar />
-        <div className="flex-1 ml-64">
-          <TopBar title="Upload to Editor" />
-          <div className="flex items-center justify-center h-64">
-            <LoadingSpinner />
-          </div>
+      <Layout title="Upload to Editor">
+        <div className="flex items-center justify-center h-64">
+          <LoadingSpinner />
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <Sidebar />
-      <div className="flex-1 ml-64">
-        <TopBar title="Upload to Editor" />
+    <Layout title="Upload to Editor">
         
         <div className="p-6 max-w-4xl mx-auto">
           <div className="mb-8">
@@ -1057,7 +1049,7 @@ function UploadToEditorContent() {
           </div>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }
 
