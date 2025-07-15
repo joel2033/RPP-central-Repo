@@ -680,14 +680,14 @@ function UploadToEditorContent() {
                     <SelectContent>
                       {jobCards?.map((job) => (
                         <SelectItem key={job.id} value={job.id.toString()}>
-                          {job.jobId ? `${job.jobId} - ` : ''}{job.booking?.propertyAddress || job.client.name} ({job.requestedServices?.join(', ')})
+                          {job.jobId ? `${job.jobId} - ` : ''}{job.booking?.propertyAddress || "No Address Available"} ({job.requestedServices?.join(', ')})
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   {selectedJob && (
                     <div className="mt-3 p-3 bg-slate-50 rounded-md">
-                      <p className="text-sm font-medium">Property: {selectedJob.client.name}</p>
+                      <p className="text-sm font-medium">Property: {selectedJob.booking?.propertyAddress || "No Address Available"}</p>
                       <div className="flex flex-wrap gap-1 mt-2">
                         {(selectedJob.requestedServices as string[])?.map((service) => (
                           <Badge key={service} variant="outline" className="text-xs">
