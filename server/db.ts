@@ -17,8 +17,19 @@ if (!process.env.DATABASE_URL) {
 export const pool = new Pool({ 
   connectionString: process.env.DATABASE_URL,
   connectionTimeoutMillis: 5000,
-  idleTimeoutMillis: 10000,
-  max: 1
+  idleTimeoutMillis: 30000,
+  max: 10
+});
+
+// Add error handling for reconnections
+pool.on('error', (err) => {
+  console.error('Database pool error:', err);
+  
+  // Handle specific reconnection errors (57P01: terminating connection due to administrator command)
+  if (err.code === '57P01' || err.message.includes('terminating connection due to administrator command')) {
+    console.log('Attempting to reconnect to database...');
+    // The pool will automatically attempt to reconnect on the next query
+  }
 });
 
 export const db = drizzle({ client: pool, schema });
