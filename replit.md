@@ -382,6 +382,15 @@ Changelog:
   - **Status Badges**: Color-coded status indicators with icons for clear visual feedback
   - **Comprehensive Error Handling**: Proper unauthorized error detection with automatic login redirects
   - **Empty State Management**: Professional empty states for each tab when no jobs are available
+- July 15, 2025. Fixed critical editor dashboard job visibility issues:
+  - **Root Cause Resolution**: Fixed authentication and role-based filtering that prevented submitted jobs from appearing in editor dashboard
+  - **Database Query Fix**: Replaced missing `getJobCardsByLicensee` function with existing `getJobCards` function
+  - **Admin Role Support**: Admin users now see all jobs assigned to any editor, not just jobs assigned to themselves
+  - **User Role Detection**: Enhanced `/api/editor/job-cards` endpoint to properly detect user roles from database
+  - **API Endpoint Consistency**: Updated frontend to use correct `/api/editor/job-cards` endpoint with proper query invalidation
+  - **Comprehensive Logging**: Added detailed logging for debugging job assignment and visibility issues
+  - **Verified Functionality**: Confirmed jobs 00004 and 00005 now appear correctly in editor dashboard for admin users
+  - **Complete Integration**: Submit-to-editor workflow now properly displays submitted jobs in editor dashboard without delay
 ```
 
 ## User Preferences
