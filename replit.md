@@ -371,6 +371,17 @@ Changelog:
   - **Frontend Enhancement**: Success messages display assigned Job ID and handle complete submission workflow
   - **File Upload Integration**: Files upload successfully with proper service category classification (photography, floor_plan, drone, video)
   - **Complete Workflow Validation**: Confirmed end-to-end functionality from job selection through file upload and activity logging
+- July 15, 2025. Added EditorDashboard.tsx component with comprehensive editor workflow management:
+  - **Modular Component Design**: Created EditorDashboard.tsx in client/src/views folder with TanStack Query integration
+  - **Complete Editor Workflow**: Implemented Accept/Decline → In Progress → Start Editing → Editing → Mark Complete workflow
+  - **Enhanced API Endpoint**: Added GET /api/editor/jobs with full job details including client, booking, and file information
+  - **Status-Based UI**: Tabbed interface showing Pending, In Progress, Editing, and Completed jobs with real-time counts
+  - **Action Buttons**: Context-aware buttons for each job status with proper mutation handling and error management
+  - **Fixed API Request Issues**: Corrected apiRequest function calls throughout codebase to use proper parameter order (method, url, data)
+  - **Real-time Updates**: All mutations invalidate queries for instant UI updates after status changes
+  - **Status Badges**: Color-coded status indicators with icons for clear visual feedback
+  - **Comprehensive Error Handling**: Proper unauthorized error detection with automatic login redirects
+  - **Empty State Management**: Professional empty states for each tab when no jobs are available
 ```
 
 ## User Preferences

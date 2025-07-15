@@ -512,6 +512,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Editor jobs with details route
+  app.get('/api/editor/jobs', isAuthenticated, async (req: any, res) => {
+    try {
+      const editorId = req.user.claims.sub;
+      // For testing, use the user's ID as licenseeId
+      const licenseeId = req.user.claims.sub;
+      
+      const jobCards = await storage.getJobCardsByEditor(editorId, licenseeId);
+      
+      // Enhance with client and booking information
+      const enhancedJobCards = await Promise.all(
+        jobCards.map(async (jobCard) => {
+          const client = await storage.getClient(jobCard.clientId, licenseeId);
+          const booking = await storage.getBooking(jobCard.bookingId, licenseeId);
+          const files = await storage.getJobCardFiles(jobCard.id);
+          
+          return {
+            ...jobCard,
+            client: client || { 
+              id: jobCard.clientId, 
+              name: "Unknown Client", 
+              email: "", 
+              contactName: "" 
+            },
+            booking: booking || { 
+              id: jobCard.bookingId, 
+              propertyAddress: "Unknown Address",
+              price: "0.00",
+              scheduledDate: new Date().toISOString().split('T')[0],
+              scheduledTime: "09:00"
+            },
+            files: files || []
+          };
+        })
+      );
+      
+      res.json(enhancedJobCards);
+    } catch (error) {
+      console.error("Error fetching editor jobs:", error);
+      res.status(500).json({ message: "Failed to fetch editor jobs" });
+    }
+  });
+
   app.get('/api/job-cards/:id', isAuthenticated, async (req: any, res) => {
     try {
       const licenseeId = req.user.claims.sub;
