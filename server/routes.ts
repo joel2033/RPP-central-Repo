@@ -515,11 +515,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Editor jobs with details route
   app.get('/api/editor/jobs', isAuthenticated, async (req: any, res) => {
     try {
-      const editorId = req.user.claims.sub;
-      // For testing, use the user's ID as licenseeId
-      const licenseeId = req.user.claims.sub;
+      const userId = req.user.claims.sub;
+      const userData = (req as any).userData;
       
-      const jobCards = await storage.getJobCardsByEditor(editorId, licenseeId);
+      // Determine licenseeId based on user role
+      const licenseeId = userData?.role === 'editor' ? userData.licenseeId : userId;
+      
+      let jobCards;
+      if (userData?.role === 'editor') {
+        // For editors, show only their assigned jobs
+        jobCards = await storage.getJobCardsByEditor(userId, licenseeId);
+      } else {
+        // For admins/licensees, show all jobs with assigned editors
+        jobCards = await storage.getJobCardsByLicensee(licenseeId);
+        // Filter to only show jobs that have been assigned to an editor
+        jobCards = jobCards.filter(job => job.editorId !== null);
+      }
       
       // Enhance with client and booking information
       const enhancedJobCards = await Promise.all(
