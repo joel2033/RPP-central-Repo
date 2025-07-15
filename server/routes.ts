@@ -501,10 +501,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/editor/job-cards', isAuthenticated, async (req: any, res) => {
     try {
       const editorId = req.user.claims.sub;
+      const userData = (req as any).userData;
+      
       // For testing, use the user's ID as licenseeId
       const licenseeId = req.user.claims.sub;
       
+      console.log('Editor job cards fetch - editorId:', editorId, 'licenseeId:', licenseeId, 'userData:', userData);
+      
       const jobCards = await storage.getJobCardsByEditor(editorId, licenseeId);
+      
+      console.log('Editor job cards fetched:', jobCards.length, 'jobs found');
+      console.log('Job cards:', jobCards.map(j => ({ id: j.id, jobId: j.jobId, editorId: j.editorId, status: j.status })));
+      
       res.json(jobCards);
     } catch (error) {
       console.error("Error fetching editor job cards:", error);
@@ -1034,6 +1042,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         editingNotes: instructions,
         assignedAt: new Date()
       }, licenseeId);
+      
+      console.log('Submit to editor - Updated job card:', {
+        jobCardId,
+        editorId,
+        licenseeId,
+        status: "pending",
+        jobId
+      });
       
       // Step 4: Get editor information for logging
       const editor = await storage.getUser(editorId);

@@ -723,6 +723,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getJobCardsByEditor(editorId: string, licenseeId: string): Promise<(JobCard & { client: Client; photographer: User | null })[]> {
+    console.log('getJobCardsByEditor called with:', { editorId, licenseeId });
+    
     const results = await db
       .select({
         jobCard: jobCards,
@@ -737,6 +739,17 @@ export class DatabaseStorage implements IStorage {
         eq(jobCards.licenseeId, licenseeId)
       ))
       .orderBy(desc(jobCards.updatedAt));
+
+    console.log('getJobCardsByEditor found:', results.length, 'results');
+    results.forEach(result => {
+      console.log('Job card:', {
+        id: result.jobCard.id,
+        jobId: result.jobCard.jobId,
+        editorId: result.jobCard.editorId,
+        licenseeId: result.jobCard.licenseeId,
+        status: result.jobCard.status
+      });
+    });
 
     return results.map(result => ({
       ...result.jobCard,
