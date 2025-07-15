@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Mail, Phone, MapPin, Edit, Trash2, Eye, MoreVertical, Building2 } from 'lucide-react';
-import { formatDate, formatPhoneNumber } from '@/utils/formatting';
+import { formatDate, formatAustralianPhoneNumber } from '@/utils/formatting';
 import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { officeApi } from '@/lib/api';
@@ -86,7 +86,7 @@ export const ClientCard = memo(({ client, onEdit, onDelete }: ClientCardProps) =
         </div>
         <div className="flex items-center gap-2 text-sm text-gray-600">
           <Phone className="h-4 w-4 flex-shrink-0" />
-          <span>{client.phone ? formatPhoneNumber(client.phone) : "No phone"}</span>
+          <span>{client.phone ? formatAustralianPhoneNumber(client.phone) : "No phone"}</span>
         </div>
         <div className="flex items-start gap-2 text-sm text-gray-600">
           <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />

@@ -74,6 +74,33 @@ export const formatPhoneNumber = (phone: string): string => {
   return phone;
 };
 
+// Australian phone number formatting
+export const formatAustralianPhoneNumber = (phone: string): string => {
+  const cleaned = phone.replace(/\D/g, '');
+  
+  // Australian mobile numbers (04XX XXX XXX)
+  if (cleaned.length === 10 && cleaned.startsWith('04')) {
+    return `${cleaned.slice(0, 4)} ${cleaned.slice(4, 7)} ${cleaned.slice(7)}`;
+  }
+  
+  // Australian landline numbers with area code (0X XXXX XXXX)
+  if (cleaned.length === 10 && cleaned.startsWith('0')) {
+    return `${cleaned.slice(0, 2)} ${cleaned.slice(2, 6)} ${cleaned.slice(6)}`;
+  }
+  
+  // International format starting with +61
+  if (cleaned.length === 11 && cleaned.startsWith('61')) {
+    const withoutCountryCode = cleaned.slice(2);
+    if (withoutCountryCode.startsWith('4')) {
+      return `+61 ${withoutCountryCode.slice(0, 3)} ${withoutCountryCode.slice(3, 6)} ${withoutCountryCode.slice(6)}`;
+    } else {
+      return `+61 ${withoutCountryCode.slice(0, 1)} ${withoutCountryCode.slice(1, 5)} ${withoutCountryCode.slice(5)}`;
+    }
+  }
+  
+  return phone;
+};
+
 // Status formatting
 export const formatStatus = (status: string): string => {
   return status.replace(/_/g, ' ').split(' ').map(capitalize).join(' ');
