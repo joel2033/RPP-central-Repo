@@ -1368,14 +1368,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const s3Key = s3Service.generateS3Key(jobCardId, fileName, mediaType || 'raw');
       
+      // Determine tags based on media type
+      const tags: Record<string, string> = {};
+      if (mediaType === 'raw') {
+        tags.type = 'raw';
+        console.log(`Generated S3 upload URL with tags for raw content: ${s3Key}`, tags);
+      } else if (mediaType === 'final' || mediaType === 'finished') {
+        tags.type = 'finished';
+        console.log(`Generated S3 upload URL with tags for finished content: ${s3Key}`, tags);
+      }
+      
       const uploadUrl = await s3Service.withRetry(() => 
-        s3Service.generatePresignedUploadUrl(s3Key, contentType)
+        s3Service.generatePresignedUploadUrl(s3Key, contentType, tags)
       );
 
-      res.json({ uploadUrl, s3Key });
+      res.json({ uploadUrl, s3Key, tags });
     } catch (error) {
       console.error("Error generating upload URL:", error);
       res.status(500).json({ message: "Failed to generate upload URL" });
+    }
+  });
+
+  // Test S3 tagging endpoint
+  app.get('/api/test-s3-tags', isAuthenticated, async (req: any, res) => {
+    try {
+      if (!s3Service) {
+        return res.status(503).json({ message: "S3 service not configured" });
+      }
+
+      const testKey = 'test-files/test-upload.txt';
+      const rawTags = { type: 'raw' };
+      const finishedTags = { type: 'finished' };
+
+      const rawUploadUrl = await s3Service.generatePresignedUploadUrl(testKey + '-raw', 'text/plain', rawTags);
+      const finishedUploadUrl = await s3Service.generatePresignedUploadUrl(testKey + '-finished', 'text/plain', finishedTags);
+
+      res.json({
+        message: "S3 tagging test URLs generated successfully",
+        rawUpload: {
+          url: rawUploadUrl,
+          key: testKey + '-raw',
+          tags: rawTags
+        },
+        finishedUpload: {
+          url: finishedUploadUrl,
+          key: testKey + '-finished',
+          tags: finishedTags
+        }
+      });
+    } catch (error) {
+      console.error("Error testing S3 tags:", error);
+      res.status(500).json({ message: "Failed to test S3 tags", error: error.message });
     }
   });
 

@@ -154,7 +154,7 @@ export const S3FileUpload: React.FC<S3FileUploadProps> = ({
       const uploadUrlResponse = await apiRequest('POST', `/api/job-cards/${jobCardId}/files/upload-url`, {
         fileName: file.name,
         contentType: file.type,
-        mediaType,
+        mediaType, // This determines S3 tags: 'raw' → type:raw, 'final' → type:finished
         fileSize: file.size
       });
 

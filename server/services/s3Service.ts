@@ -27,15 +27,24 @@ export class S3Service {
   async generatePresignedUploadUrl(
     key: string,
     contentType: string,
+    tags?: Record<string, string>,
     expiresIn: number = 3600 // 1 hour
   ): Promise<string> {
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
       Key: key,
       ContentType: contentType,
+      Tagging: tags ? this.formatTagging(tags) : undefined,
     });
 
     return await getSignedUrl(this.s3Client, command, { expiresIn });
+  }
+
+  // Format tags for S3 tagging
+  private formatTagging(tags: Record<string, string>): string {
+    return Object.entries(tags)
+      .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+      .join('&');
   }
 
   // Generate presigned URL for download

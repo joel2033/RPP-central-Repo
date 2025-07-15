@@ -400,6 +400,16 @@ Changelog:
   - **Comprehensive Error Codes**: Handles ECONNRESET, ENOTFOUND, and "terminating connection due to administrator command" scenarios
   - **Pool Management**: Dynamic pool creation and cleanup with proper event handlers for connection monitoring
   - **Production Stability**: Prevents application crashes from database connection interruptions in serverless environments
+- July 15, 2025. Implemented comprehensive AWS S3 integration with automatic tagging system:
+  - **S3 Service Layer**: Created server/services/s3Service.ts with presigned URL generation, file validation, and retry logic
+  - **Database Schema Updates**: Extended productionFiles table with s3Key and s3Bucket fields for S3 metadata storage
+  - **Automatic Tagging System**: Implemented S3 object tagging with { Key: 'type', Value: 'raw' } for 'Upload to Editor' flow and { Key: 'type', Value: 'finished' } for editor completion uploads
+  - **S3FileUpload Component**: Created modern React component with drag-and-drop, progress tracking, 2GB file support, and error handling with 3 automatic retries
+  - **API Endpoints**: Added /api/job-cards/:id/files/upload-url and /api/job-cards/:id/files/metadata for S3 presigned uploads
+  - **Direct Client-Side Uploads**: Files upload directly to S3 without server proxying, with metadata stored in database
+  - **Fallback Support**: Maintains compatibility with existing local file storage when S3 is not configured
+  - **Test Endpoint**: Added /api/test-s3-tags for verifying tagging functionality in S3 Console
+  - **Integration Points**: Updated Upload to Editor page and Editor Dashboard to use S3 uploads with proper tagging
 ```
 
 ## User Preferences

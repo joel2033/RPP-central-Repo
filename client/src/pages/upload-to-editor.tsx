@@ -132,7 +132,7 @@ function FileUploadModal({
         body: JSON.stringify({
           fileName: file.name,
           contentType: file.type,
-          mediaType: 'raw',
+          mediaType: 'raw', // This will add 'type: raw' tag in S3
           fileSize: file.size
         })
       });

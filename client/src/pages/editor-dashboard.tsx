@@ -489,7 +489,7 @@ function EditorDashboardContent() {
                     <h4 className="font-medium text-slate-700 mb-2">Upload Final Files</h4>
                     <S3FileUpload
                       jobCardId={selectedJobCard.id}
-                      mediaType="final"
+                      mediaType="final" // This will add 'type: finished' tag in S3
                       serviceCategory="general"
                       onUploadComplete={(fileData) => {
                         console.log('File uploaded successfully:', fileData);
