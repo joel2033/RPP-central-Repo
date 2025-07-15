@@ -526,6 +526,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const userData = (req as any).userData;
       
+      console.log('Editor jobs endpoint - userId:', userId, 'userData:', userData);
+      
       // Determine licenseeId based on user role
       const licenseeId = userData?.role === 'editor' ? userData.licenseeId : userId;
       
