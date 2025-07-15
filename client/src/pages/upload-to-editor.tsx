@@ -446,9 +446,11 @@ function UploadToEditorContent() {
   const { data: jobCards, isLoading: jobsLoading } = useQuery<JobCardWithDetails[]>({
     queryKey: ["/api/job-cards"],
     queryFn: async () => {
-      const response = await fetch("/api/job-cards?status=unassigned");
+      const response = await fetch("/api/job-cards?status=unassigned&include_details=true");
       if (!response.ok) throw new Error("Failed to fetch job cards");
-      return response.json();
+      const data = await response.json();
+      console.log('Fetched jobCards:', data);
+      return data;
     },
     enabled: isAuthenticated,
   });
