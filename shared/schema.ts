@@ -183,7 +183,9 @@ export const productionFiles = pgTable("production_files", {
   jobCardId: integer("job_card_id").notNull(),
   fileName: varchar("file_name", { length: 255 }).notNull(),
   originalName: varchar("original_name", { length: 255 }),
-  filePath: text("file_path"),
+  filePath: text("file_path"), // Keep for backward compatibility
+  s3Key: text("s3_key"), // S3 object key
+  s3Bucket: varchar("s3_bucket", { length: 255 }), // S3 bucket name
   fileSize: integer("file_size"),
   mimeType: varchar("mime_type", { length: 100 }),
   mediaType: mediaTypeEnum("media_type").notNull(), // raw, edited, final

@@ -11,6 +11,8 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.844.0",
+    "@aws-sdk/s3-request-presigner": "^3.844.0",
     "@fullcalendar/core": "^6.1.18",
     "@fullcalendar/daygrid": "^6.1.18",
     "@fullcalendar/interaction": "^6.1.18",

@@ -25,6 +25,7 @@ import multer from "multer";
 import { fileStorage } from "./fileStorage";
 import { requireEditor, requireAdmin, requireVA, requireAdminOrVA, requireProductionStaff } from "./middleware/roleAuth";
 import { googleCalendarService } from "./googleCalendar";
+import { s3Service } from "./services/s3Service";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -1312,13 +1313,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
         files = await storage.getProductionFiles(jobCardId);
       }
       
-      res.json(files);
+      // Add download URLs for S3 files
+      if (s3Service) {
+        const filesWithUrls = await Promise.all(
+          files.map(async (file) => {
+            if (file.s3Key) {
+              try {
+                const downloadUrl = await s3Service.withRetry(() => 
+                  s3Service.generatePresignedDownloadUrl(file.s3Key)
+                );
+                return { ...file, downloadUrl };
+              } catch (error) {
+                console.error(`Failed to generate download URL for ${file.s3Key}:`, error);
+                return file;
+              }
+            }
+            return file;
+          })
+        );
+        res.json(filesWithUrls);
+      } else {
+        res.json(files);
+      }
     } catch (error) {
       console.error("Error fetching production files:", error);
       res.status(500).json({ message: "Failed to fetch production files" });
     }
   });
 
+  // S3 presigned upload URL endpoint
+  app.post('/api/job-cards/:id/files/upload-url', isAuthenticated, async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      const { fileName, contentType, mediaType } = req.body;
+
+      if (!s3Service) {
+        return res.status(503).json({ message: "S3 service not configured" });
+      }
+
+      // Check if Job ID has been assigned - REQUIRED for uploads
+      const hasJobId = await storage.hasJobId(jobCardId);
+      if (!hasJobId) {
+        return res.status(400).json({ 
+          message: "Job ID must be assigned before uploading files. Please assign a Job ID first." 
+        });
+      }
+
+      // Validate file
+      const validation = s3Service.validateFile({ size: req.body.fileSize || 0, type: contentType });
+      if (!validation.valid) {
+        return res.status(400).json({ message: validation.error });
+      }
+
+      const s3Key = s3Service.generateS3Key(jobCardId, fileName, mediaType || 'raw');
+      
+      const uploadUrl = await s3Service.withRetry(() => 
+        s3Service.generatePresignedUploadUrl(s3Key, contentType)
+      );
+
+      res.json({ uploadUrl, s3Key });
+    } catch (error) {
+      console.error("Error generating upload URL:", error);
+      res.status(500).json({ message: "Failed to generate upload URL" });
+    }
+  });
+
+  // S3 file metadata endpoint (after successful upload)
+  app.post('/api/job-cards/:id/files/metadata', isAuthenticated, async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      const { 
+        fileName, 
+        originalName, 
+        s3Key, 
+        fileSize, 
+        mimeType, 
+        mediaType, 
+        serviceCategory, 
+        instructions, 
+        exportType, 
+        customDescription 
+      } = req.body;
+
+      if (!s3Service) {
+        return res.status(503).json({ message: "S3 service not configured" });
+      }
+
+      // Create database record
+      const fileData = insertProductionFileSchema.parse({
+        originalName: originalName || fileName,
+        fileName: fileName,
+        s3Key: s3Key,
+        s3Bucket: process.env.S3_BUCKET,
+        mediaType: mediaType || "raw",
+        serviceCategory: serviceCategory || "general",
+        fileSize: fileSize,
+        mimeType: mimeType,
+        jobCardId,
+        uploadedBy: userId,
+        instructions: instructions || "",
+        exportType: exportType || "",
+        customDescription: customDescription || "",
+      });
+
+      const savedFile = await storage.createProductionFile(fileData);
+      res.status(201).json(savedFile);
+    } catch (error) {
+      console.error("Error saving file metadata:", error);
+      res.status(400).json({ message: "Failed to save file metadata" });
+    }
+  });
+
+  // Legacy file upload endpoint (with fallback to local storage)
   app.post('/api/job-cards/:id/files', isAuthenticated, upload.array('files', 10), async (req: any, res) => {
     try {
       const jobCardId = parseInt(req.params.id);
@@ -1340,7 +1448,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const savedFiles = [];
       
       for (const file of files) {
-        // Save file to storage
+        // Save file to storage (fallback to local storage)
         const fileName = await fileStorage.saveFile(file.buffer, file.originalname, jobCardId);
         
         // Create database record

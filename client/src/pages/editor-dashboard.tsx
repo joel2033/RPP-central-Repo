@@ -25,6 +25,7 @@ import EmptyState from "@/components/shared/empty-state";
 import LoadingSpinner from "@/components/shared/loading-spinner";
 import EditorServicePricing from "@/components/editor/service-pricing";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { S3FileUpload } from "@/components/S3FileUpload";
 import type { JobCard, Client, User, ProductionFile } from "@shared/schema";
 
 interface JobCardWithDetails extends JobCard {
@@ -486,13 +487,20 @@ function EditorDashboardContent() {
                   {/* Upload Section */}
                   <div>
                     <h4 className="font-medium text-slate-700 mb-2">Upload Final Files</h4>
-                    <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
-                      <Upload className="h-8 w-8 text-slate-400 mx-auto mb-2" />
-                      <p className="text-slate-600">Drag and drop files here or click to browse</p>
-                      <Button variant="outline" className="mt-2">
-                        Select Files
-                      </Button>
-                    </div>
+                    <S3FileUpload
+                      jobCardId={selectedJobCard.id}
+                      mediaType="final"
+                      serviceCategory="general"
+                      onUploadComplete={(fileData) => {
+                        console.log('File uploaded successfully:', fileData);
+                        // Refresh the job data
+                        queryClient.invalidateQueries({ queryKey: ['/api/editor/jobs'] });
+                      }}
+                      onUploadError={(error) => {
+                        console.error('Upload error:', error);
+                        // You can add toast notification here
+                      }}
+                    />
                   </div>
                   
                   {/* Completion Notes */}

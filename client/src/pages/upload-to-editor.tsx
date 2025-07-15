@@ -119,6 +119,110 @@ function FileUploadModal({
     onFilesUpload(newUploadedFiles);
   };
 
+  const uploadFileToS3 = async (file: File): Promise<void> => {
+    const fileName = file.name;
+    
+    try {
+      // Get presigned upload URL
+      const uploadUrlResponse = await fetch(`/api/job-cards/0/files/upload-url`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileName: file.name,
+          contentType: file.type,
+          mediaType: 'raw',
+          fileSize: file.size
+        })
+      });
+
+      if (!uploadUrlResponse.ok) {
+        throw new Error('Failed to get upload URL');
+      }
+
+      const { uploadUrl, s3Key } = await uploadUrlResponse.json();
+
+      // Upload to S3 with progress tracking
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const progress = Math.round((event.loaded / event.total) * 100);
+            setUploadingFiles(prev => new Map(prev.set(fileName, progress)));
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            resolve();
+          } else {
+            reject(new Error(`Upload failed with status ${xhr.status}`));
+          }
+        };
+
+        xhr.onerror = () => {
+          reject(new Error('Upload failed'));
+        };
+
+        xhr.open('PUT', uploadUrl);
+        xhr.setRequestHeader('Content-Type', file.type);
+        xhr.send(file);
+      });
+
+      // Clean up progress tracking
+      setUploadingFiles(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(fileName);
+        return newMap;
+      });
+    } catch (error) {
+      console.error('Upload failed:', error);
+      setUploadingFiles(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(fileName);
+        return newMap;
+      });
+      throw error;
+    }
+  };
+
+  const handleUpload = async () => {
+    if (files.length === 0) return;
+    
+    setIsUploading(true);
+    
+    try {
+      // Check if S3 is configured, otherwise use simulation
+      const s3Available = await fetch('/api/job-cards/0/files/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: 'test', contentType: 'text/plain', fileSize: 1 })
+      }).then(res => res.status !== 503);
+
+      if (s3Available) {
+        // Use S3 upload
+        const uploadPromises = files.map(file => uploadFileToS3(file));
+        await Promise.all(uploadPromises);
+      } else {
+        // Fallback to simulation
+        const uploadPromises = files.map(file => simulateUpload(file));
+        await Promise.all(uploadPromises);
+      }
+      
+      // Add files to uploaded files
+      onFilesUpload([...uploadedFiles, ...files]);
+      
+      setFiles([]);
+      setUrlLink("");
+    } catch (error) {
+      console.error('Upload error:', error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const simulateUpload = async (file: File): Promise<void> => {
     return new Promise((resolve) => {
       const fileName = file.name;
@@ -142,23 +246,6 @@ function FileUploadModal({
         }
       }, stepDuration);
     });
-  };
-
-  const handleUpload = async () => {
-    if (files.length === 0) return;
-    
-    setIsUploading(true);
-    
-    // Simulate upload progress for each file
-    const uploadPromises = files.map(file => simulateUpload(file));
-    await Promise.all(uploadPromises);
-    
-    // Add files to uploaded files
-    onFilesUpload([...uploadedFiles, ...files]);
-    
-    setIsUploading(false);
-    setFiles([]);
-    setUrlLink("");
   };
 
   return (
