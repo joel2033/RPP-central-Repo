@@ -58,6 +58,12 @@ export default function EditorDashboard({ className }: EditorDashboardProps) {
   // Fetch editor's assigned jobs
   const { data: myJobCards, isLoading, error } = useQuery<JobCardWithDetails[]>({
     queryKey: ["/api/editor/jobs"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/editor/jobs');
+      console.log('Editor Dashboard - Current user:', user);
+      console.log('Editor Dashboard - Fetched jobs:', response);
+      return response;
+    },
     enabled: isAuthenticated && !!user,
     retry: (failureCount, error) => {
       if (isUnauthorizedError(error)) {
