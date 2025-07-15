@@ -680,7 +680,7 @@ function UploadToEditorContent() {
                     <SelectContent>
                       {jobCards?.map((job) => (
                         <SelectItem key={job.id} value={job.id.toString()}>
-                          {job.jobId ? `${job.jobId} - ` : ''}{job.client.name} ({job.requestedServices?.join(', ')})
+                          {job.jobId ? `${job.jobId} - ` : ''}{job.booking?.propertyAddress || job.client.name} ({job.requestedServices?.join(', ')})
                         </SelectItem>
                       ))}
                     </SelectContent>
