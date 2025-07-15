@@ -500,15 +500,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Editor-specific job cards route
   app.get('/api/editor/job-cards', isAuthenticated, async (req: any, res) => {
     try {
-      const editorId = req.user.claims.sub;
+      const userId = req.user.claims.sub;
       const userData = (req as any).userData;
       
-      // For testing, use the user's ID as licenseeId
-      const licenseeId = req.user.claims.sub;
+      // Get user info from database to determine role
+      const userFromDB = await storage.getUser(userId);
+      const userRole = userFromDB?.role || 'admin';
       
-      console.log('Editor job cards fetch - editorId:', editorId, 'licenseeId:', licenseeId, 'userData:', userData);
+      // Determine licenseeId based on user role
+      const licenseeId = userRole === 'editor' ? (userFromDB?.licenseeId || userId) : userId;
       
-      const jobCards = await storage.getJobCardsByEditor(editorId, licenseeId);
+      console.log('Editor job cards fetch - userId:', userId, 'userRole:', userRole, 'licenseeId:', licenseeId, 'userData:', userData);
+      
+      let jobCards;
+      if (userRole === 'editor') {
+        // For editors, show only their assigned jobs
+        jobCards = await storage.getJobCardsByEditor(userId, licenseeId);
+      } else {
+        // For admins/licensees, show all jobs with assigned editors
+        jobCards = await storage.getJobCardsByLicensee(licenseeId);
+        // Filter to only show jobs that have been assigned to an editor
+        jobCards = jobCards.filter(job => job.editorId !== null);
+      }
       
       console.log('Editor job cards fetched:', jobCards.length, 'jobs found');
       console.log('Job cards:', jobCards.map(j => ({ id: j.id, jobId: j.jobId, editorId: j.editorId, status: j.status })));

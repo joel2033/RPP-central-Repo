@@ -57,9 +57,9 @@ export default function EditorDashboard({ className }: EditorDashboardProps) {
 
   // Fetch editor's assigned jobs
   const { data: myJobCards, isLoading, error } = useQuery<JobCardWithDetails[]>({
-    queryKey: ["/api/editor/jobs"],
+    queryKey: ["/api/editor/job-cards"],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/editor/jobs');
+      const response = await apiRequest('GET', '/api/editor/job-cards');
       console.log('Editor Dashboard - Current user:', user);
       console.log('Editor Dashboard - Fetched jobs:', response);
       return response;
@@ -94,7 +94,7 @@ export default function EditorDashboard({ className }: EditorDashboardProps) {
         title: "Job accepted",
         description: `Job #${data.jobId} has been accepted and is now in progress`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/editor/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/editor/job-cards"] });
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -129,7 +129,7 @@ export default function EditorDashboard({ className }: EditorDashboardProps) {
         title: "Job declined",
         description: "Job has been declined and returned to the queue",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/editor/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/editor/job-cards"] });
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -163,7 +163,7 @@ export default function EditorDashboard({ className }: EditorDashboardProps) {
         title: "Editing started",
         description: `Job #${data.jobId} is now in editing mode`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/editor/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/editor/job-cards"] });
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -197,7 +197,7 @@ export default function EditorDashboard({ className }: EditorDashboardProps) {
         title: "Job completed",
         description: `Job #${data.jobId} has been completed and is ready for QC`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/editor/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/editor/job-cards"] });
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
