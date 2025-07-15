@@ -518,7 +518,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         jobCards = await storage.getJobCardsByEditor(userId, licenseeId);
       } else {
         // For admins/licensees, show all jobs with assigned editors
-        jobCards = await storage.getJobCardsByLicensee(licenseeId);
+        jobCards = await storage.getJobCards(licenseeId);
         // Filter to only show jobs that have been assigned to an editor
         jobCards = jobCards.filter(job => job.editorId !== null);
       }
@@ -550,7 +550,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         jobCards = await storage.getJobCardsByEditor(userId, licenseeId);
       } else {
         // For admins/licensees, show all jobs with assigned editors
-        jobCards = await storage.getJobCardsByLicensee(licenseeId);
+        jobCards = await storage.getJobCards(licenseeId);
         // Filter to only show jobs that have been assigned to an editor
         jobCards = jobCards.filter(job => job.editorId !== null);
       }
