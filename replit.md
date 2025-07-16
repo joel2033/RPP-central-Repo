@@ -444,6 +444,15 @@ Changelog:
   - **S3 CORS Configuration**: Created documentation for required S3 bucket CORS policy to allow PUT requests from Replit domains
   - **Error Toast Messages**: Added specific toast notifications for different error types (timeout, network, CORS)
   - **Upload Progress Logging**: Enhanced progress tracking with detailed S3 upload URL logging for debugging
+- July 16, 2025. Implemented server-side proxy fallback for persistent CORS errors:
+  - **Server-side Upload Proxy**: Created /api/job-cards/:id/files/upload-proxy endpoint using multer and S3.putObject
+  - **Automatic Fallback Logic**: Frontend tries presigned URL first, falls back to server proxy on CORS errors
+  - **Enhanced Multer Configuration**: 2GB file size limit with comprehensive DNG/RAW format support
+  - **S3Service Enhancement**: Added uploadFileToS3 method for direct server-side uploads with proper tagging
+  - **Comprehensive Error Handling**: Specific error detection and logging for both upload methods
+  - **Upload Method Separation**: Split upload logic into uploadViaPresignedUrl and uploadViaServerProxy helpers
+  - **Progress Tracking**: Maintained progress indicators for both upload methods
+  - **Database Integration**: Server proxy saves metadata directly, bypassing separate metadata endpoint
 ```
 
 ## User Preferences

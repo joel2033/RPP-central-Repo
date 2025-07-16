@@ -66,6 +66,46 @@ export class S3Service {
     }
   }
 
+  // Upload file directly to S3 using server-side putObject (bypasses CORS)
+  async uploadFileToS3(
+    key: string,
+    buffer: Buffer,
+    contentType: string,
+    tags?: Record<string, string>
+  ): Promise<void> {
+    try {
+      console.log(`Server-side S3 upload:`, {
+        bucket: this.bucketName,
+        key,
+        contentType,
+        bufferSize: buffer.length,
+        tags
+      });
+
+      const command = new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+        Tagging: tags ? this.formatTagging(tags) : undefined,
+      });
+
+      await this.s3Client.send(command);
+      console.log(`Successfully uploaded ${key} to S3 using server-side putObject`);
+    } catch (error: any) {
+      console.error(`Failed to upload ${key} to S3:`, {
+        error: error.message,
+        code: error.code,
+        name: error.name,
+        bucket: this.bucketName,
+        key,
+        contentType,
+        bufferSize: buffer.length
+      });
+      throw error;
+    }
+  }
+
   // Format tags for S3 tagging
   private formatTagging(tags: Record<string, string>): string {
     return Object.entries(tags)

@@ -121,6 +121,164 @@ function FileUploadModal({
     onFilesUpload(newUploadedFiles);
   };
 
+  // Helper function for presigned URL upload
+  const uploadViaPresignedUrl = async (file: File, fileName: string, jobCardId: number) => {
+    // Get presigned upload URL with timeout and CORS
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+    
+    const uploadUrlResponse = await fetch(`/api/job-cards/${jobCardId}/files/upload-url`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      mode: 'cors',
+      signal: controller.signal,
+      body: JSON.stringify({
+        fileName: file.name,
+        contentType: file.type,
+        mediaType: 'raw', // This will add 'type: raw' tag in S3
+        fileSize: file.size
+      })
+    });
+    
+    clearTimeout(timeoutId);
+
+    if (!uploadUrlResponse.ok) {
+      const errorText = await uploadUrlResponse.text();
+      console.error(`Failed to get upload URL: ${uploadUrlResponse.status} - ${errorText}`);
+      throw new Error(`Failed to get upload URL: ${uploadUrlResponse.status}`);
+    }
+
+    const { uploadUrl, s3Key } = await uploadUrlResponse.json();
+    console.log(`Got presigned URL for ${fileName}, S3 key: ${s3Key}`);
+
+    // Upload to S3 with progress tracking
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const progress = Math.round((event.loaded / event.total) * 100);
+          console.log(`Upload progress for ${fileName}: ${progress}%`);
+          setUploadingFiles(prev => new Map(prev.set(fileName, progress)));
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          console.log(`S3 upload completed for ${fileName}`);
+          resolve();
+        } else {
+          console.error(`S3 upload failed for ${fileName}:`, {
+            status: xhr.status,
+            statusText: xhr.statusText,
+            response: xhr.response,
+            responseText: xhr.responseText,
+            headers: xhr.getAllResponseHeaders()
+          });
+          reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.statusText}`));
+        }
+      };
+
+      xhr.onerror = (event) => {
+        console.error(`S3 upload error for ${fileName}:`, {
+          error: event,
+          status: xhr.status,
+          statusText: xhr.statusText,
+          response: xhr.response,
+          responseText: xhr.responseText,
+          readyState: xhr.readyState,
+          errorType: 'XMLHttpRequest onerror'
+        });
+        
+        // More specific error messages for CORS and network issues
+        let errorMessage = 'Network error';
+        if (xhr.status === 0) {
+          errorMessage = 'CORS error - S3 bucket may not allow requests from this domain';
+        } else if (xhr.statusText) {
+          errorMessage = xhr.statusText;
+        }
+        
+        reject(new Error(`Upload failed: ${errorMessage}`));
+      };
+
+      xhr.ontimeout = () => {
+        console.error(`S3 upload timeout for ${fileName}`);
+        reject(new Error('Upload timeout - file too large or connection too slow'));
+      };
+
+      xhr.open('PUT', uploadUrl);
+      xhr.setRequestHeader('Content-Type', file.type);
+      xhr.timeout = 300000; // 5 minutes timeout
+      
+      // Add CORS headers if needed
+      xhr.withCredentials = false; // Don't send cookies to S3
+      
+      console.log(`Uploading ${fileName} to S3 with Content-Type: ${file.type}`);
+      console.log(`S3 Upload URL: ${uploadUrl.substring(0, 100)}...`);
+      xhr.send(file);
+    });
+
+    // Save metadata to database
+    const metadataResponse = await fetch(`/api/job-cards/${jobCardId}/files/metadata`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        fileName: file.name,
+        originalName: file.name,
+        s3Key: s3Key,
+        fileSize: file.size,
+        mimeType: file.type,
+        mediaType: 'raw',
+        serviceCategory: 'general',
+        instructions: '',
+        exportType: '',
+        customDescription: ''
+      })
+    });
+
+    if (!metadataResponse.ok) {
+      console.error(`Failed to save metadata for ${fileName}`);
+      throw new Error('Failed to save file metadata');
+    }
+
+    console.log(`Successfully uploaded ${fileName} to S3 with metadata`);
+  };
+
+  // Helper function for server-side proxy upload
+  const uploadViaServerProxy = async (file: File, fileName: string, jobCardId: number) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('mediaType', 'raw');
+    formData.append('serviceCategory', 'general');
+    formData.append('instructions', '');
+    formData.append('exportType', '');
+    formData.append('customDescription', '');
+
+    console.log(`Uploading ${fileName} via server proxy`);
+
+    const response = await fetch(`/api/job-cards/${jobCardId}/files/upload-proxy`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Server proxy upload failed: ${response.status} - ${errorText}`);
+      throw new Error(`Server proxy upload failed: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log(`Successfully uploaded ${fileName} via server proxy`);
+    return result;
+  };
+
   const uploadFileToS3 = async (file: File, jobCardId: number): Promise<void> => {
     const fileName = file.name;
     const maxRetries = 3;
@@ -130,147 +288,55 @@ function FileUploadModal({
       try {
         console.log(`Starting S3 upload for ${fileName}, size: ${file.size} (attempt ${attempt}/${maxRetries})`);
         
-        // Get presigned upload URL with timeout and CORS
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
-        
-        const uploadUrlResponse = await fetch(`/api/job-cards/${jobCardId}/files/upload-url`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          mode: 'cors',
-          signal: controller.signal,
-          body: JSON.stringify({
-            fileName: file.name,
-            contentType: file.type,
-            mediaType: 'raw', // This will add 'type: raw' tag in S3
-            fileSize: file.size
-          })
-        });
-        
-        clearTimeout(timeoutId);
-
-        if (!uploadUrlResponse.ok) {
-          const errorText = await uploadUrlResponse.text();
-          console.error(`Failed to get upload URL: ${uploadUrlResponse.status} - ${errorText}`);
-          throw new Error(`Failed to get upload URL: ${uploadUrlResponse.status}`);
-        }
-
-        const { uploadUrl, s3Key } = await uploadUrlResponse.json();
-        console.log(`Got presigned URL for ${fileName}, S3 key: ${s3Key}`);
-
-        // Upload to S3 with progress tracking
-        await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const progress = Math.round((event.loaded / event.total) * 100);
-            console.log(`Upload progress for ${fileName}: ${progress}%`);
-            setUploadingFiles(prev => new Map(prev.set(fileName, progress)));
-          }
-        };
-
-        xhr.onload = () => {
-          if (xhr.status === 200) {
-            console.log(`S3 upload completed for ${fileName}`);
-            resolve();
-          } else {
-            console.error(`S3 upload failed for ${fileName}:`, {
-              status: xhr.status,
-              statusText: xhr.statusText,
-              response: xhr.response,
-              responseText: xhr.responseText,
-              headers: xhr.getAllResponseHeaders()
-            });
-            reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.statusText}`));
-          }
-        };
-
-        xhr.onerror = (event) => {
-          console.error(`S3 upload error for ${fileName}:`, {
-            error: event,
-            status: xhr.status,
-            statusText: xhr.statusText,
-            response: xhr.response,
-            responseText: xhr.responseText,
-            readyState: xhr.readyState,
-            errorType: 'XMLHttpRequest onerror'
+        // Try presigned URL upload first
+        try {
+          await uploadViaPresignedUrl(file, fileName, jobCardId);
+          console.log(`Successfully uploaded ${fileName} via presigned URL`);
+          
+          // Clean up progress tracking
+          setUploadingFiles(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(fileName);
+            return newMap;
           });
           
-          // More specific error messages for CORS and network issues
-          let errorMessage = 'Network error';
-          if (xhr.status === 0) {
-            errorMessage = 'CORS error - S3 bucket may not allow requests from this domain';
-          } else if (xhr.statusText) {
-            errorMessage = xhr.statusText;
-          }
+          // Clear any previous errors
+          setUploadErrors(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(fileName);
+            return newMap;
+          });
           
-          reject(new Error(`Upload failed: ${errorMessage}`));
-        };
-
-        xhr.ontimeout = () => {
-          console.error(`S3 upload timeout for ${fileName}`);
-          reject(new Error('Upload timeout - file too large or connection too slow'));
-        };
-
-        xhr.open('PUT', uploadUrl);
-        xhr.setRequestHeader('Content-Type', file.type);
-        xhr.timeout = 300000; // 5 minutes timeout
-        
-        // Add CORS headers if needed
-        xhr.withCredentials = false; // Don't send cookies to S3
-        
-        console.log(`Uploading ${fileName} to S3 with Content-Type: ${file.type}`);
-        console.log(`S3 Upload URL: ${uploadUrl.substring(0, 100)}...`);
-        xhr.send(file);
-      });
-
-      // Save metadata to database
-      const metadataResponse = await fetch(`/api/job-cards/${jobCardId}/files/metadata`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          fileName: file.name,
-          originalName: file.name,
-          s3Key: s3Key,
-          fileSize: file.size,
-          mimeType: file.type,
-          mediaType: 'raw',
-          serviceCategory: 'general',
-          instructions: '',
-          exportType: '',
-          customDescription: ''
-        })
-      });
-
-      if (!metadataResponse.ok) {
-        console.error(`Failed to save metadata for ${fileName}`);
-        throw new Error('Failed to save file metadata');
-      }
-
-      console.log(`Successfully uploaded ${fileName} to S3 with metadata`);
-
-      // Clean up progress tracking
-      setUploadingFiles(prev => {
-        const newMap = new Map(prev);
-        newMap.delete(fileName);
-        return newMap;
-      });
-      
-      // Clear any previous errors
-      setUploadErrors(prev => {
-        const newMap = new Map(prev);
-        newMap.delete(fileName);
-        return newMap;
-      });
-      
-      return; // Success, exit retry loop
+          return; // Success, exit retry loop
+        } catch (presignedError: any) {
+          console.log(`Presigned URL upload failed for ${fileName}:`, presignedError.message);
+          
+          // If it's a CORS error, fall back to server-side proxy
+          if (presignedError.message.includes('CORS') || presignedError.message.includes('Network error')) {
+            console.log(`Falling back to server-side proxy for ${fileName}`);
+            await uploadViaServerProxy(file, fileName, jobCardId);
+            console.log(`Successfully uploaded ${fileName} via server proxy`);
+            
+            // Clean up progress tracking
+            setUploadingFiles(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(fileName);
+              return newMap;
+            });
+            
+            // Clear any previous errors
+            setUploadErrors(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(fileName);
+              return newMap;
+            });
+            
+            return; // Success, exit retry loop
+          } else {
+            // Re-throw non-CORS errors for retry
+            throw presignedError;
+          }
+        }
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
         console.error(`Upload attempt ${attempt} failed for ${fileName}:`, {

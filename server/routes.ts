@@ -30,11 +30,18 @@ import { s3Service } from "./services/s3Service";
 // Configure multer for file uploads
 const upload = multer({
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit
+    fileSize: 2 * 1024 * 1024 * 1024, // 2GB limit for professional photography
   },
   fileFilter: (req, file, cb) => {
-    // Accept images and videos
-    if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
+    // Accept images (including DNG/RAW) and videos
+    const allowedTypes = [
+      'image/jpeg', 'image/png', 'image/tiff', 'image/gif',
+      'image/x-adobe-dng', 'image/x-canon-cr2', 'image/x-canon-crw',
+      'image/x-nikon-nef', 'image/x-sony-arw', 'image/x-panasonic-raw',
+      'video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/flv'
+    ];
+    
+    if (allowedTypes.includes(file.mimetype) || file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
       cb(null, true);
     } else {
       cb(new Error('Only image and video files are allowed'));
@@ -1338,6 +1345,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching production files:", error);
       res.status(500).json({ message: "Failed to fetch production files" });
+    }
+  });
+
+  // Server-side S3 upload proxy (fallback for CORS issues)
+  app.post('/api/job-cards/:id/files/upload-proxy', isAuthenticated, upload.single('file'), async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      const file = req.file;
+      const { mediaType, serviceCategory, instructions, exportType, customDescription } = req.body;
+
+      if (!file) {
+        return res.status(400).json({ message: "No file provided" });
+      }
+
+      console.log(`Server-side upload proxy for job card ${jobCardId}:`, { 
+        fileName: file.originalname, 
+        contentType: file.mimetype, 
+        size: file.size,
+        mediaType 
+      });
+
+      // Check AWS environment variables
+      if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_REGION || !process.env.S3_BUCKET) {
+        return res.status(500).json({ 
+          message: "S3 service not configured - missing AWS credentials"
+        });
+      }
+
+      if (!s3Service) {
+        return res.status(503).json({ message: "S3 service not configured" });
+      }
+
+      // Check if Job ID has been assigned - REQUIRED for uploads
+      const hasJobId = await storage.hasJobId(jobCardId);
+      if (!hasJobId) {
+        return res.status(400).json({ 
+          message: "Job ID must be assigned before uploading files. Please assign a Job ID first." 
+        });
+      }
+
+      // Validate file
+      const validation = s3Service.validateFile({ size: file.size, type: file.mimetype });
+      if (!validation.valid) {
+        return res.status(400).json({ message: validation.error });
+      }
+
+      const s3Key = s3Service.generateS3Key(jobCardId, file.originalname, mediaType || 'raw');
+      
+      // Determine tags based on media type
+      const tags: Record<string, string> = {};
+      if (mediaType === 'raw') {
+        tags.type = 'raw';
+      } else if (mediaType === 'final' || mediaType === 'finished') {
+        tags.type = 'finished';
+      }
+      
+      try {
+        // Upload directly to S3 using server-side putObject
+        console.log(`Uploading ${file.originalname} to S3 server-side with key: ${s3Key}`);
+        await s3Service.uploadFileToS3(s3Key, file.buffer, file.mimetype, tags);
+        
+        // Save metadata to database
+        const fileData = insertProductionFileSchema.parse({
+          originalName: file.originalname,
+          fileName: file.originalname,
+          s3Key: s3Key,
+          s3Bucket: process.env.S3_BUCKET,
+          mediaType: mediaType || "raw",
+          serviceCategory: serviceCategory || "general",
+          fileSize: file.size,
+          mimeType: file.mimetype,
+          jobCardId,
+          uploadedBy: userId,
+          instructions: instructions || "",
+          exportType: exportType || "",
+          customDescription: customDescription || "",
+        });
+
+        const savedFile = await storage.createProductionFile(fileData);
+        console.log(`Successfully uploaded ${file.originalname} to S3 and saved metadata`);
+        res.status(201).json(savedFile);
+      } catch (s3Error: any) {
+        console.error("Server-side S3 upload error:", {
+          message: s3Error.message,
+          code: s3Error.code,
+          name: s3Error.name,
+          key: s3Key,
+          fileName: file.originalname
+        });
+        res.status(500).json({ 
+          message: "Failed to upload file to S3",
+          details: s3Error.message
+        });
+      }
+    } catch (error) {
+      console.error("Server-side upload proxy error:", error);
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
