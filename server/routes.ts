@@ -1348,13 +1348,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { fileName, contentType, mediaType } = req.body;
 
+      console.log(`Upload URL request for job card ${jobCardId}:`, { fileName, contentType, mediaType });
+
+      // Check AWS environment variables
+      if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_REGION || !process.env.S3_BUCKET) {
+        console.error("AWS environment variables missing:", {
+          AWS_ACCESS_KEY_ID: !!process.env.AWS_ACCESS_KEY_ID,
+          AWS_SECRET_ACCESS_KEY: !!process.env.AWS_SECRET_ACCESS_KEY,
+          AWS_REGION: !!process.env.AWS_REGION,
+          S3_BUCKET: !!process.env.S3_BUCKET
+        });
+        return res.status(500).json({ 
+          message: "S3 service not configured - missing AWS credentials",
+          details: "AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, and S3_BUCKET must be set"
+        });
+      }
+
       if (!s3Service) {
+        console.error("S3 service instance not available");
         return res.status(503).json({ message: "S3 service not configured" });
       }
 
       // Check if Job ID has been assigned - REQUIRED for uploads
       const hasJobId = await storage.hasJobId(jobCardId);
       if (!hasJobId) {
+        console.log(`Job card ${jobCardId} does not have a Job ID assigned`);
         return res.status(400).json({ 
           message: "Job ID must be assigned before uploading files. Please assign a Job ID first." 
         });
@@ -1363,6 +1381,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate file
       const validation = s3Service.validateFile({ size: req.body.fileSize || 0, type: contentType });
       if (!validation.valid) {
+        console.log(`File validation failed for ${fileName}:`, validation.error);
         return res.status(400).json({ message: validation.error });
       }
 
@@ -1378,14 +1397,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Generated S3 upload URL with tags for finished content: ${s3Key}`, tags);
       }
       
-      const uploadUrl = await s3Service.withRetry(() => 
-        s3Service.generatePresignedUploadUrl(s3Key, contentType, tags)
-      );
+      try {
+        const uploadUrl = await s3Service.withRetry(() => 
+          s3Service.generatePresignedUploadUrl(s3Key, contentType, tags)
+        );
 
-      res.json({ uploadUrl, s3Key, tags });
-    } catch (error) {
-      console.error("Error generating upload URL:", error);
-      res.status(500).json({ message: "Failed to generate upload URL" });
+        console.log(`Successfully generated presigned upload URL for ${s3Key}`);
+        res.json({ uploadUrl, s3Key, tags });
+      } catch (s3Error: any) {
+        console.error("AWS S3 SDK Error:", {
+          message: s3Error.message,
+          code: s3Error.code,
+          name: s3Error.name,
+          requestId: s3Error.$metadata?.requestId,
+          statusCode: s3Error.$metadata?.httpStatusCode,
+          stack: s3Error.stack
+        });
+        
+        // Provide specific error messages based on AWS error codes
+        let errorMessage = "Failed to generate S3 upload URL";
+        if (s3Error.code === 'AccessDenied') {
+          errorMessage = "Access denied to S3 bucket. Check IAM permissions for s3:PutObject";
+        } else if (s3Error.code === 'NoSuchBucket') {
+          errorMessage = "S3 bucket does not exist";
+        } else if (s3Error.code === 'InvalidBucketName') {
+          errorMessage = "Invalid S3 bucket name";
+        } else if (s3Error.code === 'CredentialsError') {
+          errorMessage = "Invalid AWS credentials";
+        }
+        
+        return res.status(500).json({ 
+          message: errorMessage,
+          details: s3Error.message,
+          errorCode: s3Error.code
+        });
+      }
+    } catch (error: any) {
+      console.error("Error generating upload URL:", {
+        message: error.message,
+        stack: error.stack,
+        jobCardId: req.params.id,
+        fileName: req.body.fileName
+      });
+      res.status(500).json({ 
+        message: "Failed to generate upload URL",
+        details: error.message 
+      });
     }
   });
 

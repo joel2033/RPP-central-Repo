@@ -13,8 +13,12 @@ export class S3Service {
   private bucketName: string;
 
   constructor(config: S3Config) {
+    // Extract region code from full region description (e.g., "Asia Pacific (Sydney) ap-southeast-2" -> "ap-southeast-2")
+    const regionCode = config.region?.split(' ').pop() || config.region;
+    console.log('S3Client initializing with region:', regionCode);
+    
     this.s3Client = new S3Client({
-      region: config.region,
+      region: regionCode,
       credentials: {
         accessKeyId: config.accessKeyId,
         secretAccessKey: config.secretAccessKey,
@@ -30,14 +34,36 @@ export class S3Service {
     tags?: Record<string, string>,
     expiresIn: number = 3600 // 1 hour
   ): Promise<string> {
-    const command = new PutObjectCommand({
-      Bucket: this.bucketName,
-      Key: key,
-      ContentType: contentType,
-      Tagging: tags ? this.formatTagging(tags) : undefined,
-    });
+    try {
+      console.log(`Generating presigned URL for S3 upload:`, {
+        bucket: this.bucketName,
+        key,
+        contentType,
+        tags,
+        expiresIn
+      });
 
-    return await getSignedUrl(this.s3Client, command, { expiresIn });
+      const command = new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+        ContentType: contentType,
+        Tagging: tags ? this.formatTagging(tags) : undefined,
+      });
+
+      const uploadUrl = await getSignedUrl(this.s3Client, command, { expiresIn });
+      console.log(`Successfully generated presigned URL for ${key}`);
+      return uploadUrl;
+    } catch (error: any) {
+      console.error(`Failed to generate presigned URL for ${key}:`, {
+        error: error.message,
+        code: error.code,
+        name: error.name,
+        bucket: this.bucketName,
+        key,
+        contentType
+      });
+      throw error;
+    }
   }
 
   // Format tags for S3 tagging
@@ -141,10 +167,16 @@ const createS3Service = (): S3Service | null => {
 
   // Check if all required environment variables are present
   if (!config.accessKeyId || !config.secretAccessKey || !config.region || !config.bucketName) {
-    console.warn('S3 configuration incomplete. Some environment variables are missing.');
+    console.warn('S3 configuration incomplete. Missing environment variables:', {
+      AWS_ACCESS_KEY_ID: !!config.accessKeyId,
+      AWS_SECRET_ACCESS_KEY: !!config.secretAccessKey,
+      AWS_REGION: !!config.region,
+      S3_BUCKET: !!config.bucketName
+    });
     return null;
   }
 
+  console.log('S3 service initialized successfully with bucket:', config.bucketName);
   return new S3Service(config);
 };
 

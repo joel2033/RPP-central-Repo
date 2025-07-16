@@ -420,6 +420,14 @@ Changelog:
   - **AWS Integration**: Added proper S3 tagging (type:raw for raw uploads, type:finished for finished uploads)
   - **Test Infrastructure**: Created test infrastructure for validating S3 upload functionality with progress monitoring
   - **Legacy Support**: Updated legacy file upload endpoint to support S3 uploads with proper tagging and fallback logic
+- July 16, 2025. Fixed AWS region parsing issue that was causing "Failed to get upload URL: 500" errors:
+  - **Root Cause**: AWS_REGION environment variable contained full description "Asia Pacific (Sydney) ap-southeast-2" instead of region code
+  - **AWS Region Fix**: Enhanced S3Service to extract region code from full region descriptions (e.g., "ap-southeast-2" from full string)
+  - **Enhanced Error Handling**: Added comprehensive AWS SDK error logging with specific error codes and detailed messages
+  - **Environment Validation**: Added detailed environment variable validation with clear error reporting
+  - **S3 Connectivity Testing**: Created test scripts to verify S3 presigned URL generation and file upload functionality
+  - **Comprehensive Logging**: Added detailed console logging for all S3 operations and error scenarios
+  - **Verified Fix**: Confirmed S3 uploads now work correctly with proper presigned URL generation and file tagging
 ```
 
 ## User Preferences
