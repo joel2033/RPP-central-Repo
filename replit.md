@@ -483,6 +483,9 @@ Changelog:
   - **Runtime Error Resolution**: Fixed "Invalid string length" errors through improved async error handling and delayed activity logging
   - **Download Experience**: Single files use direct presigned URLs, multiple files automatically create ZIP archives with job ID naming
   - **Admin User Support**: Resolved authentication issues for admin users accessing job cards and activity logging across all endpoints
+  - **S3 Streaming Optimization**: Enhanced S3 download with sequential processing, retry logic, and comprehensive performance monitoring
+  - **Stream Processing**: Optimized from parallel batching to sequential processing to prevent S3 throttling and improve reliability
+  - **Performance Logging**: Added detailed per-file timing and total processing time tracking for ZIP creation monitoring
 ```
 
 ## User Preferences

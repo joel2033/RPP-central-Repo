@@ -126,8 +126,10 @@ export class S3Service {
     return await getSignedUrl(this.s3Client, command, { expiresIn });
   }
 
-  // Get file stream from S3 for ZIP archive creation
+  // Get file stream from S3 for ZIP archive creation with optimized streaming
   async getFileStream(key: string): Promise<NodeJS.ReadableStream> {
+    console.log(`Fetching S3 stream for key: ${key}`);
+    
     const command = new GetObjectCommand({
       Bucket: this.bucketName,
       Key: key,
@@ -140,7 +142,15 @@ export class S3Service {
     }
 
     // Cast to ReadableStream for archiver compatibility
-    return response.Body as NodeJS.ReadableStream;
+    const stream = response.Body as NodeJS.ReadableStream;
+    
+    // Add error handling to the stream
+    stream.on('error', (error) => {
+      console.error(`Stream error for key ${key}:`, error);
+    });
+    
+    console.log(`Successfully created stream for key: ${key}`);
+    return stream;
   }
 
   // Generate S3 key for file

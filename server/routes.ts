@@ -1915,35 +1915,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Pipe archive to response
             archive.pipe(res);
             
-            // Add files to archive in parallel batches
-            const batchSize = 10; // Process 10 files at a time
-            const fileBatches = [];
+            // Process files sequentially to avoid overwhelming S3 and archiver
+            let processedFiles = 0;
+            const startTime = Date.now();
             
-            for (let i = 0; i < rawFiles.length; i += batchSize) {
-              fileBatches.push(rawFiles.slice(i, i + batchSize));
-            }
-            
-            for (const batch of fileBatches) {
-              const promises = batch.map(async (file) => {
-                if (file.s3Key) {
-                  try {
-                    console.log(`Adding file to ZIP: ${file.fileName}`);
-                    
-                    // Get file stream from S3
-                    const fileStream = await s3Service.getFileStream(file.s3Key);
-                    
-                    // Add file to archive with original filename
-                    archive.append(fileStream, { name: file.fileName });
-                  } catch (error) {
-                    console.error(`Error adding file ${file.fileName} to ZIP:`, error);
-                    // Continue with other files
-                  }
+            for (const file of rawFiles) {
+              if (file.s3Key) {
+                try {
+                  const fileStartTime = Date.now();
+                  console.log(`[${processedFiles + 1}/${rawFiles.length}] Adding file to ZIP: ${file.fileName}`);
+                  
+                  // Get file stream from S3 with retry logic
+                  const fileStream = await s3Service.withRetry(
+                    () => s3Service.getFileStream(file.s3Key),
+                    3, // Max retries
+                    100 // Base delay ms
+                  );
+                  
+                  // Add file to archive with original filename
+                  archive.append(fileStream, { name: file.fileName });
+                  
+                  processedFiles++;
+                  const fileTime = Date.now() - fileStartTime;
+                  console.log(`✓ File ${file.fileName} added to ZIP in ${fileTime}ms`);
+                } catch (error) {
+                  console.error(`✗ Error adding file ${file.fileName} to ZIP:`, error);
+                  // Continue with other files
                 }
-              });
-              
-              // Wait for current batch to complete before starting next
-              await Promise.all(promises);
+              }
             }
+            
+            const totalTime = Date.now() - startTime;
+            console.log(`ZIP Processing Complete: ${processedFiles}/${rawFiles.length} files processed in ${totalTime}ms`);
+            console.log(`Average time per file: ${Math.round(totalTime / processedFiles)}ms`);
             
             // Finalize archive
             await archive.finalize();
