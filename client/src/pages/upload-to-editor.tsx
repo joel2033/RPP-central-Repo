@@ -77,6 +77,7 @@ function FileUploadModal({
   onFilesUpload: (files: File[]) => void; 
   uploadedFiles: File[]; 
 }) {
+  const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [urlLink, setUrlLink] = useState("");
@@ -122,36 +123,39 @@ function FileUploadModal({
 
   const uploadFileToS3 = async (file: File, jobCardId: number): Promise<void> => {
     const fileName = file.name;
-    
-    try {
-      console.log(`Starting S3 upload for ${fileName}, size: ${file.size}`);
-      
-      // Get presigned upload URL
-      const uploadUrlResponse = await fetch(`/api/job-cards/${jobCardId}/files/upload-url`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          fileName: file.name,
-          contentType: file.type,
-          mediaType: 'raw', // This will add 'type: raw' tag in S3
-          fileSize: file.size
-        })
-      });
+    const maxRetries = 3;
+    let lastError: Error | null = null;
 
-      if (!uploadUrlResponse.ok) {
-        const errorText = await uploadUrlResponse.text();
-        console.error(`Failed to get upload URL: ${uploadUrlResponse.status} - ${errorText}`);
-        throw new Error(`Failed to get upload URL: ${uploadUrlResponse.status}`);
-      }
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Starting S3 upload for ${fileName}, size: ${file.size} (attempt ${attempt}/${maxRetries})`);
+        
+        // Get presigned upload URL
+        const uploadUrlResponse = await fetch(`/api/job-cards/${jobCardId}/files/upload-url`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            fileName: file.name,
+            contentType: file.type,
+            mediaType: 'raw', // This will add 'type: raw' tag in S3
+            fileSize: file.size
+          })
+        });
 
-      const { uploadUrl, s3Key } = await uploadUrlResponse.json();
-      console.log(`Got presigned URL for ${fileName}, S3 key: ${s3Key}`);
+        if (!uploadUrlResponse.ok) {
+          const errorText = await uploadUrlResponse.text();
+          console.error(`Failed to get upload URL: ${uploadUrlResponse.status} - ${errorText}`);
+          throw new Error(`Failed to get upload URL: ${uploadUrlResponse.status}`);
+        }
 
-      // Upload to S3 with progress tracking
-      await new Promise<void>((resolve, reject) => {
+        const { uploadUrl, s3Key } = await uploadUrlResponse.json();
+        console.log(`Got presigned URL for ${fileName}, S3 key: ${s3Key}`);
+
+        // Upload to S3 with progress tracking
+        await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         
         xhr.upload.onprogress = (event) => {
@@ -167,18 +171,38 @@ function FileUploadModal({
             console.log(`S3 upload completed for ${fileName}`);
             resolve();
           } else {
-            console.error(`S3 upload failed for ${fileName} with status ${xhr.status}`);
-            reject(new Error(`Upload failed with status ${xhr.status}`));
+            console.error(`S3 upload failed for ${fileName}:`, {
+              status: xhr.status,
+              statusText: xhr.statusText,
+              response: xhr.response,
+              responseText: xhr.responseText,
+              headers: xhr.getAllResponseHeaders()
+            });
+            reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.statusText}`));
           }
         };
 
-        xhr.onerror = () => {
-          console.error(`S3 upload error for ${fileName}`);
-          reject(new Error('Upload failed'));
+        xhr.onerror = (event) => {
+          console.error(`S3 upload error for ${fileName}:`, {
+            error: event,
+            status: xhr.status,
+            statusText: xhr.statusText,
+            response: xhr.response,
+            responseText: xhr.responseText,
+            readyState: xhr.readyState
+          });
+          reject(new Error(`Upload failed: ${xhr.statusText || 'Network error'}`));
+        };
+
+        xhr.ontimeout = () => {
+          console.error(`S3 upload timeout for ${fileName}`);
+          reject(new Error('Upload timeout'));
         };
 
         xhr.open('PUT', uploadUrl);
         xhr.setRequestHeader('Content-Type', file.type);
+        xhr.timeout = 300000; // 5 minutes timeout
+        console.log(`Uploading ${fileName} to S3 with Content-Type: ${file.type}`);
         xhr.send(file);
       });
 
@@ -223,17 +247,35 @@ function FileUploadModal({
         newMap.delete(fileName);
         return newMap;
       });
-    } catch (error) {
-      console.error('Upload failed:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      setUploadErrors(prev => new Map(prev.set(fileName, errorMessage)));
-      setUploadingFiles(prev => {
-        const newMap = new Map(prev);
-        newMap.delete(fileName);
-        return newMap;
-      });
-      throw error;
+      
+      return; // Success, exit retry loop
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error('Unknown error');
+        console.error(`Upload attempt ${attempt} failed for ${fileName}:`, {
+          error: lastError.message,
+          code: (error as any).code,
+          name: (error as any).name
+        });
+        
+        // If this is the last attempt, set error state
+        if (attempt === maxRetries) {
+          setUploadErrors(prev => new Map(prev.set(fileName, lastError!.message)));
+          setUploadingFiles(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(fileName);
+            return newMap;
+          });
+        } else {
+          // Wait before retrying (exponential backoff)
+          const delay = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
+          console.log(`Retrying upload for ${fileName} in ${delay}ms`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
     }
+    
+    // If we get here, all retries failed
+    throw lastError || new Error('Upload failed after all retries');
   };
 
   const handleUpload = async () => {
@@ -285,6 +327,13 @@ function FileUploadModal({
       console.error('Upload error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.log(`Upload failed: ${errorMessage}`);
+      
+      // Show error toast
+      toast({
+        title: "Upload Failed",
+        description: `Failed to upload files: ${errorMessage}`,
+        variant: "destructive"
+      });
     } finally {
       setIsUploading(false);
     }
