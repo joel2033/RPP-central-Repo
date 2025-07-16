@@ -125,23 +125,34 @@ function FileUploadModal({
   const uploadViaPresignedUrl = async (file: File, fileName: string, jobCardId: number) => {
     // Get presigned upload URL with timeout and CORS
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
     
-    const uploadUrlResponse = await fetch(`/api/job-cards/${jobCardId}/files/upload-url`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      mode: 'cors',
-      signal: controller.signal,
-      body: JSON.stringify({
-        fileName: file.name,
-        contentType: file.type,
-        mediaType: 'raw', // This will add 'type: raw' tag in S3
-        fileSize: file.size
-      })
-    });
+    let uploadUrlResponse;
+    try {
+      uploadUrlResponse = await fetch(`/api/job-cards/${jobCardId}/files/upload-url`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        mode: 'cors',
+        signal: controller.signal,
+        body: JSON.stringify({
+          fileName: file.name,
+          contentType: file.type,
+          mediaType: 'raw', // This will add 'type: raw' tag in S3
+          fileSize: file.size
+        })
+      });
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      console.error('Fetch error for presigned URL:', err);
+      
+      if (err.name === 'AbortError') {
+        throw new Error('Request timed out - try again');
+      }
+      throw err;
+    }
     
     clearTimeout(timeoutId);
 
@@ -235,7 +246,7 @@ function FileUploadModal({
         fileSize: file.size,
         mimeType: file.type,
         mediaType: 'raw',
-        serviceCategory: 'general',
+        serviceCategory: 'photography',
         instructions: '',
         exportType: '',
         customDescription: ''
@@ -255,7 +266,7 @@ function FileUploadModal({
     const formData = new FormData();
     formData.append('file', file);
     formData.append('mediaType', 'raw');
-    formData.append('serviceCategory', 'general');
+    formData.append('serviceCategory', 'photography');
     formData.append('instructions', '');
     formData.append('exportType', '');
     formData.append('customDescription', '');
@@ -310,6 +321,17 @@ function FileUploadModal({
           return; // Success, exit retry loop
         } catch (presignedError: any) {
           console.log(`Presigned URL upload failed for ${fileName}:`, presignedError.message);
+          console.error('Full presigned URL error:', presignedError);
+          
+          // Handle timeout errors with toast notification
+          if (presignedError.message.includes('Request timed out')) {
+            toast({
+              title: "Upload Timeout",
+              description: "Request timed out - try again",
+              variant: "destructive"
+            });
+            throw presignedError;
+          }
           
           // If it's a CORS error, fall back to server-side proxy
           if (presignedError.message.includes('CORS') || presignedError.message.includes('Network error')) {

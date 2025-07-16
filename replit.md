@@ -453,6 +453,12 @@ Changelog:
   - **Upload Method Separation**: Split upload logic into uploadViaPresignedUrl and uploadViaServerProxy helpers
   - **Progress Tracking**: Maintained progress indicators for both upload methods
   - **Database Integration**: Server proxy saves metadata directly, bypassing separate metadata endpoint
+- July 16, 2025. Fixed timeout and validation errors in upload system:
+  - **Increased Timeout**: Changed AbortController timeout from 5s to 30s for presigned URL requests
+  - **AbortError Handling**: Added proper error handling for timeout errors with toast notifications
+  - **Service Category Fix**: Changed from 'general' to 'photography' to match enum validation requirements
+  - **Enhanced Error Logging**: Added comprehensive error logging for presigned URL fetch failures
+  - **Toast Notifications**: Added specific toast for timeout errors: "Request timed out - try again"
 ```
 
 ## User Preferences
