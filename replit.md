@@ -435,6 +435,15 @@ Changelog:
   - **Format Support**: Added support for image/tiff, image/x-adobe-dng, image/x-canon-cr2, image/x-canon-crw, image/x-nikon-nef, image/x-sony-arw, image/x-panasonic-raw
   - **Video Format Enhancement**: Added support for video/avi and video/mov formats
   - **Real Estate Media**: Comprehensive file format support for real estate photography and media production workflow
+- July 16, 2025. Fixed S3 upload network errors with enhanced CORS handling and error detection:
+  - **Enhanced Error Logging**: Added detailed XMLHttpRequest error logging with specific status codes and response headers
+  - **CORS Error Detection**: Added specific error detection for CORS issues (status 0) with informative error messages
+  - **Network Error Handling**: Enhanced error handling for timeout, network, and CORS errors with specific toast notifications
+  - **Retry Logic Enhancement**: Improved 3-retry system with exponential backoff and specific error categorization
+  - **Fetch Timeout**: Added 5-second timeout to presigned URL requests with AbortController
+  - **S3 CORS Configuration**: Created documentation for required S3 bucket CORS policy to allow PUT requests from Replit domains
+  - **Error Toast Messages**: Added specific toast notifications for different error types (timeout, network, CORS)
+  - **Upload Progress Logging**: Enhanced progress tracking with detailed S3 upload URL logging for debugging
 ```
 
 ## User Preferences

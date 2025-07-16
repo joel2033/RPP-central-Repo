@@ -130,13 +130,18 @@ function FileUploadModal({
       try {
         console.log(`Starting S3 upload for ${fileName}, size: ${file.size} (attempt ${attempt}/${maxRetries})`);
         
-        // Get presigned upload URL
+        // Get presigned upload URL with timeout and CORS
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+        
         const uploadUrlResponse = await fetch(`/api/job-cards/${jobCardId}/files/upload-url`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           credentials: 'include',
+          mode: 'cors',
+          signal: controller.signal,
           body: JSON.stringify({
             fileName: file.name,
             contentType: file.type,
@@ -144,6 +149,8 @@ function FileUploadModal({
             fileSize: file.size
           })
         });
+        
+        clearTimeout(timeoutId);
 
         if (!uploadUrlResponse.ok) {
           const errorText = await uploadUrlResponse.text();
@@ -189,20 +196,35 @@ function FileUploadModal({
             statusText: xhr.statusText,
             response: xhr.response,
             responseText: xhr.responseText,
-            readyState: xhr.readyState
+            readyState: xhr.readyState,
+            errorType: 'XMLHttpRequest onerror'
           });
-          reject(new Error(`Upload failed: ${xhr.statusText || 'Network error'}`));
+          
+          // More specific error messages for CORS and network issues
+          let errorMessage = 'Network error';
+          if (xhr.status === 0) {
+            errorMessage = 'CORS error - S3 bucket may not allow requests from this domain';
+          } else if (xhr.statusText) {
+            errorMessage = xhr.statusText;
+          }
+          
+          reject(new Error(`Upload failed: ${errorMessage}`));
         };
 
         xhr.ontimeout = () => {
           console.error(`S3 upload timeout for ${fileName}`);
-          reject(new Error('Upload timeout'));
+          reject(new Error('Upload timeout - file too large or connection too slow'));
         };
 
         xhr.open('PUT', uploadUrl);
         xhr.setRequestHeader('Content-Type', file.type);
         xhr.timeout = 300000; // 5 minutes timeout
+        
+        // Add CORS headers if needed
+        xhr.withCredentials = false; // Don't send cookies to S3
+        
         console.log(`Uploading ${fileName} to S3 with Content-Type: ${file.type}`);
+        console.log(`S3 Upload URL: ${uploadUrl.substring(0, 100)}...`);
         xhr.send(file);
       });
 
@@ -256,6 +278,29 @@ function FileUploadModal({
           code: (error as any).code,
           name: (error as any).name
         });
+        
+        // Show specific toast messages for different error types
+        if (attempt === maxRetries) {
+          let toastMessage = lastError.message;
+          let toastTitle = "Upload Failed";
+          
+          if (lastError.name === 'AbortError') {
+            toastTitle = "Upload Timeout";
+            toastMessage = "Upload timed out - try a smaller file or check your connection";
+          } else if (lastError.name === 'TypeError') {
+            toastTitle = "Network Error";
+            toastMessage = "Network error - check your internet connection";
+          } else if (lastError.message.includes('CORS')) {
+            toastTitle = "CORS Error";
+            toastMessage = "S3 bucket configuration issue - contact administrator";
+          }
+          
+          toast({
+            title: toastTitle,
+            description: toastMessage,
+            variant: "destructive"
+          });
+        }
         
         // If this is the last attempt, set error state
         if (attempt === maxRetries) {
