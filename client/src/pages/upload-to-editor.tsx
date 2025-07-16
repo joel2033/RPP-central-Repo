@@ -83,6 +83,7 @@ function FileUploadModal({
   const [dragActive, setDragActive] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<Map<string, number>>(new Map());
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadErrors, setUploadErrors] = useState<Map<string, string>>(new Map());
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -119,16 +120,19 @@ function FileUploadModal({
     onFilesUpload(newUploadedFiles);
   };
 
-  const uploadFileToS3 = async (file: File): Promise<void> => {
+  const uploadFileToS3 = async (file: File, jobCardId: number): Promise<void> => {
     const fileName = file.name;
     
     try {
+      console.log(`Starting S3 upload for ${fileName}, size: ${file.size}`);
+      
       // Get presigned upload URL
-      const uploadUrlResponse = await fetch(`/api/job-cards/0/files/upload-url`, {
+      const uploadUrlResponse = await fetch(`/api/job-cards/${jobCardId}/files/upload-url`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           fileName: file.name,
           contentType: file.type,
@@ -138,10 +142,13 @@ function FileUploadModal({
       });
 
       if (!uploadUrlResponse.ok) {
-        throw new Error('Failed to get upload URL');
+        const errorText = await uploadUrlResponse.text();
+        console.error(`Failed to get upload URL: ${uploadUrlResponse.status} - ${errorText}`);
+        throw new Error(`Failed to get upload URL: ${uploadUrlResponse.status}`);
       }
 
       const { uploadUrl, s3Key } = await uploadUrlResponse.json();
+      console.log(`Got presigned URL for ${fileName}, S3 key: ${s3Key}`);
 
       // Upload to S3 with progress tracking
       await new Promise<void>((resolve, reject) => {
@@ -150,19 +157,23 @@ function FileUploadModal({
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
             const progress = Math.round((event.loaded / event.total) * 100);
+            console.log(`Upload progress for ${fileName}: ${progress}%`);
             setUploadingFiles(prev => new Map(prev.set(fileName, progress)));
           }
         };
 
         xhr.onload = () => {
           if (xhr.status === 200) {
+            console.log(`S3 upload completed for ${fileName}`);
             resolve();
           } else {
+            console.error(`S3 upload failed for ${fileName} with status ${xhr.status}`);
             reject(new Error(`Upload failed with status ${xhr.status}`));
           }
         };
 
         xhr.onerror = () => {
+          console.error(`S3 upload error for ${fileName}`);
           reject(new Error('Upload failed'));
         };
 
@@ -171,14 +182,51 @@ function FileUploadModal({
         xhr.send(file);
       });
 
+      // Save metadata to database
+      const metadataResponse = await fetch(`/api/job-cards/${jobCardId}/files/metadata`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          fileName: file.name,
+          originalName: file.name,
+          s3Key: s3Key,
+          fileSize: file.size,
+          mimeType: file.type,
+          mediaType: 'raw',
+          serviceCategory: 'general',
+          instructions: '',
+          exportType: '',
+          customDescription: ''
+        })
+      });
+
+      if (!metadataResponse.ok) {
+        console.error(`Failed to save metadata for ${fileName}`);
+        throw new Error('Failed to save file metadata');
+      }
+
+      console.log(`Successfully uploaded ${fileName} to S3 with metadata`);
+
       // Clean up progress tracking
       setUploadingFiles(prev => {
         const newMap = new Map(prev);
         newMap.delete(fileName);
         return newMap;
       });
+      
+      // Clear any previous errors
+      setUploadErrors(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(fileName);
+        return newMap;
+      });
     } catch (error) {
       console.error('Upload failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setUploadErrors(prev => new Map(prev.set(fileName, errorMessage)));
       setUploadingFiles(prev => {
         const newMap = new Map(prev);
         newMap.delete(fileName);
@@ -192,21 +240,37 @@ function FileUploadModal({
     if (files.length === 0) return;
     
     setIsUploading(true);
+    setUploadErrors(new Map()); // Clear previous errors
+    console.log(`Starting upload of ${files.length} files`);
     
     try {
-      // Check if S3 is configured, otherwise use simulation
-      const s3Available = await fetch('/api/job-cards/0/files/upload-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName: 'test', contentType: 'text/plain', fileSize: 1 })
-      }).then(res => res.status !== 503);
+      // For now, use job card ID 1 as a test, but this should be passed from parent component
+      const jobCardId = 1;
+      
+      // Check if S3 is configured by trying to get an upload URL
+      let s3Available = false;
+      try {
+        const testResponse = await fetch(`/api/job-cards/${jobCardId}/files/upload-url`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ fileName: 'test', contentType: 'text/plain', fileSize: 1 })
+        });
+        s3Available = testResponse.status !== 503;
+        console.log(`S3 availability check: ${s3Available ? 'available' : 'not available'}`);
+      } catch (error) {
+        console.log('S3 availability check failed, using simulation');
+        s3Available = false;
+      }
 
       if (s3Available) {
         // Use S3 upload
-        const uploadPromises = files.map(file => uploadFileToS3(file));
+        console.log('Using S3 upload');
+        const uploadPromises = files.map(file => uploadFileToS3(file, jobCardId));
         await Promise.all(uploadPromises);
       } else {
         // Fallback to simulation
+        console.log('Using simulation upload');
         const uploadPromises = files.map(file => simulateUpload(file));
         await Promise.all(uploadPromises);
       }
@@ -216,8 +280,11 @@ function FileUploadModal({
       
       setFiles([]);
       setUrlLink("");
+      console.log('Upload completed successfully');
     } catch (error) {
       console.error('Upload error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.log(`Upload failed: ${errorMessage}`);
     } finally {
       setIsUploading(false);
     }
@@ -406,27 +473,36 @@ function FileUploadModal({
                   ))}
                   
                   {/* Pending files (not yet uploading) */}
-                  {files.filter(file => !uploadingFiles.has(file.name)).map((file, index) => (
-                    <div key={`pending-${index}`} className="flex items-center justify-between p-3 bg-white rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className="text-sm font-medium">{file.name}</div>
-                        <div className="flex items-center space-x-2">
-                          <div className="text-xs text-gray-500">0%</div>
-                          <div className="w-32 h-2 bg-gray-200 rounded-full">
-                            <div className="w-0 h-2 bg-black rounded-full"></div>
+                  {files.filter(file => !uploadingFiles.has(file.name)).map((file, index) => {
+                    const error = uploadErrors.get(file.name);
+                    return (
+                      <div key={`pending-${index}`} className={`flex items-center justify-between p-3 rounded-lg ${error ? 'bg-red-50' : 'bg-white'}`}>
+                        <div className="flex items-center space-x-3">
+                          <div className="text-sm font-medium">{file.name}</div>
+                          <div className="flex items-center space-x-2">
+                            {error ? (
+                              <div className="text-xs text-red-600">Error: {error}</div>
+                            ) : (
+                              <>
+                                <div className="text-xs text-gray-500">0%</div>
+                                <div className="w-32 h-2 bg-gray-200 rounded-full">
+                                  <div className="w-0 h-2 bg-black rounded-full"></div>
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFile(files.indexOf(file))}
+                          disabled={isUploading}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeFile(files.indexOf(file))}
-                        disabled={isUploading}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <input
                   id={`file-input-${blockId}`}

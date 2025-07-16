@@ -410,6 +410,16 @@ Changelog:
   - **Fallback Support**: Maintains compatibility with existing local file storage when S3 is not configured
   - **Test Endpoint**: Added /api/test-s3-tags for verifying tagging functionality in S3 Console
   - **Integration Points**: Updated Upload to Editor page and Editor Dashboard to use S3 uploads with proper tagging
+- July 16, 2025. Fixed FileUploadModal S3 upload functionality with comprehensive error handling:
+  - **Fixed Upload Button**: Corrected S3 availability check to use proper job card ID instead of hardcoded value
+  - **Comprehensive Logging**: Added detailed console logging for upload progress, errors, and S3 operations
+  - **Progress Tracking**: Implemented real-time percentage updates during S3 uploads with visual progress bars
+  - **Error Display**: Added error display in UI with red highlighting for failed uploads
+  - **Enhanced Workflow**: Added retry logic and fallback to simulation when S3 unavailable
+  - **Metadata Saving**: Fixed metadata saving after successful S3 uploads to properly store file information in database
+  - **AWS Integration**: Added proper S3 tagging (type:raw for raw uploads, type:finished for finished uploads)
+  - **Test Infrastructure**: Created test infrastructure for validating S3 upload functionality with progress monitoring
+  - **Legacy Support**: Updated legacy file upload endpoint to support S3 uploads with proper tagging and fallback logic
 ```
 
 ## User Preferences
