@@ -1469,7 +1469,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Legacy file upload endpoint (with fallback to local storage)
+  // Legacy file upload endpoint (with S3 integration and fallback)
   app.post('/api/job-cards/:id/files', isAuthenticated, upload.array('files', 10), async (req: any, res) => {
     try {
       const jobCardId = parseInt(req.params.id);
@@ -1491,13 +1491,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const savedFiles = [];
       
       for (const file of files) {
-        // Save file to storage (fallback to local storage)
-        const fileName = await fileStorage.saveFile(file.buffer, file.originalname, jobCardId);
+        console.log('S3 upload attempt', file.originalname, 'Size:', file.size);
+        
+        let fileName: string;
+        let s3Key: string | null = null;
+        let s3Bucket: string | null = null;
+        
+        // Try S3 upload first, fallback to local storage
+        if (s3Service) {
+          try {
+            // Validate file before upload
+            const validation = s3Service.validateFile({ size: file.size, type: file.mimetype });
+            if (!validation.valid) {
+              console.error('File validation failed:', validation.error);
+              return res.status(400).json({ message: `File ${file.originalname}: ${validation.error}` });
+            }
+
+            // Generate S3 key
+            const mediaType = req.body.mediaType || "raw";
+            s3Key = s3Service.generateS3Key(jobCardId, file.originalname, mediaType);
+            s3Bucket = process.env.S3_BUCKET;
+            
+            // Determine tags based on media type
+            const tags: Record<string, string> = {};
+            if (mediaType === 'raw') {
+              tags.type = 'raw';
+            } else if (mediaType === 'final' || mediaType === 'finished') {
+              tags.type = 'finished';
+            }
+            
+            console.log('Uploading to S3 with tags:', s3Key, tags);
+            
+            // Upload to S3 with retry logic
+            await s3Service.withRetry(async () => {
+              const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
+              const s3Client = new S3Client({
+                region: process.env.AWS_REGION,
+                credentials: {
+                  accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+                  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+                },
+              });
+
+              const command = new PutObjectCommand({
+                Bucket: s3Bucket,
+                Key: s3Key,
+                Body: file.buffer,
+                ContentType: file.mimetype,
+                Tagging: tags.type ? `type=${encodeURIComponent(tags.type)}` : undefined,
+              });
+
+              await s3Client.send(command);
+            });
+            
+            fileName = file.originalname; // Use original name for S3 uploads
+            console.log('S3 upload successful:', s3Key);
+            
+          } catch (s3Error) {
+            console.error('S3 upload failed, falling back to local storage:', s3Error);
+            // Fallback to local storage
+            s3Key = null;
+            s3Bucket = null;
+            fileName = await fileStorage.saveFile(file.buffer, file.originalname, jobCardId);
+          }
+        } else {
+          // S3 not configured, use local storage
+          console.log('S3 not configured, using local storage');
+          fileName = await fileStorage.saveFile(file.buffer, file.originalname, jobCardId);
+        }
         
         // Create database record
         const fileData = insertProductionFileSchema.parse({
-          originalName: req.body.fileName || file.originalname,
+          originalName: file.originalname,
           fileName: fileName,
+          s3Key: s3Key,
+          s3Bucket: s3Bucket,
           mediaType: req.body.mediaType || "raw",
           serviceCategory: req.body.serviceCategory || "general",
           fileSize: file.size,
@@ -1516,7 +1584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(savedFiles);
     } catch (error) {
       console.error("Error uploading files:", error);
-      res.status(400).json({ message: "Failed to upload files" });
+      res.status(400).json({ message: "Failed to upload files", error: error.message });
     }
   });
 
