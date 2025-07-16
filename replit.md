@@ -461,6 +461,7 @@ Changelog:
   - **Toast Notifications**: Added specific toast for timeout errors: "Request timed out - try again"
   - **Fixed Submit to Editor**: Removed duplicate file upload logic from mutation since files are already uploaded via FileUploadModal
   - **Successful DNG Upload**: Confirmed DNG files upload successfully via server-side proxy fallback system
+  - **Fixed Editor Dashboard Accept Order**: Resolved double JSON parsing error in updateJobCardMutation by removing .json() call since apiRequest already returns parsed data
 ```
 
 ## User Preferences

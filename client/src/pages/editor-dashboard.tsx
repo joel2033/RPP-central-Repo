@@ -80,7 +80,7 @@ function EditorDashboardContent() {
   const updateJobCardMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
       const response = await apiRequest("PUT", `/api/job-cards/${id}`, data);
-      return response.json();
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/editor/job-cards"] });
@@ -114,7 +114,7 @@ function EditorDashboardContent() {
   const completeJobWithContentMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
       const response = await apiRequest("POST", `/api/job-cards/${id}/complete-with-content`, data);
-      return response.json();
+      return response;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/editor/job-cards"] });
