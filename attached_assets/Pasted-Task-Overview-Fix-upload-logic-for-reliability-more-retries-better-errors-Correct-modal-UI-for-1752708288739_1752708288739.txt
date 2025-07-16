@@ -1,0 +1,55 @@
+Task Overview:
+
+Fix upload logic for reliability (more retries, better errors).
+Correct modal UI for proper display.
+Integrate uploads to auto-create/update content in job cards, mirroring the example (editable names, categories).
+Detailed Requirements:
+
+Fix Upload Failures:
+Backend (e.g., server/controllers/jobController.ts or upload routes): Use @aws-sdk/client-s3 for PutObject. Add exponential backoff retries (e.g., via promise-retry, 5 attempts). Handle errors: Specific messages (e.g., "S3 Access Denied" for permissions, "File too large" >50MB). Store in S3 with key like jobs/${jobId}/finished/${category}/${filename} (permanent retention).
+Frontend (e.g., client/src/pages/EditorDashboard.tsx or UploadModal.tsx): On button click, use fetch/multipart form to post files. Display progress, retry UI. Log failures to console/activity log.
+Edge Cases: Large files, multiple uploads, network drops. Ensure editor role permissions.
+Fix Modal Display:
+In React component (e.g., UploadModal.tsx): Set max-height (e.g., 80vh), overflow-y: auto, Tailwind classes like 'max-h-[80vh] overflow-y-auto'. Use Radix Dialog/Sheet for responsive layout. Add close button, error list styling (red text compact).
+Integrate with Job Card Content:
+Post-Upload Hook: Backend updates Drizzle table (e.g., content_items with job_id, category: 'Photos', name: default like ${jobId} Images, editable: true, status: 'Ready for QC', s3_url). Sync order status tracker.
+Frontend (job card, e.g., client/src/components/JobCard.tsx or ManageContent.tsx): Fetch updated content on mutation success. Render sections like example: Tabs for Add Images/Video/etc., editable input for names (e.g., "#01376 Images ON"), toggle ON/OFF.
+Automation: Notify admin/VA on upload; link to delivery pages.
+Workflow Integration:
+Editor: Uploads only for assigned jobs (filter by user/licensee ID).
+Licensee Job Card: Auto-refresh content sections post-upload; allow name changes via form (update DB).
+Logging: Activity log entries (e.g., "Finished files uploaded [timestamp]"); update dashboard reporting (editor costs, assets).
+Permissions: Editor: Upload/view own; Admin/VA: QC/edit names.
+Technical Implementation:
+Dependencies: If needed, add promise-retry for backoff.
+Example Backend Upload Code:
+javascript
+
+Collapse
+
+Wrap
+
+Run
+
+Copy
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const retry = require('promise-retry');
+// In route:
+async function handleUpload(req, res) {
+  const s3 = new S3Client({ region: 'us-east-1' });
+  await retry(async (retryFn, attempt) => {
+    try {
+      await s3.send(new PutObjectCommand({ Bucket: 'rpp-finished', Key: key, Body: file.buffer }));
+    } catch (err) { if (attempt < 5) return retryFn(err); throw err; }
+  }, { retries: 4, factor: 2 });
+  // Update DB: await db.insert(contentItems).values({ jobId, category, name: defaultName });
+  // Update status: await updateJobStatus(jobId, 'Ready for QC');
+}
+Frontend Modal: Add CSS 'overflow-hidden' parent, scrollable child.
+Testing: Mock large files, simulate failures; verify job card updates.
+Output:
+
+Updated files (e.g., EditorDashboard.tsx, UploadModal.tsx, jobController.ts, schema.ts if needed).
+Summary of changes, migration steps (DB if new fields).
+Testing instructions: Upload via modal, check no failures, modal height, job card content creation/editable names.
+Ensure fixes are scalable, secure, and automate editor-to-QC handover for licensees.

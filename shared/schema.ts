@@ -412,6 +412,27 @@ export const jobCardDeliverySettings = pgTable("job_card_delivery_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Content Items table for job card content management
+export const contentItemsStatusEnum = pgEnum("content_items_status", ["draft", "ready_for_qc", "approved", "delivered", "in_revision"]);
+
+export const contentItems = pgTable("content_items", {
+  id: serial("id").primaryKey(),
+  jobCardId: integer("job_card_id").notNull(),
+  category: serviceCategoryEnum("category").notNull(), // photos, floor_plans, video, virtual_tour, other
+  name: varchar("name", { length: 255 }).notNull(), // e.g., "#01376 Images ON"
+  description: text("description"),
+  isEditable: boolean("is_editable").default(true),
+  isActive: boolean("is_active").default(true),
+  status: contentItemsStatusEnum("status").default("draft"),
+  fileCount: integer("file_count").default(0),
+  s3Urls: jsonb("s3_urls").$type<string[]>().default([]), // Array of S3 URLs
+  displayOrder: integer("display_order").default(0),
+  createdBy: varchar("created_by").notNull(),
+  updatedBy: varchar("updated_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   bookings: many(bookings),
@@ -511,6 +532,7 @@ export const jobCardsRelations = relations(jobCards, ({ one, many }) => ({
   deliveryComments: many(deliveryComments),
   deliveryTracking: many(deliveryTracking),
   deliverySettings: one(jobCardDeliverySettings),
+  contentItems: many(contentItems),
 }));
 
 // Production Files relations
@@ -593,6 +615,22 @@ export const jobCardDeliverySettingsRelations = relations(jobCardDeliverySetting
   headerImageFile: one(productionFiles, {
     fields: [jobCardDeliverySettings.headerImageFileId],
     references: [productionFiles.id],
+  }),
+}));
+
+// Content Items relations
+export const contentItemsRelations = relations(contentItems, ({ one }) => ({
+  jobCard: one(jobCards, {
+    fields: [contentItems.jobCardId],
+    references: [jobCards.id],
+  }),
+  createdByUser: one(users, {
+    fields: [contentItems.createdBy],
+    references: [users.id],
+  }),
+  updatedByUser: one(users, {
+    fields: [contentItems.updatedBy],
+    references: [users.id],
   }),
 }));
 
@@ -876,3 +914,13 @@ export const insertJobIdCounterSchema = createInsertSchema(jobIdCounter).omit({
 
 export type InsertJobIdCounter = z.infer<typeof insertJobIdCounterSchema>;
 export type JobIdCounter = typeof jobIdCounter.$inferSelect;
+
+// Content Items schemas and types
+export const insertContentItemSchema = createInsertSchema(contentItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertContentItem = z.infer<typeof insertContentItemSchema>;
+export type ContentItem = typeof contentItems.$inferSelect;

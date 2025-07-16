@@ -1,5 +1,6 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import promiseRetry from 'promise-retry';
 
 export interface S3Config {
   accessKeyId: string;
@@ -27,83 +28,116 @@ export class S3Service {
     this.bucketName = config.bucketName;
   }
 
-  // Generate presigned URL for upload
+  // Generate presigned URL for upload with retry logic
   async generatePresignedUploadUrl(
     key: string,
     contentType: string,
     tags?: Record<string, string>,
     expiresIn: number = 3600 // 1 hour
   ): Promise<string> {
-    try {
-      console.log(`Generating presigned URL for S3 upload:`, {
-        bucket: this.bucketName,
-        key,
-        contentType,
-        tags,
-        expiresIn
-      });
+    console.log(`Generating presigned URL for S3 upload:`, {
+      bucket: this.bucketName,
+      key,
+      contentType,
+      tags,
+      expiresIn
+    });
 
-      const command = new PutObjectCommand({
-        Bucket: this.bucketName,
-        Key: key,
-        ContentType: contentType,
-        Tagging: tags ? this.formatTagging(tags) : undefined,
-      });
+    return promiseRetry(async (retry, attempt) => {
+      try {
+        const command = new PutObjectCommand({
+          Bucket: this.bucketName,
+          Key: key,
+          ContentType: contentType,
+          Tagging: tags ? this.formatTagging(tags) : undefined,
+        });
 
-      const uploadUrl = await getSignedUrl(this.s3Client, command, { expiresIn });
-      console.log(`Successfully generated presigned URL for ${key}`);
-      return uploadUrl;
-    } catch (error: any) {
-      console.error(`Failed to generate presigned URL for ${key}:`, {
-        error: error.message,
-        code: error.code,
-        name: error.name,
-        bucket: this.bucketName,
-        key,
-        contentType
-      });
-      throw error;
-    }
+        const uploadUrl = await getSignedUrl(this.s3Client, command, { expiresIn });
+        console.log(`✓ Successfully generated presigned URL for ${key} on attempt ${attempt}`);
+        return uploadUrl;
+      } catch (error: any) {
+        console.error(`✗ Presigned URL attempt ${attempt} failed for ${key}:`, {
+          error: error.message,
+          code: error.code,
+          name: error.name
+        });
+
+        // Don't retry on certain errors
+        if (error.code === 'AccessDenied' || error.code === 'InvalidAccessKeyId') {
+          throw new Error(`S3 Access Denied - check AWS credentials`);
+        }
+
+        if (attempt < 3) {
+          console.log(`Retrying presigned URL generation for ${key} (attempt ${attempt + 1}/3)`);
+          retry(error);
+        } else {
+          throw new Error(`Presigned URL generation failed after 3 attempts: ${error.message}`);
+        }
+      }
+    }, {
+      retries: 2,
+      factor: 1.5,
+      minTimeout: 500,
+      maxTimeout: 3000
+    });
   }
 
-  // Upload file directly to S3 using server-side putObject (bypasses CORS)
+  // Upload file directly to S3 using server-side putObject with retry logic
   async uploadFileToS3(
     key: string,
     buffer: Buffer,
     contentType: string,
     tags?: Record<string, string>
   ): Promise<void> {
-    try {
-      console.log(`Server-side S3 upload:`, {
-        bucket: this.bucketName,
-        key,
-        contentType,
-        bufferSize: buffer.length,
-        tags
-      });
+    console.log(`Server-side S3 upload starting:`, {
+      bucket: this.bucketName,
+      key,
+      contentType,
+      bufferSize: buffer.length,
+      tags
+    });
 
-      const command = new PutObjectCommand({
-        Bucket: this.bucketName,
-        Key: key,
-        Body: buffer,
-        ContentType: contentType,
-        Tagging: tags ? this.formatTagging(tags) : undefined,
-      });
+    return promiseRetry(async (retry, attempt) => {
+      try {
+        const command = new PutObjectCommand({
+          Bucket: this.bucketName,
+          Key: key,
+          Body: buffer,
+          ContentType: contentType,
+          Tagging: tags ? this.formatTagging(tags) : undefined,
+        });
 
-      await this.s3Client.send(command);
-      console.log(`Successfully uploaded ${key} to S3 using server-side putObject`);
-    } catch (error: any) {
-      console.error(`Failed to upload ${key} to S3:`, {
-        error: error.message,
-        code: error.code,
-        name: error.name,
-        bucket: this.bucketName,
-        key,
-        contentType,
-        bufferSize: buffer.length
-      });
-      throw error;
-    }
+        await this.s3Client.send(command);
+        console.log(`✓ Successfully uploaded ${key} to S3 on attempt ${attempt}`);
+      } catch (error: any) {
+        console.error(`✗ Upload attempt ${attempt} failed for ${key}:`, {
+          error: error.message,
+          code: error.code,
+          name: error.name
+        });
+
+        // Don't retry on certain errors
+        if (error.code === 'AccessDenied' || error.code === 'InvalidAccessKeyId') {
+          throw new Error(`S3 Access Denied - check AWS credentials`);
+        }
+
+        if (error.code === 'EntityTooLarge') {
+          throw new Error(`File too large - maximum size is 2GB`);
+        }
+
+        if (attempt < 5) {
+          console.log(`Retrying upload for ${key} (attempt ${attempt + 1}/5)`);
+          retry(error);
+        } else {
+          throw new Error(`Upload failed after 5 attempts: ${error.message}`);
+        }
+      }
+    }, {
+      retries: 4,
+      factor: 2,
+      minTimeout: 1000,
+      maxTimeout: 10000
+    });
   }
 
   // Format tags for S3 tagging

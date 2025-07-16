@@ -1,8 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import { Upload, X, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { Upload, X, AlertCircle, CheckCircle, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { apiRequest } from '@/lib/queryClient';
 
@@ -19,9 +22,10 @@ interface S3FileUploadProps {
 interface UploadingFile {
   file: File;
   progress: number;
-  status: 'uploading' | 'success' | 'error';
+  status: 'uploading' | 'success' | 'error' | 'retrying';
   error?: string;
   s3Key?: string;
+  retryCount?: number;
 }
 
 export const S3FileUpload: React.FC<S3FileUploadProps> = ({
@@ -36,6 +40,8 @@ export const S3FileUpload: React.FC<S3FileUploadProps> = ({
   const [dragActive, setDragActive] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -136,58 +142,125 @@ export const S3FileUpload: React.FC<S3FileUploadProps> = ({
     }
   };
 
-  const uploadFileWithRetry = async (file: File, retries = 3): Promise<void> => {
-    for (let attempt = 0; attempt < retries; attempt++) {
+  const uploadFileWithRetry = async (file: File, retries = 5): Promise<void> => {
+    for (let attempt = 1; attempt <= retries; attempt++) {
       try {
+        updateFileStatus(file, attempt === 1 ? 'uploading' : 'retrying', 0, 
+          attempt === 1 ? undefined : `Retrying... (${attempt}/${retries})`);
+        
         await uploadFile(file);
         return;
-      } catch (error) {
-        console.error(`Upload attempt ${attempt + 1} failed:`, error);
+      } catch (error: any) {
+        console.error(`Upload attempt ${attempt} failed for ${file.name}:`, error);
         
-        if (attempt === retries - 1) {
-          updateFileStatus(file, 'error', 0, `Upload failed after ${retries} attempts`);
-          throw error;
+        // Add specific error handling
+        let errorMessage = error.message;
+        if (error.message.includes('CORS')) {
+          errorMessage = 'Upload blocked by browser - trying alternative method';
+        } else if (error.message.includes('timeout')) {
+          errorMessage = 'Upload timed out - check your connection';
+        } else if (error.message.includes('Access Denied')) {
+          errorMessage = 'S3 access denied - check credentials';
+        } else if (error.message.includes('too large')) {
+          errorMessage = 'File too large - maximum size is 2GB';
         }
         
-        // Wait before retrying with exponential backoff
-        await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
+        updateFileStatus(file, 'error', 0, `Attempt ${attempt}/${retries}: ${errorMessage}`);
+        
+        if (attempt < retries) {
+          const delay = Math.min(Math.pow(2, attempt) * 1000, 10000); // Exponential backoff, max 10s
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          const finalError = `Upload failed after ${retries} attempts: ${errorMessage}`;
+          setUploadErrors(prev => [...prev, finalError]);
+          throw new Error(finalError);
+        }
       }
     }
   };
 
   const uploadFile = async (file: File): Promise<void> => {
     try {
-      // Step 1: Get presigned upload URL
-      const uploadUrlResponse = await apiRequest('POST', `/api/job-cards/${jobCardId}/files/upload-url`, {
-        fileName: file.name,
-        contentType: file.type,
-        mediaType, // This determines S3 tags: 'raw' → type:raw, 'final' → type:finished
-        fileSize: file.size
-      });
-
-      const { uploadUrl, s3Key } = uploadUrlResponse;
-
-      // Step 2: Upload file directly to S3 with progress tracking
-      await uploadToS3(file, uploadUrl, s3Key);
-
-      // Step 3: Save metadata to database
-      await apiRequest('POST', `/api/job-cards/${jobCardId}/files/metadata`, {
-        fileName: file.name,
-        originalName: file.name,
-        s3Key,
-        fileSize: file.size,
-        mimeType: file.type,
-        mediaType,
-        serviceCategory
-      });
-
+      // Try presigned URL first, fallback to server proxy on CORS errors
+      try {
+        await uploadViaPresignedUrl(file);
+      } catch (error: any) {
+        console.warn('Presigned URL upload failed, trying server proxy:', error.message);
+        
+        // Fallback to server proxy for CORS or other presigned URL issues
+        if (error.message.includes('CORS') || error.message.includes('timeout') || error.message.includes('Access Denied')) {
+          await uploadViaServerProxy(file);
+        } else {
+          throw error;
+        }
+      }
+      
       updateFileStatus(file, 'success', 100);
-      onUploadComplete({ fileName: file.name, s3Key, fileSize: file.size });
-    } catch (error) {
+      onUploadComplete({ fileName: file.name, fileSize: file.size });
+    } catch (error: any) {
       console.error('Upload failed:', error);
       updateFileStatus(file, 'error', 0, error.message);
       throw error;
     }
+  };
+
+  const uploadViaPresignedUrl = async (file: File): Promise<void> => {
+    // Step 1: Get presigned upload URL
+    const uploadUrlResponse = await apiRequest('POST', `/api/job-cards/${jobCardId}/files/upload-url`, {
+      fileName: file.name,
+      contentType: file.type,
+      mediaType, // This determines S3 tags: 'raw' → type:raw, 'final' → type:finished
+      fileSize: file.size
+    });
+
+    const { uploadUrl, s3Key } = uploadUrlResponse;
+
+    // Step 2: Upload file directly to S3 with progress tracking
+    await uploadToS3(file, uploadUrl, s3Key);
+
+    // Step 3: Save metadata to database
+    await apiRequest('POST', `/api/job-cards/${jobCardId}/files/metadata`, {
+      fileName: file.name,
+      originalName: file.name,
+      s3Key,
+      fileSize: file.size,
+      mimeType: file.type,
+      mediaType,
+      serviceCategory
+    });
+  };
+
+  const uploadViaServerProxy = async (file: File): Promise<void> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('mediaType', mediaType);
+    formData.append('serviceCategory', serviceCategory);
+
+    const xhr = new XMLHttpRequest();
+    
+    return new Promise((resolve, reject) => {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const progress = Math.round((event.loaded / event.total) * 100);
+          updateFileStatus(file, 'uploading', progress);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          resolve();
+        } else {
+          reject(new Error(`Server proxy upload failed: ${xhr.status}`));
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(new Error('Server proxy upload failed'));
+      };
+
+      xhr.open('POST', `/api/job-cards/${jobCardId}/files/upload-proxy`);
+      xhr.send(formData);
+    });
   };
 
   const uploadToS3 = async (file: File, uploadUrl: string, s3Key: string): Promise<void> => {
@@ -219,11 +292,11 @@ export const S3FileUpload: React.FC<S3FileUploadProps> = ({
     });
   };
 
-  const updateFileStatus = (file: File, status: 'uploading' | 'success' | 'error', progress: number, error?: string) => {
+  const updateFileStatus = (file: File, status: 'uploading' | 'success' | 'error' | 'retrying', progress: number, error?: string) => {
     setUploadingFiles(prev => 
       prev.map(uf => 
         uf.file.name === file.name 
-          ? { ...uf, status, progress, error }
+          ? { ...uf, status, progress, error, retryCount: status === 'retrying' ? (uf.retryCount || 0) + 1 : uf.retryCount }
           : uf
       )
     );
@@ -262,13 +335,13 @@ export const S3FileUpload: React.FC<S3FileUploadProps> = ({
                 Drag and drop files here, or click to select
               </p>
               <p className="text-xs text-gray-500">
-                Max file size: 2GB • Supported: Images, Videos, PDFs, ZIP files
+                Max file size: 2GB • Supported: Images, Videos, PDFs, RAW files (DNG, CR2, NEF, ARW), ZIP files
               </p>
             </div>
             <input
               type="file"
               multiple
-              accept="image/*,video/*,.pdf,.zip"
+              accept="image/*,video/*,.pdf,.zip,.tiff,.dng,.cr2,.nef,.arw"
               onChange={handleFileInput}
               className="hidden"
               id="file-upload"
@@ -305,12 +378,18 @@ export const S3FileUpload: React.FC<S3FileUploadProps> = ({
                     </span>
                   </div>
                   
-                  {uploadingFile.status === 'uploading' && (
+                  {(uploadingFile.status === 'uploading' || uploadingFile.status === 'retrying') && (
                     <div className="flex items-center gap-2">
                       <Progress value={uploadingFile.progress} className="flex-1" />
                       <span className="text-xs text-gray-500">
                         {uploadingFile.progress}%
                       </span>
+                      {uploadingFile.status === 'retrying' && (
+                        <Badge variant="outline" className="text-xs">
+                          <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                          Retry {uploadingFile.retryCount || 1}
+                        </Badge>
+                      )}
                     </div>
                   )}
                   
@@ -329,7 +408,7 @@ export const S3FileUpload: React.FC<S3FileUploadProps> = ({
                   )}
                 </div>
                 
-                {uploadingFile.status === 'uploading' && (
+                {(uploadingFile.status === 'uploading' || uploadingFile.status === 'retrying') && (
                   <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
                 )}
                 

@@ -453,6 +453,17 @@ Changelog:
   - **Upload Method Separation**: Split upload logic into uploadViaPresignedUrl and uploadViaServerProxy helpers
   - **Progress Tracking**: Maintained progress indicators for both upload methods
   - **Database Integration**: Server proxy saves metadata directly, bypassing separate metadata endpoint
+- July 16, 2025. Implemented comprehensive content items management system:
+  - **Content Items Database Table**: Created content_items table with foreign key relationship to job_cards
+  - **Complete API Endpoints**: Built full CRUD API for content items (GET, POST, PUT, DELETE) with authentication
+  - **Content Items Manager Component**: Created ContentItemsManager.tsx with status filtering, creation, and editing capabilities
+  - **Content Item Cards**: Built ContentItemCard.tsx with status management, file tracking, and update functionality
+  - **Job Card Integration**: Added content items tab to job card detail pages for seamless workflow management
+  - **Database Storage Methods**: Implemented comprehensive storage methods in DatabaseStorage class for content items
+  - **Auto-Creation Logic**: Added helper function to automatically create content items when files are uploaded
+  - **Status Tracking**: Support for draft, ready_for_qc, and delivered status with visual indicators
+  - **File Association**: Content items track file counts and S3 URLs for better organization and delivery management
+  - **Test Infrastructure**: Created test endpoint for validating content items functionality
 - July 16, 2025. Fixed timeout and validation errors in upload system:
   - **Increased Timeout**: Changed AbortController timeout from 5s to 30s for presigned URL requests
   - **AbortError Handling**: Added proper error handling for timeout errors with toast notifications

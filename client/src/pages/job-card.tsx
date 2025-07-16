@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { JobIdBadge } from "@/components/JobIdBadge";
+import { ContentItemsManager } from "@/components/ContentItemsManager";
 
 interface JobCardDetails {
   id: number;
@@ -416,12 +417,13 @@ export default function JobCardPage() {
             </CardHeader>
             <CardContent>
               <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-5">
+                <TabsList className="grid w-full grid-cols-6">
                   <TabsTrigger value="photos">Photos</TabsTrigger>
                   <TabsTrigger value="floorplan">Floor Plan</TabsTrigger>
                   <TabsTrigger value="virtual">Virtual Tour</TabsTrigger>
                   <TabsTrigger value="video">Video</TabsTrigger>
                   <TabsTrigger value="other">Other Files</TabsTrigger>
+                  <TabsTrigger value="content">Content Items</TabsTrigger>
                 </TabsList>
 
                 <div className="mt-6">
@@ -488,6 +490,10 @@ export default function JobCardPage() {
                       </div>
                       {renderFileGrid(getFilesByCategory("other"))}
                     </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="content">
+                    <ContentItemsManager jobCardId={jobCard.id} />
                   </TabsContent>
                 </div>
               </Tabs>

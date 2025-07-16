@@ -1344,6 +1344,37 @@ export class DatabaseStorage implements IStorage {
   async getCurrentJobIdCounter(): Promise<number> {
     return await JobIdService.getCurrentCounter();
   }
+
+  // Content Items
+  async createContentItem(contentItem: InsertContentItem): Promise<ContentItem> {
+    const [savedItem] = await db.insert(contentItems).values(contentItem).returning();
+    return savedItem;
+  }
+
+  async getContentItems(jobCardId: number, serviceCategory?: string): Promise<ContentItem[]> {
+    let query = db.select().from(contentItems).where(eq(contentItems.jobCardId, jobCardId));
+    
+    if (serviceCategory) {
+      query = query.where(eq(contentItems.category, serviceCategory));
+    }
+    
+    return await query;
+  }
+
+  async getContentItem(id: number): Promise<ContentItem | null> {
+    const [item] = await db.select().from(contentItems).where(eq(contentItems.id, id));
+    return item || null;
+  }
+
+  async updateContentItem(id: number, updates: Partial<InsertContentItem>): Promise<ContentItem | null> {
+    const [updatedItem] = await db.update(contentItems).set(updates).where(eq(contentItems.id, id)).returning();
+    return updatedItem || null;
+  }
+
+  async deleteContentItem(id: number): Promise<boolean> {
+    const result = await db.delete(contentItems).where(eq(contentItems.id, id));
+    return result.rowCount > 0;
+  }
 }
 
 export const storage = new DatabaseStorage();
