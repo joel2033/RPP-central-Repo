@@ -1790,16 +1790,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const jobCardId = parseInt(req.params.id);
       const userId = req.user.claims.sub;
       
+      console.log('Download raw files request:', { jobCardId, userId });
+      
       // Check if user is assigned to this job or is admin
       const user = await storage.getUser(userId);
       if (!user) {
+        console.log('User not found:', userId);
         return res.status(404).json({ message: "User not found" });
       }
       
+      console.log('User found:', { id: user.id, role: user.role, licenseeId: user.licenseeId });
+      
       const jobCard = await storage.getJobCard(jobCardId, user.licenseeId);
       if (!jobCard) {
+        console.log('Job card not found:', { jobCardId, licenseeId: user.licenseeId });
         return res.status(404).json({ message: "Job card not found" });
       }
+      
+      console.log('Job card found:', { id: jobCard.id, editorId: jobCard.editorId, status: jobCard.status });
       
       // Check permissions - must be assigned editor or admin
       if (jobCard.editorId !== userId && user.role !== 'admin') {

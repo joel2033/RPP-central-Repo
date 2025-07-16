@@ -100,17 +100,8 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
   // Download raw files mutation
   const downloadRawFilesMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/job-cards/${job.id}/download-raw-files`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to generate download URL');
-      }
-      
-      const data = await response.json();
-      return data;
+      const response = await apiRequest('POST', `/api/job-cards/${job.id}/download-raw-files`);
+      return response;
     },
     onSuccess: (data) => {
       if (data.downloadUrl) {
