@@ -70,6 +70,19 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
   const [revisionReply, setRevisionReply] = useState('');
   const [statusNotes, setStatusNotes] = useState('');
 
+  // Handle unhandled promise rejections
+  React.useEffect(() => {
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('Unhandled promise rejection:', event.reason);
+      event.preventDefault(); // Prevent the default browser error
+    };
+
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    return () => {
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
+
   // Fetch raw files for download
   const { data: rawFiles, isLoading: rawFilesLoading } = useQuery<ProductionFile[]>({
     queryKey: ["/api/job-cards", job.id, "files", "raw"],
@@ -157,15 +170,19 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
         
         // Log download activity - handle errors gracefully
         setTimeout(() => {
-          try {
-            logActivityMutation.mutate({
-              action: 'raw_files_downloaded',
-              description: 'Editor downloaded raw files for editing'
-            });
-          } catch (logError) {
-            console.error('Error logging download activity:', logError);
-          }
-        }, 500);
+          Promise.resolve().then(() => {
+            try {
+              logActivityMutation.mutate({
+                action: 'raw_files_downloaded',
+                description: 'Editor downloaded raw files for editing'
+              });
+            } catch (logError) {
+              console.error('Error logging download activity:', logError);
+            }
+          }).catch(err => {
+            console.error('Error in activity logging promise:', err);
+          });
+        }, 1000);
       } catch (successError) {
         console.error('Error in success handler:', successError);
         toast({
@@ -223,6 +240,10 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/job-cards", job.id, "activity"] });
+    },
+    onError: (error) => {
+      console.error('Error logging activity:', error);
+      // Don't show error toast for activity logging failures
     },
   });
 
