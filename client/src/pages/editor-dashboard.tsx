@@ -10,35 +10,36 @@ import { RoleProtectedRoute } from "@/components/auth/RoleProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { 
-  Download, 
-  Upload, 
   CheckCircle, 
   Clock, 
   Camera,
   FileText,
   DollarSign
 } from "lucide-react";
-import JobStatusPanel from "@/components/job-status-panel";
 import EmptyState from "@/components/shared/empty-state";
 import LoadingSpinner from "@/components/shared/loading-spinner";
 import EditorServicePricing from "@/components/editor/service-pricing";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { S3FileUpload } from "@/components/S3FileUpload";
-import type { JobCard, Client, User, ProductionFile } from "@shared/schema";
+import EditorJobCard from "@/components/editor/EditorJobCard";
+import type { JobCard, Client, User } from "@shared/schema";
 
 interface JobCardWithDetails extends JobCard {
   client: Client;
   photographer: User | null;
+  booking?: {
+    id: number;
+    propertyAddress: string;
+    scheduledDate: string;
+    scheduledTime: string;
+    price: string;
+  };
 }
 
 function EditorDashboardContent() {
   const { toast } = useToast();
   const { isAuthenticated, user, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
-  const [selectedJobCard, setSelectedJobCard] = useState<JobCardWithDetails | null>(null);
-  const [completionNotes, setCompletionNotes] = useState("");
   const [activeTab, setActiveTab] = useState("jobs");
 
   useEffect(() => {
@@ -65,156 +66,6 @@ function EditorDashboardContent() {
     },
     enabled: isAuthenticated && !!user?.id,
   });
-
-  const { data: productionFiles } = useQuery<ProductionFile[]>({
-    queryKey: ["/api/job-cards", selectedJobCard?.id, "files"],
-    queryFn: async () => {
-      if (!selectedJobCard?.id) return [];
-      const response = await fetch(`/api/job-cards/${selectedJobCard.id}/files`);
-      if (!response.ok) throw new Error("Failed to fetch files");
-      return response.json();
-    },
-    enabled: !!selectedJobCard?.id,
-  });
-
-  const updateJobCardMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      const response = await apiRequest("PUT", `/api/job-cards/${id}`, data);
-      return response;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/editor/job-cards"] });
-      toast({
-        title: "Success",
-        description: "Job status updated successfully",
-      });
-      setSelectedJobCard(null);
-      setCompletionNotes("");
-    },
-    onError: (error: Error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Error",
-        description: "Failed to update job status",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const completeJobWithContentMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      const response = await apiRequest("POST", `/api/job-cards/${id}/complete-with-content`, data);
-      return response;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/editor/job-cards"] });
-      toast({
-        title: "Success",
-        description: `Job completed! Content pieces created with final cost: $${data.finalCost || 0}`,
-      });
-      setSelectedJobCard(null);
-      setCompletionNotes("");
-    },
-    onError: (error: Error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Error",
-        description: "Failed to complete job with content",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleAcceptJob = (jobCard: JobCardWithDetails) => {
-    updateJobCardMutation.mutate({
-      id: jobCard.id,
-      data: { status: "in_progress" }
-    });
-  };
-
-  const handleDeclineJob = (jobCard: JobCardWithDetails) => {
-    updateJobCardMutation.mutate({
-      id: jobCard.id,
-      data: { 
-        status: "unassigned",
-        editorId: null
-      }
-    });
-  };
-
-  const handleStartEditing = (jobCard: JobCardWithDetails) => {
-    updateJobCardMutation.mutate({
-      id: jobCard.id,
-      data: { status: "editing" }
-    });
-  };
-
-  const handleCompleteJob = (jobCard: JobCardWithDetails) => {
-    // Use the new comprehensive completion endpoint
-    completeJobWithContentMutation.mutate({
-      id: jobCard.id,
-      data: {
-        notes: completionNotes || jobCard.editingNotes,
-        instructionsFollowed: "All client instructions followed as specified",
-        qcIssues: "No issues flagged - ready for client delivery",
-        completionDetails: {
-          editorNotes: completionNotes,
-          completionTime: new Date().toISOString(),
-          filesCompleted: true
-        }
-      }
-    });
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending": return "bg-purple-500";
-      case "in_progress": return "bg-blue-500";
-      case "editing": return "bg-yellow-500";
-      case "ready_for_qc": return "bg-green-500";
-      case "in_revision": return "bg-orange-500";
-      case "delivered": return "bg-emerald-500";
-      default: return "bg-gray-500";
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "pending": return "Pending";
-      case "in_progress": return "Assigned";
-      case "editing": return "Editing";
-      case "ready_for_qc": return "Ready for QC";
-      case "in_revision": return "In Revision";
-      case "delivered": return "Delivered";
-      default: return status;
-    }
-  };
-
-  const getRawFiles = (files: ProductionFile[]) => 
-    files?.filter(file => file.mediaType === "raw") || [];
-
-  const getFinalFiles = (files: ProductionFile[]) => 
-    files?.filter(file => file.mediaType === "final") || [];
 
   if (authLoading || isLoading) {
     return (
@@ -310,7 +161,6 @@ function EditorDashboardContent() {
             </TabsList>
 
             <TabsContent value="jobs">
-              {/* Job Cards */}
               {!myJobCards || myJobCards.length === 0 ? (
                 <EmptyState
                   icon={Camera}
@@ -318,109 +168,15 @@ function EditorDashboardContent() {
                   description="You don't have any jobs assigned to you yet."
                 />
               ) : (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-6">
                   {myJobCards.map((jobCard) => (
-                    <Card key={jobCard.id} className="hover:shadow-lg transition-shadow">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-lg font-semibold">
-                            {jobCard.jobId}
-                          </CardTitle>
-                          <Badge 
-                            className={`text-white ${getStatusColor(jobCard.status || "unassigned")}`}
-                          >
-                            {getStatusLabel(jobCard.status || "unassigned")}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      
-                      <CardContent className="space-y-4">
-                        <div>
-                          <p className="font-medium text-slate-900">{jobCard.client.name}</p>
-                          <p className="text-sm text-slate-600">{jobCard.client.email}</p>
-                        </div>
-                        
-                        <div>
-                          <p className="text-sm font-medium text-slate-700">Services:</p>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {(jobCard.requestedServices as string[])?.map((service) => (
-                              <Badge key={service} variant="outline" className="text-xs">
-                                {service}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                        
-                        {jobCard.editingNotes && (
-                          <div>
-                            <p className="text-sm font-medium text-slate-700">Notes:</p>
-                            <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded">
-                              {jobCard.editingNotes}
-                            </p>
-                          </div>
-                        )}
-                        
-                        {/* Quick Status Panel */}
-                        <JobStatusPanel 
-                          jobId={jobCard.id}
-                          currentStatus={jobCard.status}
-                          jobStatus={jobCard.jobStatus || jobCard.status}
-                          compact={true}
-                        />
-                        
-                        <div className="flex gap-2">
-                          {jobCard.status === "pending" && (
-                            <>
-                              <Button
-                                size="sm"
-                                onClick={() => handleAcceptJob(jobCard)}
-                                className="flex-1"
-                              >
-                                Accept Order
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleDeclineJob(jobCard)}
-                                className="flex-1"
-                              >
-                                Decline
-                              </Button>
-                            </>
-                          )}
-                          
-                          {jobCard.status === "in_progress" && (
-                            <Button
-                              size="sm"
-                              onClick={() => handleStartEditing(jobCard)}
-                              className="flex-1"
-                            >
-                              Start Editing
-                            </Button>
-                          )}
-                          
-                          {jobCard.status === "editing" && (
-                            <Button
-                              size="sm"
-                              onClick={() => setSelectedJobCard(jobCard)}
-                              className="flex-1"
-                            >
-                              Mark Complete
-                            </Button>
-                          )}
-                          
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setSelectedJobCard(jobCard)}
-                            className="flex-1"
-                            
-                          >
-                            View Files
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <EditorJobCard
+                      key={jobCard.id}
+                      job={jobCard}
+                      onStatusChange={(jobId, newStatus) => {
+                        queryClient.invalidateQueries({ queryKey: ["/api/editor/job-cards", user?.id] });
+                      }}
+                    />
                   ))}
                 </div>
               )}
@@ -430,140 +186,6 @@ function EditorDashboardContent() {
               <EditorServicePricing />
             </TabsContent>
           </Tabs>
-
-          {/* Job Details Modal */}
-          {selectedJobCard && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
-                <h3 className="text-lg font-semibold mb-4">
-                  Job Details - {selectedJobCard.jobId}
-                </h3>
-                
-                <div className="space-y-6">
-                  {/* Raw Files */}
-                  <div>
-                    <h4 className="font-medium text-slate-700 mb-2">Raw Files</h4>
-                    <div className="space-y-2">
-                      {getRawFiles(productionFiles || []).map((file) => (
-                        <div key={file.id} className="flex items-center justify-between p-3 bg-slate-50 rounded">
-                          <div>
-                            <p className="font-medium">{file.originalName}</p>
-                            <p className="text-sm text-slate-600">{file.serviceCategory}</p>
-                          </div>
-                          <Button size="sm" variant="outline">
-                            <Download className="h-4 w-4 mr-2" />
-                            Download
-                          </Button>
-                        </div>
-                      ))}
-                      {getRawFiles(productionFiles || []).length === 0 && (
-                        <p className="text-slate-500 italic">No raw files uploaded yet</p>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Final Files */}
-                  <div>
-                    <h4 className="font-medium text-slate-700 mb-2">Final Files</h4>
-                    <div className="space-y-2">
-                      {getFinalFiles(productionFiles || []).map((file) => (
-                        <div key={file.id} className="flex items-center justify-between p-3 bg-slate-50 rounded">
-                          <div>
-                            <p className="font-medium">{file.originalName}</p>
-                            <p className="text-sm text-slate-600">{file.serviceCategory}</p>
-                          </div>
-                          <Button size="sm" variant="outline">
-                            <Download className="h-4 w-4 mr-2" />
-                            Download
-                          </Button>
-                        </div>
-                      ))}
-                      {getFinalFiles(productionFiles || []).length === 0 && (
-                        <p className="text-slate-500 italic">No final files uploaded yet</p>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Upload Section */}
-                  <div>
-                    <h4 className="font-medium text-slate-700 mb-2">Upload Final Files</h4>
-                    <S3FileUpload
-                      jobCardId={selectedJobCard.id}
-                      mediaType="final" // This will add 'type: finished' tag in S3
-                      serviceCategory="general"
-                      onUploadComplete={(fileData) => {
-                        console.log('File uploaded successfully:', fileData);
-                        // Refresh the job data
-                        queryClient.invalidateQueries({ queryKey: ['/api/editor/jobs'] });
-                      }}
-                      onUploadError={(error) => {
-                        console.error('Upload error:', error);
-                        // You can add toast notification here
-                      }}
-                    />
-                  </div>
-                  
-                  {/* Completion Notes */}
-                  {selectedJobCard.status === "editing" && (
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Completion Notes
-                        </label>
-                        <Textarea
-                          placeholder="Add any notes about the completed work..."
-                          value={completionNotes}
-                          onChange={(e) => setCompletionNotes(e.target.value)}
-                          className="h-24"
-                        />
-                      </div>
-                      
-                      <div className="bg-blue-50 p-4 rounded-lg">
-                        <h5 className="font-medium text-blue-900 mb-2">Content Creation Summary</h5>
-                        <p className="text-sm text-blue-700">
-                          When you complete this job, the system will:
-                        </p>
-                        <ul className="text-sm text-blue-700 mt-2 space-y-1">
-                          <li>• Create content pieces for all final files with Job ID {selectedJobCard.jobId}</li>
-                          <li>• Log comprehensive completion details in the activity record</li>
-                          <li>• Calculate final edit costs based on service pricing</li>
-                          <li>• Track instructions followed and QC status</li>
-                          <li>• Prepare job for client delivery</li>
-                        </ul>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="flex gap-2 mt-6">
-                  <Button
-                    variant="outline"
-                    onClick={() => setSelectedJobCard(null)}
-                    className="flex-1"
-                  >
-                    Close
-                  </Button>
-                  
-                  {selectedJobCard.status === "editing" && (
-                    <Button
-                      onClick={() => handleCompleteJob(selectedJobCard)}
-                      className="flex-1"
-                      disabled={completeJobWithContentMutation.isPending}
-                    >
-                      {completeJobWithContentMutation.isPending ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Creating Content...
-                        </>
-                      ) : (
-                        "Complete Job & Create Content"
-                      )}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -571,13 +193,9 @@ function EditorDashboardContent() {
 }
 
 export default function EditorDashboard() {
-  // TEMPORARY: Allow direct access for testing (remove after testing)
-  return <EditorDashboardContent />;
-  
-  // Original role protection (uncomment after testing)
-  // return (
-  //   <RoleProtectedRoute allowedRoles={["editor"]}>
-  //     <EditorDashboardContent />
-  //   </RoleProtectedRoute>
-  // );
+  return (
+    <RoleProtectedRoute allowedRoles={["editor", "admin"]}>
+      <EditorDashboardContent />
+    </RoleProtectedRoute>
+  );
 }

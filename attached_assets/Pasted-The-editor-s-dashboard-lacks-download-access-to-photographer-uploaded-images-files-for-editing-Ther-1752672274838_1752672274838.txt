@@ -1,0 +1,42 @@
+The editor's dashboard lacks download access to photographer-uploaded images/files for editing. There's no dedicated editor's job card for uploading edited files, managing statuses, viewing activity, or handling revisions from photographers/admins.
+
+Task Overview: Enhance the editor's dashboard by:
+
+Adding secure download functionality for photographer-uploaded files (e.g., RAW images).
+Creating an "Editor's Job Card" component for each assigned job, enabling file uploads, status management, activity logs, and revision handling.
+Detailed Requirements:
+
+Download Functionality:
+In the editor's dashboard (e.g., client/src/pages/EditorDashboard.tsx or similar), display assigned jobs with a "Download Raw Files" button.
+Button triggers a backend endpoint (e.g., in server/controllers/jobController.ts) to generate a secure, temporary URL or zip download for files uploaded by photographers (stored temporarily for 3 days, e.g., via PostgreSQL-linked blob or external storage like S3 if configured).
+Integrate with existing upload logic: Assume photographer uploads via API routes (e.g., server/routes/jobs.ts), storing files tied to Job ID.
+Log downloads in activity tracking.
+Permissions: Restricted to assigned editors via role-based middleware (e.g., server/middleware/auth.ts).
+Editor's Job Card:
+Auto-generate job cards for editors upon job handover (e.g., after photographer upload, triggered via status update in order tracker).
+UI: React component (e.g., in client/src/components/job/EditorJobCard.tsx) with sections:
+Header: Job ID (5-digit, unique, system-wide), property address, client info, services ordered, editor instructions, due dates.
+Download Section: Button for raw files (as above).
+Upload Section: File input for edited assets (e.g., photos/videos/floorplans); use React hooks for upload, post to backend endpoint to store permanently and tie to Job ID.
+Status Management: Dropdown/select for editor statuses (e.g., "Assigned", "In Progress", "Submitted for QC" from schema enums). Update Drizzle ORM table and sync with global order status tracker (Pending → In Progress → Ready for QC → Delivered).
+Activity Log: Display chronological events (e.g., timestamps for uploads/downloads, status changes, user actions) fetched from DB table.
+Revisions Section: Show comments/requests from photographer/admin (e.g., submitted via delivery page form). Allow editors to reply, re-upload files, and resolve revisions. Use modals for interactions.
+Workflow Integration:
+Job Assignment: Editors view only their assigned jobs (filtered by user ID and licensee in DB queries).
+On Upload/Submission: Auto-notify admin for QC via real-time (if implemented) or email; update status in tracker.
+Revisions: Route photographer/admin comments to editor's job card; support multiple cycles.
+Logging: All actions update DB (e.g., activity log table) and dashboard reporting (editor costs, asset types).
+Permissions: Editor role: View/edit own jobs; Admin: View all. Use multi-tenant isolation (e.g., licensee ID in queries).
+Google Calendar Sync: If relevant, update events on status changes.
+Technical Implementation:
+Frontend: React/TypeScript, use TanStack Query for data fetching, Radix UI/Tailwind for components/modals. Ensure mobile-responsive.
+Backend: Node/Express routes/controllers for API (e.g., POST /jobs/:id/upload-editor, GET /jobs/:id/download-raw). Handle files with multer or similar; temporary storage expiration via cron job.
+Database: Update shared/schema.ts with any needed fields (e.g., editor_status enum, activity_log table with job_id foreign key, revisions table).
+Edge Cases: Large files, expiration (delete after 3 days), concurrent access, error handling.
+Testing: Add unit tests for endpoints; ensure integration with existing auth/sessions.
+Output:
+
+Updated files (e.g., client/src/pages/EditorDashboard.tsx, client/src/components/EditorJobCard.tsx, server/controllers/jobController.ts, shared/schema.ts).
+Summary of changes, migration steps (if schema updated), and testing instructions.
+Any new dependencies (e.g., for file handling, keep minimal).
+Ensure code is scalable, secure, and aligns with RPP's automation focus for licensees.

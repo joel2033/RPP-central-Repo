@@ -1784,6 +1784,181 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Editor workflow routes
+  app.post('/api/job-cards/:id/download-raw-files', isAuthenticated, async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      
+      // Check if user is assigned to this job or is admin
+      const jobCard = await storage.getJobCard(jobCardId);
+      if (!jobCard) {
+        return res.status(404).json({ message: "Job card not found" });
+      }
+      
+      // Check permissions - must be assigned editor or admin
+      const user = await storage.getUser(userId);
+      if (jobCard.editorId !== userId && user?.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      // Get raw files for this job
+      const rawFiles = await storage.getProductionFilesByType(jobCardId, 'raw');
+      
+      if (!rawFiles || rawFiles.length === 0) {
+        return res.status(404).json({ message: "No raw files found" });
+      }
+      
+      // If S3 is configured, generate download URLs
+      if (s3Service) {
+        // For single file, return direct download URL
+        if (rawFiles.length === 1 && rawFiles[0].s3Key) {
+          const downloadUrl = await s3Service.generatePresignedDownloadUrl(rawFiles[0].s3Key);
+          
+          // Log download activity
+          await storage.createJobActivityLog({
+            jobCardId,
+            userId,
+            action: 'raw_files_downloaded',
+            description: `Editor downloaded raw files for editing (${rawFiles.length} files)`,
+            metadata: {
+              fileCount: rawFiles.length,
+              downloadType: 'single',
+              timestamp: new Date().toISOString()
+            }
+          });
+          
+          return res.json({ downloadUrl, fileCount: rawFiles.length });
+        }
+        
+        // For multiple files, we'd need to implement zip functionality
+        // For now, return the first file's download URL
+        if (rawFiles[0].s3Key) {
+          const downloadUrl = await s3Service.generatePresignedDownloadUrl(rawFiles[0].s3Key);
+          
+          // Log download activity
+          await storage.createJobActivityLog({
+            jobCardId,
+            userId,
+            action: 'raw_files_downloaded',
+            description: `Editor downloaded raw files for editing (${rawFiles.length} files)`,
+            metadata: {
+              fileCount: rawFiles.length,
+              downloadType: 'multiple',
+              timestamp: new Date().toISOString()
+            }
+          });
+          
+          return res.json({ downloadUrl, fileCount: rawFiles.length });
+        }
+      }
+      
+      // Fallback to local storage
+      if (rawFiles[0].fileName) {
+        const fileBuffer = await fileStorage.getFile(rawFiles[0].fileName);
+        
+        // Log download activity
+        await storage.createJobActivityLog({
+          jobCardId,
+          userId,
+          action: 'raw_files_downloaded',
+          description: `Editor downloaded raw files for editing (${rawFiles.length} files)`,
+          metadata: {
+            fileCount: rawFiles.length,
+            downloadType: 'local',
+            timestamp: new Date().toISOString()
+          }
+        });
+        
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${rawFiles[0].originalName}"`);
+        res.send(fileBuffer);
+      } else {
+        return res.status(404).json({ message: "File not accessible" });
+      }
+    } catch (error) {
+      console.error("Error downloading raw files:", error);
+      res.status(500).json({ message: "Failed to download raw files" });
+    }
+  });
+
+  app.post('/api/job-cards/:id/revision-reply', isAuthenticated, async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      const { reply, status } = req.body;
+      
+      // Check if user is assigned to this job
+      const jobCard = await storage.getJobCard(jobCardId);
+      if (!jobCard) {
+        return res.status(404).json({ message: "Job card not found" });
+      }
+      
+      if (jobCard.editorId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      // Update job status
+      await storage.updateJobCard(jobCardId, { 
+        status: status || 'editing',
+        revisionNotes: reply 
+      });
+      
+      // Log revision response activity
+      await storage.createJobActivityLog({
+        jobCardId,
+        userId,
+        action: 'revision_response',
+        description: `Editor responded to revision request`,
+        metadata: {
+          reply,
+          timestamp: new Date().toISOString()
+        }
+      });
+      
+      res.json({ success: true, message: "Revision response submitted" });
+    } catch (error) {
+      console.error("Error submitting revision response:", error);
+      res.status(500).json({ message: "Failed to submit revision response" });
+    }
+  });
+
+  app.post('/api/job-cards/:id/activity', isAuthenticated, async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      const { action, description } = req.body;
+      
+      // Check if user has access to this job
+      const jobCard = await storage.getJobCard(jobCardId);
+      if (!jobCard) {
+        return res.status(404).json({ message: "Job card not found" });
+      }
+      
+      // Check permissions
+      const user = await storage.getUser(userId);
+      if (jobCard.editorId !== userId && user?.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      // Create activity log entry
+      const activityLog = await storage.createJobActivityLog({
+        jobCardId,
+        userId,
+        action,
+        description,
+        metadata: {
+          timestamp: new Date().toISOString()
+        }
+      });
+      
+      res.status(201).json(activityLog);
+    } catch (error) {
+      console.error("Error creating activity log:", error);
+      res.status(500).json({ message: "Failed to create activity log" });
+    }
+  });
+
   // File serving routes
   app.get('/api/files/:fileName', isAuthenticated, async (req: any, res) => {
     try {
