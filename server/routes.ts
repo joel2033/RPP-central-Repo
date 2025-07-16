@@ -1791,14 +1791,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       
       // Check if user is assigned to this job or is admin
-      const jobCard = await storage.getJobCard(jobCardId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const jobCard = await storage.getJobCard(jobCardId, user.licenseeId);
       if (!jobCard) {
         return res.status(404).json({ message: "Job card not found" });
       }
       
       // Check permissions - must be assigned editor or admin
-      const user = await storage.getUser(userId);
-      if (jobCard.editorId !== userId && user?.role !== 'admin') {
+      if (jobCard.editorId !== userId && user.role !== 'admin') {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -1889,7 +1893,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { reply, status } = req.body;
       
       // Check if user is assigned to this job
-      const jobCard = await storage.getJobCard(jobCardId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const jobCard = await storage.getJobCard(jobCardId, user.licenseeId);
       if (!jobCard) {
         return res.status(404).json({ message: "Job card not found" });
       }
@@ -1902,7 +1911,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateJobCard(jobCardId, { 
         status: status || 'editing',
         revisionNotes: reply 
-      });
+      }, user.licenseeId);
       
       // Log revision response activity
       await storage.createJobActivityLog({
