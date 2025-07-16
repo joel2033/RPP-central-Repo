@@ -156,10 +156,16 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
         }
         
         // Log download activity - handle errors gracefully
-        logActivityMutation.mutate({
-          action: 'raw_files_downloaded',
-          description: 'Editor downloaded raw files for editing'
-        });
+        setTimeout(() => {
+          try {
+            logActivityMutation.mutate({
+              action: 'raw_files_downloaded',
+              description: 'Editor downloaded raw files for editing'
+            });
+          } catch (logError) {
+            console.error('Error logging download activity:', logError);
+          }
+        }, 500);
       } catch (successError) {
         console.error('Error in success handler:', successError);
         toast({
