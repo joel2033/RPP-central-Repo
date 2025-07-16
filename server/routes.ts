@@ -26,6 +26,9 @@ import { fileStorage } from "./fileStorage";
 import { requireEditor, requireAdmin, requireVA, requireAdminOrVA, requireProductionStaff } from "./middleware/roleAuth";
 import { googleCalendarService } from "./googleCalendar";
 import { s3Service } from "./services/s3Service";
+import { db } from "./db";
+import { jobCards, clients } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -1804,8 +1807,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // For admin users, get job card without licensee filter
       let jobCard;
       if (user.role === 'admin') {
-        // Admin users can access any job card - get without licensee filter
-        jobCard = await storage.getJobCards().then(cards => cards.find(card => card.id === jobCardId));
+        // Admin users can access any job card - use direct DB query without licensee filter
+        console.log('Admin user accessing job card, querying database directly...');
+        try {
+          const result = await db.select().from(jobCards).where(eq(jobCards.id, jobCardId)).limit(1);
+          if (result.length > 0) {
+            // Get additional client info
+            const clientResult = await db.select().from(clients).where(eq(clients.id, result[0].clientId)).limit(1);
+            jobCard = {
+              ...result[0],
+              client: clientResult[0] || null,
+              photographer: null,
+              editor: null
+            };
+            console.log('Admin found job card:', { id: jobCard.id, licenseeId: jobCard.licenseeId });
+          }
+        } catch (error) {
+          console.error('Error querying job card for admin:', error);
+        }
       } else {
         // Regular users need licensee filter
         jobCard = await storage.getJobCard(jobCardId, user.licenseeId);
