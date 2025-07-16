@@ -100,63 +100,73 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
   // Download raw files mutation
   const downloadRawFilesMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/job-cards/${job.id}/download-raw-files`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to download raw files');
-      }
-      
-      // Check if response is JSON (single file) or blob (ZIP file)
-      const contentType = response.headers.get('content-type');
-      
-      if (contentType && contentType.includes('application/json')) {
-        // Single file - return JSON with download URL
-        const data = await response.json();
-        return { type: 'single', data };
-      } else {
-        // Multiple files - return blob for ZIP download
-        const blob = await response.blob();
-        const filename = response.headers.get('content-disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'raw_files.zip';
-        return { type: 'zip', blob, filename };
+      try {
+        const response = await fetch(`/api/job-cards/${job.id}/download-raw-files`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to download raw files: ${response.status} - ${errorText}`);
+        }
+        
+        // Check if response is JSON (single file) or blob (ZIP file)
+        const contentType = response.headers.get('content-type');
+        
+        if (contentType && contentType.includes('application/json')) {
+          // Single file - return JSON with download URL
+          const data = await response.json();
+          return { type: 'single', data };
+        } else {
+          // Multiple files - return blob for ZIP download
+          const blob = await response.blob();
+          const filename = response.headers.get('content-disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'raw_files.zip';
+          return { type: 'zip', blob, filename };
+        }
+      } catch (error) {
+        console.error('Download fetch error:', error);
+        throw error;
       }
     },
     onSuccess: (result) => {
-      if (result.type === 'single' && result.data.downloadUrl) {
-        // Single file - open download URL in new tab
-        window.open(result.data.downloadUrl, '_blank');
-        toast({
-          title: "Download Started",
-          description: "Raw file download has been initiated.",
-        });
-      } else if (result.type === 'zip') {
-        // Multiple files - trigger ZIP download
-        const url = window.URL.createObjectURL(result.blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = result.filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-        toast({
-          title: "Download Started",
-          description: `ZIP file with ${rawFiles?.length || 'multiple'} raw files has been downloaded.`,
-        });
-      }
-      
-      // Log download activity - handle errors gracefully
       try {
+        if (result.type === 'single' && result.data.downloadUrl) {
+          // Single file - open download URL in new tab
+          window.open(result.data.downloadUrl, '_blank');
+          toast({
+            title: "Download Complete",
+            description: "Raw file download has been initiated.",
+          });
+        } else if (result.type === 'zip') {
+          // Multiple files - trigger ZIP download
+          const url = window.URL.createObjectURL(result.blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = result.filename;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+          
+          toast({
+            title: "Download Complete",
+            description: `ZIP file with ${rawFiles?.length || 'multiple'} raw files has been downloaded.`,
+          });
+        }
+        
+        // Log download activity - handle errors gracefully
         logActivityMutation.mutate({
           action: 'raw_files_downloaded',
           description: 'Editor downloaded raw files for editing'
         });
-      } catch (logError) {
-        console.error('Error logging download activity:', logError);
-        // Don't show error to user for logging failures
+      } catch (successError) {
+        console.error('Error in success handler:', successError);
+        toast({
+          title: "Download Warning",
+          description: "Files downloaded but there was an issue with logging. Please refresh the page.",
+          variant: "destructive",
+        });
       }
     },
     onError: (error) => {
@@ -254,6 +264,13 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
 
   const handleDownloadRawFiles = () => {
     if (rawFiles && rawFiles.length > 0) {
+      // Show immediate feedback
+      toast({
+        title: "Download Starting",
+        description: rawFiles.length > 1 
+          ? `Creating ZIP file with ${rawFiles.length} files - this may take a moment...`
+          : "Preparing download...",
+      });
       downloadRawFilesMutation.mutate();
     } else {
       toast({
@@ -354,8 +371,17 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
             disabled={!rawFiles || rawFiles.length === 0 || downloadRawFilesMutation.isPending}
             className="flex items-center gap-2"
           >
-            <Download className="h-4 w-4" />
-            {downloadRawFilesMutation.isPending ? 'Downloading...' : 'Download Raw Files'}
+            {downloadRawFilesMutation.isPending ? (
+              <>
+                <div className="w-4 h-4 mr-2 animate-spin border-2 border-current border-t-transparent rounded-full" />
+                {rawFiles && rawFiles.length > 1 ? 'Creating ZIP...' : 'Downloading...'}
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                Download Raw Files
+              </>
+            )}
             {rawFiles && rawFiles.length > 0 && (
               <Badge variant="secondary" className="ml-1">
                 {rawFiles.length}
