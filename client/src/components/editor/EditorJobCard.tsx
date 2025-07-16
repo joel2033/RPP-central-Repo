@@ -148,13 +148,19 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
         });
       }
       
-      // Log download activity
-      logActivityMutation.mutate({
-        action: 'raw_files_downloaded',
-        description: 'Editor downloaded raw files for editing'
-      });
+      // Log download activity - handle errors gracefully
+      try {
+        logActivityMutation.mutate({
+          action: 'raw_files_downloaded',
+          description: 'Editor downloaded raw files for editing'
+        });
+      } catch (logError) {
+        console.error('Error logging download activity:', logError);
+        // Don't show error to user for logging failures
+      }
     },
     onError: (error) => {
+      console.error('Download error:', error);
       toast({
         title: "Download Failed",
         description: "Failed to download raw files. Please try again.",

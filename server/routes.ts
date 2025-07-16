@@ -1877,63 +1877,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (rawFiles.length > 1) {
           console.log(`Creating ZIP archive for ${rawFiles.length} files`);
           
-          // Set response headers for ZIP download
-          const jobId = jobCard.jobId || `job_${jobCardId}`;
-          const zipFileName = `${jobId}_raw_files.zip`;
-          
-          res.setHeader('Content-Type', 'application/zip');
-          res.setHeader('Content-Disposition', `attachment; filename="${zipFileName}"`);
-          
-          // Create ZIP archive
-          const archive = archiver('zip', {
-            zlib: { level: 9 } // Maximum compression
-          });
-          
-          // Handle archive errors
-          archive.on('error', (err) => {
-            console.error('Archive error:', err);
-            throw err;
-          });
-          
-          // Pipe archive to response
-          archive.pipe(res);
-          
-          // Add files to archive
-          for (const file of rawFiles) {
-            if (file.s3Key) {
-              try {
-                console.log(`Adding file to ZIP: ${file.fileName}`);
-                
-                // Get file stream from S3
-                const fileStream = await s3Service.getFileStream(file.s3Key);
-                
-                // Add file to archive with original filename
-                archive.append(fileStream, { name: file.fileName });
-              } catch (error) {
-                console.error(`Error adding file ${file.fileName} to ZIP:`, error);
-                // Continue with other files
+          try {
+            // Set response headers for ZIP download
+            const jobId = jobCard.jobId || `job_${jobCardId}`;
+            const zipFileName = `${jobId}_raw_files.zip`;
+            
+            res.setHeader('Content-Type', 'application/zip');
+            res.setHeader('Content-Disposition', `attachment; filename="${zipFileName}"`);
+            
+            // Create ZIP archive
+            const archive = archiver('zip', {
+              zlib: { level: 9 } // Maximum compression
+            });
+            
+            // Handle archive errors
+            archive.on('error', (err) => {
+              console.error('Archive error:', err);
+              if (!res.headersSent) {
+                res.status(500).json({ message: "Error creating ZIP file" });
+              }
+            });
+            
+            // Handle archive completion
+            archive.on('end', () => {
+              console.log(`ZIP archive completed: ${zipFileName}`);
+            });
+            
+            // Pipe archive to response
+            archive.pipe(res);
+            
+            // Add files to archive
+            for (const file of rawFiles) {
+              if (file.s3Key) {
+                try {
+                  console.log(`Adding file to ZIP: ${file.fileName}`);
+                  
+                  // Get file stream from S3
+                  const fileStream = await s3Service.getFileStream(file.s3Key);
+                  
+                  // Add file to archive with original filename
+                  archive.append(fileStream, { name: file.fileName });
+                } catch (error) {
+                  console.error(`Error adding file ${file.fileName} to ZIP:`, error);
+                  // Continue with other files
+                }
               }
             }
-          }
-          
-          // Finalize archive
-          await archive.finalize();
-          
-          // Log download activity
-          await storage.createJobActivityLog({
-            jobCardId,
-            userId,
-            action: 'raw_files_downloaded',
-            description: `Editor downloaded raw files for editing (${rawFiles.length} files as ZIP)`,
-            metadata: {
-              fileCount: rawFiles.length,
-              downloadType: 'zip',
-              zipFileName,
-              timestamp: new Date().toISOString()
+            
+            // Finalize archive
+            await archive.finalize();
+            
+            // Log download activity asynchronously to avoid blocking response
+            setTimeout(async () => {
+              try {
+                await storage.createJobActivityLog({
+                  jobCardId,
+                  userId,
+                  action: 'raw_files_downloaded',
+                  description: `Editor downloaded raw files for editing (${rawFiles.length} files as ZIP)`,
+                  metadata: {
+                    fileCount: rawFiles.length,
+                    downloadType: 'zip',
+                    zipFileName,
+                    timestamp: new Date().toISOString()
+                  }
+                });
+              } catch (logError) {
+                console.error('Error logging download activity:', logError);
+              }
+            }, 100);
+            
+            return; // Response handled by stream
+          } catch (zipError) {
+            console.error('Error creating ZIP file:', zipError);
+            if (!res.headersSent) {
+              res.status(500).json({ message: "Failed to create ZIP file" });
             }
-          });
-          
-          return; // Response handled by stream
+            return;
+          }
         }
       }
       
@@ -2026,14 +2047,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { action, description } = req.body;
       
-      // Check if user has access to this job
-      const jobCard = await storage.getJobCard(jobCardId);
+      console.log('Activity log request:', { jobCardId, userId, action, description });
+      
+      // Get user info first
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      console.log('User found:', { id: user.id, role: user.role, licenseeId: user.licenseeId });
+      
+      // Check if user has access to this job - handle admin users differently
+      let jobCard;
+      if (user.role === 'admin') {
+        // Admin users can access any job card - use direct DB query without licensee filter
+        console.log('Admin user accessing job card for activity logging...');
+        try {
+          const result = await db.select().from(jobCards).where(eq(jobCards.id, jobCardId)).limit(1);
+          if (result.length > 0) {
+            jobCard = result[0];
+            console.log('Admin found job card for activity:', { id: jobCard.id, licenseeId: jobCard.licenseeId });
+          }
+        } catch (error) {
+          console.error('Error querying job card for admin activity:', error);
+        }
+      } else {
+        // Regular users need licensee filter
+        jobCard = await storage.getJobCard(jobCardId, user.licenseeId);
+      }
+      
       if (!jobCard) {
+        console.log('Job card not found for activity:', { jobCardId, licenseeId: user.licenseeId, isAdmin: user.role === 'admin' });
         return res.status(404).json({ message: "Job card not found" });
       }
       
       // Check permissions
-      const user = await storage.getUser(userId);
       if (jobCard.editorId !== userId && user?.role !== 'admin') {
         return res.status(403).json({ message: "Access denied" });
       }
