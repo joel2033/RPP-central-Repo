@@ -100,24 +100,59 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
   // Download raw files mutation
   const downloadRawFilesMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', `/api/job-cards/${job.id}/download-raw-files`);
-      return response;
+      const response = await fetch(`/api/job-cards/${job.id}/download-raw-files`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to download raw files');
+      }
+      
+      // Check if response is JSON (single file) or blob (ZIP file)
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        // Single file - return JSON with download URL
+        const data = await response.json();
+        return { type: 'single', data };
+      } else {
+        // Multiple files - return blob for ZIP download
+        const blob = await response.blob();
+        const filename = response.headers.get('content-disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'raw_files.zip';
+        return { type: 'zip', blob, filename };
+      }
     },
-    onSuccess: (data) => {
-      if (data.downloadUrl) {
-        // Open download URL in new tab
-        window.open(data.downloadUrl, '_blank');
+    onSuccess: (result) => {
+      if (result.type === 'single' && result.data.downloadUrl) {
+        // Single file - open download URL in new tab
+        window.open(result.data.downloadUrl, '_blank');
         toast({
           title: "Download Started",
-          description: "Raw files download has been initiated.",
+          description: "Raw file download has been initiated.",
         });
+      } else if (result.type === 'zip') {
+        // Multiple files - trigger ZIP download
+        const url = window.URL.createObjectURL(result.blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = result.filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
         
-        // Log download activity
-        logActivityMutation.mutate({
-          action: 'raw_files_downloaded',
-          description: 'Editor downloaded raw files for editing'
+        toast({
+          title: "Download Started",
+          description: `ZIP file with ${rawFiles?.length || 'multiple'} raw files has been downloaded.`,
         });
       }
+      
+      // Log download activity
+      logActivityMutation.mutate({
+        action: 'raw_files_downloaded',
+        description: 'Editor downloaded raw files for editing'
+      });
     },
     onError: (error) => {
       toast({

@@ -126,6 +126,23 @@ export class S3Service {
     return await getSignedUrl(this.s3Client, command, { expiresIn });
   }
 
+  // Get file stream from S3 for ZIP archive creation
+  async getFileStream(key: string): Promise<NodeJS.ReadableStream> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+    });
+
+    const response = await this.s3Client.send(command);
+    
+    if (!response.Body) {
+      throw new Error(`No body in S3 response for key: ${key}`);
+    }
+
+    // Cast to ReadableStream for archiver compatibility
+    return response.Body as NodeJS.ReadableStream;
+  }
+
   // Generate S3 key for file
   generateS3Key(jobCardId: number, fileName: string, mediaType: string): string {
     const timestamp = Date.now();

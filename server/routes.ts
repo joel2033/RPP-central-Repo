@@ -29,6 +29,8 @@ import { s3Service } from "./services/s3Service";
 import { db } from "./db";
 import { jobCards, clients } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import archiver from "archiver";
+import { Readable } from "stream";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -1860,7 +1862,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             jobCardId,
             userId,
             action: 'raw_files_downloaded',
-            description: `Editor downloaded raw files for editing (${rawFiles.length} files)`,
+            description: `Editor downloaded raw files for editing (${rawFiles.length} file)`,
             metadata: {
               fileCount: rawFiles.length,
               downloadType: 'single',
@@ -1871,25 +1873,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({ downloadUrl, fileCount: rawFiles.length });
         }
         
-        // For multiple files, we'd need to implement zip functionality
-        // For now, return the first file's download URL
-        if (rawFiles[0].s3Key) {
-          const downloadUrl = await s3Service.generatePresignedDownloadUrl(rawFiles[0].s3Key);
+        // For multiple files, create a ZIP file
+        if (rawFiles.length > 1) {
+          console.log(`Creating ZIP archive for ${rawFiles.length} files`);
+          
+          // Set response headers for ZIP download
+          const jobId = jobCard.jobId || `job_${jobCardId}`;
+          const zipFileName = `${jobId}_raw_files.zip`;
+          
+          res.setHeader('Content-Type', 'application/zip');
+          res.setHeader('Content-Disposition', `attachment; filename="${zipFileName}"`);
+          
+          // Create ZIP archive
+          const archive = archiver('zip', {
+            zlib: { level: 9 } // Maximum compression
+          });
+          
+          // Handle archive errors
+          archive.on('error', (err) => {
+            console.error('Archive error:', err);
+            throw err;
+          });
+          
+          // Pipe archive to response
+          archive.pipe(res);
+          
+          // Add files to archive
+          for (const file of rawFiles) {
+            if (file.s3Key) {
+              try {
+                console.log(`Adding file to ZIP: ${file.fileName}`);
+                
+                // Get file stream from S3
+                const fileStream = await s3Service.getFileStream(file.s3Key);
+                
+                // Add file to archive with original filename
+                archive.append(fileStream, { name: file.fileName });
+              } catch (error) {
+                console.error(`Error adding file ${file.fileName} to ZIP:`, error);
+                // Continue with other files
+              }
+            }
+          }
+          
+          // Finalize archive
+          await archive.finalize();
           
           // Log download activity
           await storage.createJobActivityLog({
             jobCardId,
             userId,
             action: 'raw_files_downloaded',
-            description: `Editor downloaded raw files for editing (${rawFiles.length} files)`,
+            description: `Editor downloaded raw files for editing (${rawFiles.length} files as ZIP)`,
             metadata: {
               fileCount: rawFiles.length,
-              downloadType: 'multiple',
+              downloadType: 'zip',
+              zipFileName,
               timestamp: new Date().toISOString()
             }
           });
           
-          return res.json({ downloadUrl, fileCount: rawFiles.length });
+          return; // Response handled by stream
         }
       }
       
