@@ -816,7 +816,8 @@ function UploadToEditorContent() {
 
   const createJobMutation = useMutation({
     mutationFn: async (jobData: any) => {
-      // Step 1: Submit job to editor with comprehensive data
+      // Submit job to editor with comprehensive data
+      // Note: Files are already uploaded via FileUploadModal component
       const submissionResponse = await apiRequest("POST", `/api/job-cards/${selectedJobId}/submit-to-editor`, {
         editorId: selectedEditorId,
         serviceBlocks: serviceBlocks.map(block => ({
@@ -833,55 +834,6 @@ function UploadToEditorContent() {
         })),
         instructions: jobData.instructions
       });
-
-      // Step 2: Upload files for each service block
-      for (const block of serviceBlocks) {
-        if (block.files.length > 0) {
-          const formData = new FormData();
-          
-          // Add files to FormData
-          block.files.forEach(file => {
-            formData.append('files', file);
-          });
-          
-          // Add metadata with proper service category mapping
-          const serviceCategoryMap: { [key: string]: string } = {
-            'image_enhancement': 'photography',
-            'photo_editing': 'photography',
-            'photography': 'photography',
-            'floor_plan': 'floor_plan',
-            'floor_plans': 'floor_plan',
-            'drone': 'drone',
-            'aerial': 'drone',
-            'video': 'video',
-            'virtual_tour': 'video',
-            'default': 'photography'
-          };
-          
-          const normalizedCategory = block.service.toLowerCase().replace(/\s+/g, '_');
-          const serviceCategory = serviceCategoryMap[normalizedCategory] || serviceCategoryMap['default'];
-          
-          formData.append('fileName', block.fileName || '');
-          formData.append('mediaType', 'raw');
-          formData.append('serviceCategory', serviceCategory);
-          formData.append('instructions', block.instructions);
-          formData.append('exportType', block.exportType);
-          formData.append('customDescription', block.customDescription);
-          formData.append('categoryId', block.categoryId.toString());
-          formData.append('selectedOptionId', block.selectedOptionId?.toString() || '');
-          
-          // Upload files using fetch with FormData
-          const response = await fetch(`/api/job-cards/${selectedJobId}/files`, {
-            method: 'POST',
-            body: formData,
-            credentials: 'include',
-          });
-          
-          if (!response.ok) {
-            throw new Error(`Failed to upload files for ${block.service}`);
-          }
-        }
-      }
 
       return submissionResponse;
     },

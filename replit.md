@@ -459,6 +459,8 @@ Changelog:
   - **Service Category Fix**: Changed from 'general' to 'photography' to match enum validation requirements
   - **Enhanced Error Logging**: Added comprehensive error logging for presigned URL fetch failures
   - **Toast Notifications**: Added specific toast for timeout errors: "Request timed out - try again"
+  - **Fixed Submit to Editor**: Removed duplicate file upload logic from mutation since files are already uploaded via FileUploadModal
+  - **Successful DNG Upload**: Confirmed DNG files upload successfully via server-side proxy fallback system
 ```
 
 ## User Preferences
