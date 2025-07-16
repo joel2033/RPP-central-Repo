@@ -428,6 +428,13 @@ Changelog:
   - **S3 Connectivity Testing**: Created test scripts to verify S3 presigned URL generation and file upload functionality
   - **Comprehensive Logging**: Added detailed console logging for all S3 operations and error scenarios
   - **Verified Fix**: Confirmed S3 uploads now work correctly with proper presigned URL generation and file tagging
+- July 16, 2025. Added support for professional photography file formats (DNG, RAW, TIFF):
+  - **File Type Support**: Added support for DNG files (image/x-adobe-dng) and other RAW formats for professional photography
+  - **Frontend Validation**: Updated client-side file validation to accept DNG, CR2, NEF, ARW, and other RAW formats
+  - **Backend Validation**: Enhanced server-side S3Service to support professional photography file types
+  - **Format Support**: Added support for image/tiff, image/x-adobe-dng, image/x-canon-cr2, image/x-canon-crw, image/x-nikon-nef, image/x-sony-arw, image/x-panasonic-raw
+  - **Video Format Enhancement**: Added support for video/avi and video/mov formats
+  - **Real Estate Media**: Comprehensive file format support for real estate photography and media production workflow
 ```
 
 ## User Preferences
