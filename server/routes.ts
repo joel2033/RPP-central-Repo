@@ -1801,9 +1801,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('User found:', { id: user.id, role: user.role, licenseeId: user.licenseeId });
       
-      const jobCard = await storage.getJobCard(jobCardId, user.licenseeId);
+      // For admin users, get job card without licensee filter
+      let jobCard;
+      if (user.role === 'admin') {
+        // Admin users can access any job card - get without licensee filter
+        jobCard = await storage.getJobCards().then(cards => cards.find(card => card.id === jobCardId));
+      } else {
+        // Regular users need licensee filter
+        jobCard = await storage.getJobCard(jobCardId, user.licenseeId);
+      }
+      
       if (!jobCard) {
-        console.log('Job card not found:', { jobCardId, licenseeId: user.licenseeId });
+        console.log('Job card not found:', { jobCardId, licenseeId: user.licenseeId, isAdmin: user.role === 'admin' });
         return res.status(404).json({ message: "Job card not found" });
       }
       
@@ -1906,7 +1915,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
       
-      const jobCard = await storage.getJobCard(jobCardId, user.licenseeId);
+      // For admin users, get job card without licensee filter
+      let jobCard;
+      if (user.role === 'admin') {
+        jobCard = await storage.getJobCards().then(cards => cards.find(card => card.id === jobCardId));
+      } else {
+        jobCard = await storage.getJobCard(jobCardId, user.licenseeId);
+      }
+      
       if (!jobCard) {
         return res.status(404).json({ message: "Job card not found" });
       }
@@ -1915,11 +1931,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
       
-      // Update job status
+      // Update job status - use appropriate licenseeId for admin users
+      const licenseeIdForUpdate = user.role === 'admin' ? (jobCard.licenseeId || user.licenseeId) : user.licenseeId;
       await storage.updateJobCard(jobCardId, { 
         status: status || 'editing',
         revisionNotes: reply 
-      }, user.licenseeId);
+      }, licenseeIdForUpdate);
       
       // Log revision response activity
       await storage.createJobActivityLog({
