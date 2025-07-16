@@ -79,11 +79,11 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
     },
   });
 
-  // Fetch finished files
-  const { data: finishedFiles } = useQuery<ProductionFile[]>({
-    queryKey: ["/api/job-cards", job.id, "files", "finished"],
+  // Fetch final files
+  const { data: finalFiles } = useQuery<ProductionFile[]>({
+    queryKey: ["/api/job-cards", job.id, "files", "final"],
     queryFn: async () => {
-      const response = await apiRequest('GET', `/api/job-cards/${job.id}/files?mediaType=finished`);
+      const response = await apiRequest('GET', `/api/job-cards/${job.id}/files?mediaType=final`);
       return response;
     },
   });
@@ -336,9 +336,9 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
               <Button variant="outline" className="flex items-center gap-2">
                 <Upload className="h-4 w-4" />
                 Upload Finished Files
-                {finishedFiles && finishedFiles.length > 0 && (
+                {finalFiles && finalFiles.length > 0 && (
                   <Badge variant="secondary" className="ml-1">
-                    {finishedFiles.length}
+                    {finalFiles.length}
                   </Badge>
                 )}
               </Button>
@@ -350,7 +350,7 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
               <div className="py-4">
                 <S3FileUpload
                   jobCardId={job.id}
-                  mediaType="finished"
+                  mediaType="final"
                   onUploadComplete={handleFileUploadComplete}
                 />
               </div>
