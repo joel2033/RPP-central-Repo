@@ -3005,12 +3005,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const jobCardId = parseInt(req.params.id);
       const category = req.query.category as string;
       
+      console.log(`Fetching content items for job card ${jobCardId}, category: ${category}`);
+      
+      // Get all content items for the job card first
+      const allItems = await storage.getContentItems(jobCardId);
+      console.log(`Found ${allItems.length} total content items for job card ${jobCardId}`);
+      
       // Filter for only editor-uploaded finished content
-      const contentItems = await storage.getContentItemsFiltered(jobCardId, category, 'editor', 'finished');
+      const filteredItems = allItems.filter(item => 
+        item.uploaderRole === 'editor' && 
+        item.type === 'finished' &&
+        (!category || item.category === category)
+      );
+      
+      console.log(`After filtering for editor/finished: ${filteredItems.length} items`);
       
       // Generate presigned URLs for thumbnails if they exist
       const contentItemsWithThumbs = await Promise.all(
-        contentItems.map(async (item) => {
+        filteredItems.map(async (item) => {
           if (item.thumbUrl && s3Service) {
             try {
               const thumbnailUrl = await s3Service.getPresignedUrl(item.thumbUrl);
@@ -3024,6 +3036,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
       
+      console.log(`Returning ${contentItemsWithThumbs.length} content items with thumbnails`);
       res.json(contentItemsWithThumbs);
     } catch (error) {
       console.error('Error fetching content items:', error);
