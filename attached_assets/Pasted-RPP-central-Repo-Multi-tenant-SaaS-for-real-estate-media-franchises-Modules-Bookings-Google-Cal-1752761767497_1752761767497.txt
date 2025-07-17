@@ -1,0 +1,56 @@
+RPP-central-Repo – Multi-tenant SaaS for real estate media franchises. Modules: Bookings (Google Calendar sync), job cards (5-digit content-specific Job ID), temporary/raw uploads (3-day), permanent finished uploads (editor JPEG), editor workflows (download → upload → QC), delivery pages (branded galleries), order status tracker (Pending → In Progress → Ready for QC → Delivered). Tech: React/TypeScript frontend (TanStack Query, Radix UI/Tailwind), Node.js/Express backend, PostgreSQL/Drizzle ORM, AWS S3 storage.
+
+Issue/Enhancement from Screenshot: In the licensee job card's "Manage content" section (e.g., "Photos"), implement thumbnail previews for each finished image, matching the attached UI: Grid tiles with image thumbnails, file names (e.g., "DJI_0386.jpg"), sizes (e.g., "+ 8.25 MB"), folders (e.g., "2250x1500 X" with "New Folder"), upload button top-right, and header with "+" expander, content-specific Job ID tag (orange, e.g., "#018268"), type (e.g., "Images"), toggle (ON/OFF), and ellipsis menu.
+
+Task Overview:
+
+Generate/display thumbnails for editor-uploaded finished images in the gallery tile view.
+Match screenshot layout: Folders section, Files grid, responsive thumbnails.
+Integrate with existing filters (only editor-finished JPEGs).
+Detailed Requirements:
+
+Thumbnail Generation:
+Backend (e.g., jobController.ts or new service): On editor upload to S3, auto-generate thumbnails (e.g., resize to 300x300 via sharp lib; store as separate S3 key like thumbs/${filename}_thumb.jpg). Add thumb_url to DB (content_items table).
+If thumbnails exist, fetch presigned S3 URLs for previews.
+UI Implementation in Content Manager:
+Frontend (e.g., ManageContent.tsx or ContentSection.tsx in JobCard): Render "Photos" (or other categories) as expandable section with:
+Header: "+ Photos" (collapsible), orange Job ID tag "#XXXXX", "Images" label, ON/OFF toggle, ellipsis (...) menu (for actions like rename/delete).
+Folders: Horizontal list (e.g., "2250x1500 X" chip with close X, "New Folder" button).
+Files: Responsive grid (3-4 columns) of cards: Thumbnail image (centered, cover fit), file name below, size (e.g., "+ 8.25 MB").
+Top-right: Upload button (icon) for adding more files (VA/licensee).
+Use Tailwind for styling: Grid with gap, rounded cards, hover effects.
+Fetch Data: Use TanStack Query to load filtered content (editor-finished only), including thumb_urls.
+Gallery Functionality Tie-In:
+Click Thumbnail: Open full gallery view (carousel/lightbox) as previously implemented.
+Toggle Views: Button to switch between tiles (this grid) and full gallery.
+Integration: Update on editor upload; sync with QC status, delivery pages.
+Workflow Integration:
+Editor Upload: Triggers thumbnail gen, adds to section with auto Job ID.
+Licensee/VA: View/edit (rename sections, toggle visibility for delivery).
+Permissions: Read-only for clients; edit for VA/Admin.
+Logging: Activity entries for uploads/previews.
+Technical Implementation:
+Dependencies: Add sharp for resizing (npm install sharp if needed).
+Example Backend Thumbnail Code:
+javascript
+
+Collapse
+
+Wrap
+
+Run
+
+Copy
+const sharp = require('sharp');
+// On upload:
+const thumbBuffer = await sharp(file.buffer).resize(300, 300, { fit: 'cover' }).toBuffer();
+await s3.send(new PutObjectCommand({ Bucket: 'rpp-thumbs', Key: `thumbs/${filename}_thumb.jpg`, Body: thumbBuffer }));
+// Update DB: await db.update(contentItems).set({ thumbUrl: thumbKey }).where(eq(contentItems.id, itemId));
+Frontend Grid: Use CSS grid/flex; img src={presignedThumbUrl}.
+Edge Cases: No images (show empty state), large sets (lazy load), non-image files (fallback icon).
+Output:
+
+Updated files (e.g., ManageContent.tsx, jobController.ts, schema.ts if thumb_url added).
+Summary of changes, migrations if needed.
+Testing: Upload image via editor → Check licensee job card shows thumbnail grid matching screenshot.
+Ensure scalable, automated for QC-delivery flow, and aligns with RPP's business streamlining.

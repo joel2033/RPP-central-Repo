@@ -26,6 +26,7 @@ import { fileStorage } from "./fileStorage";
 import { requireEditor, requireAdmin, requireVA, requireAdminOrVA, requireProductionStaff } from "./middleware/roleAuth";
 import { googleCalendarService } from "./googleCalendar";
 import { s3Service } from "./services/s3Service";
+import { thumbnailService } from "./services/thumbnailService";
 import { db } from "./db";
 import { jobCards, clients } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -59,7 +60,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
 
   // Helper function to create or update content items
-  async function createOrUpdateContentItem(jobCardId: number, serviceCategory: string, userId: string) {
+  async function createOrUpdateContentItem(jobCardId: number, serviceCategory: string, userId: string, thumbnailKey?: string | null) {
     try {
       // Get existing content items for this job and category
       const existingItems = await storage.getContentItems(jobCardId, serviceCategory);
@@ -89,6 +90,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: `${categoryDisplayName} for content ID ${contentId}`,
           fileCount: categoryFiles.length,
           s3Urls: categoryFiles.map(f => f.s3Key).filter(Boolean),
+          thumbUrl: thumbnailKey,
           status: 'draft',
           uploaderRole: 'editor', // Flag editor uploads
           type: 'finished', // Flag as finished content
@@ -101,11 +103,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // Update existing content item
         const item = existingItems[0];
-        await storage.updateContentItem(item.id, {
+        const updateData: any = {
           fileCount: categoryFiles.length,
           s3Urls: categoryFiles.map(f => f.s3Key).filter(Boolean),
           updatedBy: userId,
-        });
+        };
+        
+        // Update thumbnail if provided
+        if (thumbnailKey) {
+          updateData.thumbUrl = thumbnailKey;
+        }
+        
+        await storage.updateContentItem(item.id, updateData);
         console.log(`Updated content item for job ${jobCardId}, category ${serviceCategory}`);
       }
     } catch (error) {
@@ -1489,7 +1498,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Auto-create/update content items after upload
         if (mediaType === 'finished' || mediaType === 'final') {
-          await createOrUpdateContentItem(jobCardId, serviceCategory || "photography", userId);
+          // Generate thumbnail for images
+          let thumbnailKey = null;
+          if (thumbnailService.isImageFile(file.mimetype)) {
+            try {
+              thumbnailKey = await thumbnailService.uploadThumbnail(
+                jobCardId, 
+                file.originalname, 
+                file.buffer
+              );
+              console.log(`Thumbnail generated: ${thumbnailKey}`);
+            } catch (error) {
+              console.error('Failed to generate thumbnail:', error);
+              // Continue without thumbnail - not a critical failure
+            }
+          }
+          
+          await createOrUpdateContentItem(jobCardId, serviceCategory || "photography", userId, thumbnailKey);
           
           // Auto-update job status to "Ready for QC" when editor uploads finished files
           await storage.updateJobCardStatus(jobCardId, "ready_for_qc", userId, "Finished files uploaded by editor");
@@ -2982,7 +3007,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Filter for only editor-uploaded finished content
       const contentItems = await storage.getContentItemsFiltered(jobCardId, category, 'editor', 'finished');
-      res.json(contentItems);
+      
+      // Generate presigned URLs for thumbnails if they exist
+      const contentItemsWithThumbs = await Promise.all(
+        contentItems.map(async (item) => {
+          if (item.thumbUrl && s3Service) {
+            try {
+              const thumbnailUrl = await s3Service.getPresignedUrl(item.thumbUrl);
+              return { ...item, thumbnailUrl };
+            } catch (error) {
+              console.warn(`Failed to generate thumbnail URL for ${item.thumbUrl}:`, error);
+              return item;
+            }
+          }
+          return item;
+        })
+      );
+      
+      res.json(contentItemsWithThumbs);
     } catch (error) {
       console.error('Error fetching content items:', error);
       res.status(500).json({ message: 'Failed to fetch content items' });

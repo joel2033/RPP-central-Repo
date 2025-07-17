@@ -436,6 +436,7 @@ export const contentItems = pgTable("content_items", {
   status: contentItemsStatusEnum("status").default("draft"),
   fileCount: integer("file_count").default(0),
   s3Urls: jsonb("s3_urls").$type<string[]>().default([]), // Array of S3 URLs
+  thumbUrl: varchar("thumb_url", { length: 500 }), // Thumbnail S3 URL
   displayOrder: integer("display_order").default(0),
   uploaderRole: uploaderRoleEnum("uploader_role").default("editor"), // Track who uploaded this content
   type: contentTypeEnum("type").default("finished"), // Track content type
