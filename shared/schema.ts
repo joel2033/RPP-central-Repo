@@ -421,6 +421,8 @@ export const contentIdCounter = pgTable("content_id_counter", {
 
 // Content Items table for job card content management
 export const contentItemsStatusEnum = pgEnum("content_items_status", ["draft", "ready_for_qc", "approved", "delivered", "in_revision"]);
+export const uploaderRoleEnum = pgEnum("uploader_role", ["editor", "photographer", "admin"]);
+export const contentTypeEnum = pgEnum("content_type", ["finished", "raw", "temp"]);
 
 export const contentItems = pgTable("content_items", {
   id: serial("id").primaryKey(),
@@ -435,6 +437,8 @@ export const contentItems = pgTable("content_items", {
   fileCount: integer("file_count").default(0),
   s3Urls: jsonb("s3_urls").$type<string[]>().default([]), // Array of S3 URLs
   displayOrder: integer("display_order").default(0),
+  uploaderRole: uploaderRoleEnum("uploader_role").default("editor"), // Track who uploaded this content
+  type: contentTypeEnum("type").default("finished"), // Track content type
   createdBy: varchar("created_by").notNull(),
   updatedBy: varchar("updated_by"),
   createdAt: timestamp("created_at").defaultNow(),

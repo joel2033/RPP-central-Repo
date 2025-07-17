@@ -506,6 +506,17 @@ Changelog:
   - **S3 Streaming Optimization**: Enhanced S3 download with sequential processing, retry logic, and comprehensive performance monitoring
   - **Stream Processing**: Optimized from parallel batching to sequential processing to prevent S3 throttling and improve reliability
   - **Performance Logging**: Added detailed per-file timing and total processing time tracking for ZIP creation monitoring
+- July 17, 2025. Implemented editor-only content filtering system for licensee job card displays:
+  - **Database Schema Enhancement**: Added uploaderRole and contentType enums to content_items table with proper migration
+  - **Content Filtering Logic**: Modified job card content display to show only editor-uploaded finished JPEG files
+  - **API Endpoint Updates**: Enhanced content items endpoints with filtering for uploader_role='editor' AND type='finished'
+  - **Editor Upload Flagging**: Automatic flagging of editor uploads as finished content with proper role attribution
+  - **Workflow Integration**: Editor file uploads automatically update job status to "Ready for QC" and create filtered content items
+  - **UI Filtering**: Job card content sections now display only finished JPEG files uploaded by editors via dashboard
+  - **Raw File Exclusion**: Photographer raw uploads and temporary files are completely hidden from licensee view
+  - **Content ID Generation**: Maintained unique content-specific Job IDs for each content piece with proper editor attribution
+  - **JPEG-Only Enforcement**: Strict JPEG validation ensures only finished image files are displayed in content galleries
+  - **Activity Logging**: Comprehensive tracking of editor uploads with "Finished files uploaded by editor" activity logs
 ```
 
 ## User Preferences

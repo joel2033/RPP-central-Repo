@@ -207,6 +207,7 @@ export interface IStorage {
   
   // Content Items operations
   getContentItems(jobCardId: number, category?: string): Promise<ContentItem[]>;
+  getContentItemsFiltered(jobCardId: number, category?: string, uploaderRole?: string, type?: string): Promise<ContentItem[]>;
   createContentItem(item: InsertContentItem): Promise<ContentItem>;
   updateContentItem(id: number, item: Partial<InsertContentItem>): Promise<ContentItem>;
   deleteContentItem(id: number): Promise<void>;
@@ -1369,6 +1370,24 @@ export class DatabaseStorage implements IStorage {
     
     if (serviceCategory) {
       query = query.where(eq(contentItems.category, serviceCategory));
+    }
+    
+    return await query;
+  }
+
+  async getContentItemsFiltered(jobCardId: number, serviceCategory?: string, uploaderRole?: string, type?: string): Promise<ContentItem[]> {
+    let query = db.select().from(contentItems).where(eq(contentItems.jobCardId, jobCardId));
+    
+    if (serviceCategory) {
+      query = query.where(eq(contentItems.category, serviceCategory));
+    }
+    
+    if (uploaderRole) {
+      query = query.where(eq(contentItems.uploaderRole, uploaderRole));
+    }
+    
+    if (type) {
+      query = query.where(eq(contentItems.type, type));
     }
     
     return await query;

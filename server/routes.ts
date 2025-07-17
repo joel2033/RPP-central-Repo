@@ -90,6 +90,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fileCount: categoryFiles.length,
           s3Urls: categoryFiles.map(f => f.s3Key).filter(Boolean),
           status: 'draft',
+          uploaderRole: 'editor', // Flag editor uploads
+          type: 'finished', // Flag as finished content
           createdBy: userId,
           updatedBy: userId,
         };
@@ -1488,6 +1490,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Auto-create/update content items after upload
         if (mediaType === 'finished' || mediaType === 'final') {
           await createOrUpdateContentItem(jobCardId, serviceCategory || "photography", userId);
+          
+          // Auto-update job status to "Ready for QC" when editor uploads finished files
+          await storage.updateJobCardStatus(jobCardId, "ready_for_qc", userId, "Finished files uploaded by editor");
         }
         
         res.status(201).json(savedFile);
@@ -2969,13 +2974,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Content Items API endpoints
+  // Content Items API endpoints - Filter to show only editor-uploaded finished content
   app.get('/api/job-cards/:id/content-items', isAuthenticated, async (req: any, res) => {
     try {
       const jobCardId = parseInt(req.params.id);
       const category = req.query.category as string;
       
-      const contentItems = await storage.getContentItems(jobCardId, category);
+      // Filter for only editor-uploaded finished content
+      const contentItems = await storage.getContentItemsFiltered(jobCardId, category, 'editor', 'finished');
       res.json(contentItems);
     } catch (error) {
       console.error('Error fetching content items:', error);
@@ -2995,6 +3001,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         jobCardId,
         contentId,
+        uploaderRole: 'editor', // Flag editor uploads
+        type: 'finished', // Flag as finished content
         createdBy: userId,
         updatedBy: userId
       };

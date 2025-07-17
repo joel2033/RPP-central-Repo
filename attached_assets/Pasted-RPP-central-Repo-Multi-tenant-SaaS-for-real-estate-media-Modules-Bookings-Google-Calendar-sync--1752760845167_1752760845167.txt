@@ -1,0 +1,46 @@
+RPP-central-Repo – Multi-tenant SaaS for real estate media. Modules: Bookings (Google Calendar sync), job cards (5-digit Job ID for content tracking), temporary/raw uploads (3-day, photographer), permanent finished uploads (JPEG/editor), editor workflows (download raw → "Upload Finished Files" → QC), delivery pages, order status tracker (Pending → In Progress → Ready for QC → Delivered). Tech: React/TypeScript frontend, Node.js/Express backend, PostgreSQL/Drizzle ORM, AWS S3.
+
+Issue Refinement: In licensee-end job card ("Manage content" sections like Photos), only display files uploaded by editors via "Upload Finished Files" in their dashboard (finished JPEG/content). Exclude all raw/photographer uploads or other sources.
+
+Task Overview:
+
+Flag editor uploads as 'finished'/'editor-sourced'.
+Filter job card queries to show only these files.
+Ensure integration: Update galleries, Job IDs, status on editor upload.
+Detailed Requirements:
+
+Flag Editor Uploads:
+Backend (e.g., jobController.ts, upload endpoint for "Upload Finished Files"): On editor upload, insert/update Drizzle table (content_items) with flags: uploader_role: 'editor', type: 'finished', job_id, category (e.g., 'Photos'), file_url (S3 permanent path).
+Validate: Only accept JPEG; reject others as before.
+Filter in Job Card:
+Frontend (e.g., JobCard.tsx, ManageContent.tsx): In data fetches (TanStack Query), filter by uploader_role = 'editor' AND type = 'finished'.
+Backend Queries: Update API endpoints (e.g., GET /jobs/:id/content) to include WHERE clause for these flags; return only matching files for sections (Photos, etc.).
+UI: No changes needed if empty (e.g., show placeholders); galleries/tiles only load filtered files.
+Workflow Integration:
+On Editor Upload: Auto-update order status to "Ready for QC"; notify VA/Admin.
+Licensee/VA View: Only editor files in galleries (tiles/full view), with content-specific Job IDs (e.g., "#01268" per section).
+Permissions: Editor: Upload; Licensee/VA: View filtered content; No access to raw.
+Logging: Activity log "Finished files uploaded by editor [timestamp]".
+Technical Implementation:
+DB Schema: If needed, add fields to shared/schema.ts (e.g., uploader_role enum['editor','photographer'], type enum['finished','raw']).
+Example Backend Filter:
+javascript
+
+Collapse
+
+Wrap
+
+Run
+
+Copy
+// In controller:
+const content = await db.select().from(contentItems)
+  .where(and(eq(contentItems.jobId, jobId), eq(contentItems.uploaderRole, 'editor'), eq(contentItems.type, 'finished')));
+Frontend Fetch: Add params to API calls for filtering.
+Edge Cases: No editor uploads (empty sections), mixed uploads (only show finished), multi-category.
+Output:
+
+Updated files (e.g., jobController.ts, JobCard.tsx, schema.ts if modified).
+Summary of changes, migrations (DB if fields added).
+Testing: Editor uploads JPEG → Check licensee job card shows only those; photographer raw hidden.
+Ensure scalable for licensees, automates editor-QC handover, aligns with RPP's streamlined replacement of fragmented tools.
