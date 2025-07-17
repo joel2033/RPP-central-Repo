@@ -248,7 +248,7 @@ export const S3FileUpload: React.FC<S3FileUploadProps> = ({
       };
 
       xhr.onload = () => {
-        if (xhr.status === 200) {
+        if (xhr.status === 200 || xhr.status === 201) {
           resolve();
         } else {
           reject(new Error(`Server proxy upload failed: ${xhr.status}`));
