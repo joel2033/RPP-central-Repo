@@ -26,8 +26,15 @@ export const ContentItemsManager: React.FC<ContentItemsManagerProps> = ({ jobCar
   // Fetch content items
   const { data: contentItems = [], isLoading, error } = useQuery({
     queryKey: ['content-items', jobCardId],
-    queryFn: () => apiRequest('GET', `/api/job-cards/${jobCardId}/content-items`),
+    queryFn: () => {
+      console.log(`Fetching content items for job card ${jobCardId}`);
+      return apiRequest('GET', `/api/job-cards/${jobCardId}/content-items`);
+    },
   });
+
+  console.log('ContentItemsManager - contentItems:', contentItems);
+  console.log('ContentItemsManager - isLoading:', isLoading);
+  console.log('ContentItemsManager - error:', error);
 
   // Group content items by category
   const itemsByCategory = contentItems.reduce((acc: any, item: ContentItem) => {
