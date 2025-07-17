@@ -436,6 +436,7 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
                 <S3FileUpload
                   jobCardId={job.id}
                   mediaType="final"
+                  serviceCategory="photography"
                   onUploadComplete={handleFileUploadComplete}
                   onUploadError={(error) => console.error('Upload error:', error)}
                 />

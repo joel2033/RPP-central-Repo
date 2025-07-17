@@ -33,7 +33,7 @@ export const S3FileUpload: React.FC<S3FileUploadProps> = ({
   onUploadComplete,
   onUploadError,
   mediaType = 'raw',
-  serviceCategory = 'general',
+  serviceCategory = 'photography',
   disabled = false,
   className
 }) => {
