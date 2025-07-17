@@ -35,6 +35,11 @@ export const ContentItemsManager: React.FC<ContentItemsManagerProps> = ({ jobCar
   console.log('ContentItemsManager - contentItems:', contentItems);
   console.log('ContentItemsManager - isLoading:', isLoading);
   console.log('ContentItemsManager - error:', error);
+  
+  // Add effect to log when component mounts
+  React.useEffect(() => {
+    console.log('ContentItemsManager component mounted for job card:', jobCardId);
+  }, [jobCardId]);
 
   // Group content items by category
   const itemsByCategory = contentItems.reduce((acc: any, item: ContentItem) => {

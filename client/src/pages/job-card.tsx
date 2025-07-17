@@ -423,7 +423,7 @@ export default function JobCardPage() {
                   <TabsTrigger value="virtual">Virtual Tour</TabsTrigger>
                   <TabsTrigger value="video">Video</TabsTrigger>
                   <TabsTrigger value="other">Other Files</TabsTrigger>
-                  <TabsTrigger value="content">Content Items</TabsTrigger>
+                  <TabsTrigger value="content">Content Management</TabsTrigger>
                 </TabsList>
 
                 <div className="mt-6">
