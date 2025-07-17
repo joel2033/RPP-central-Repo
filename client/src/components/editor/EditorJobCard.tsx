@@ -428,7 +428,7 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
                 )}
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Upload Finished Files</DialogTitle>
               </DialogHeader>
@@ -437,6 +437,7 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
                   jobCardId={job.id}
                   mediaType="final"
                   onUploadComplete={handleFileUploadComplete}
+                  onUploadError={(error) => console.error('Upload error:', error)}
                 />
               </div>
             </DialogContent>

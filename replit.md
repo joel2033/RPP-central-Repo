@@ -464,6 +464,15 @@ Changelog:
   - **Status Tracking**: Support for draft, ready_for_qc, and delivered status with visual indicators
   - **File Association**: Content items track file counts and S3 URLs for better organization and delivery management
   - **Test Infrastructure**: Created test endpoint for validating content items functionality
+- July 16, 2025. Fixed upload reliability issues and improved modal UI:
+  - **Enhanced Error Handling**: Improved S3 upload error detection with specific handling for empty error objects and network failures
+  - **Automatic Fallback System**: All presigned URL failures now automatically fallback to server-side proxy uploads for maximum reliability
+  - **Upload Modal Improvements**: Increased modal size to max-w-4xl with max-h-[80vh] and overflow-y-auto for better file upload experience
+  - **Timeout Configuration**: Added 60-second timeout to XMLHttpRequest uploads to prevent hanging requests
+  - **Comprehensive Error Messages**: Added specific error handling for S3 upload failures, CORS issues, and network errors
+  - **Modal Auto-Close**: Upload modal automatically closes after successful file uploads for better UX
+  - **S3 Configuration Validation**: Created test infrastructure to verify S3 configuration and connectivity
+  - **Retry Logic Enhancement**: Improved retry system with exponential backoff and better error categorization
 - July 16, 2025. Fixed timeout and validation errors in upload system:
   - **Increased Timeout**: Changed AbortController timeout from 5s to 30s for presigned URL requests
   - **AbortError Handling**: Added proper error handling for timeout errors with toast notifications

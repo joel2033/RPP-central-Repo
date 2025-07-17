@@ -12,7 +12,7 @@ import { apiRequest } from '@/lib/queryClient';
 interface S3FileUploadProps {
   jobCardId: number;
   onUploadComplete: (fileData: any) => void;
-  onUploadError: (error: string) => void;
+  onUploadError?: (error: string) => void;
   mediaType?: string;
   serviceCategory?: string;
   disabled?: boolean;
@@ -111,7 +111,7 @@ export const S3FileUpload: React.FC<S3FileUploadProps> = ({
     const validFiles = files.filter(file => {
       const validation = validateFile(file);
       if (!validation.valid) {
-        onUploadError(`${file.name}: ${validation.error}`);
+        onUploadError?.(`${file.name}: ${validation.error}`);
         return false;
       }
       return true;
@@ -154,15 +154,20 @@ export const S3FileUpload: React.FC<S3FileUploadProps> = ({
         console.error(`Upload attempt ${attempt} failed for ${file.name}:`, error);
         
         // Add specific error handling
-        let errorMessage = error.message;
-        if (error.message.includes('CORS')) {
-          errorMessage = 'Upload blocked by browser - trying alternative method';
-        } else if (error.message.includes('timeout')) {
-          errorMessage = 'Upload timed out - check your connection';
-        } else if (error.message.includes('Access Denied')) {
-          errorMessage = 'S3 access denied - check credentials';
-        } else if (error.message.includes('too large')) {
-          errorMessage = 'File too large - maximum size is 2GB';
+        let errorMessage = 'Upload failed';
+        if (error && error.message) {
+          errorMessage = error.message;
+          if (error.message.includes('CORS')) {
+            errorMessage = 'Upload blocked by browser - trying alternative method';
+          } else if (error.message.includes('timeout')) {
+            errorMessage = 'Upload timed out - check your connection';
+          } else if (error.message.includes('Access Denied')) {
+            errorMessage = 'S3 access denied - check credentials';
+          } else if (error.message.includes('too large')) {
+            errorMessage = 'File too large - maximum size is 2GB';
+          }
+        } else if (error && typeof error === 'object' && Object.keys(error).length === 0) {
+          errorMessage = 'Network error or upload blocked - trying alternative method';
         }
         
         updateFileStatus(file, 'error', 0, `Attempt ${attempt}/${retries}: ${errorMessage}`);
@@ -185,14 +190,10 @@ export const S3FileUpload: React.FC<S3FileUploadProps> = ({
       try {
         await uploadViaPresignedUrl(file);
       } catch (error: any) {
-        console.warn('Presigned URL upload failed, trying server proxy:', error.message);
+        console.warn('Presigned URL upload failed, trying server proxy:', error.message || 'Upload failed');
         
-        // Fallback to server proxy for CORS or other presigned URL issues
-        if (error.message.includes('CORS') || error.message.includes('timeout') || error.message.includes('Access Denied')) {
-          await uploadViaServerProxy(file);
-        } else {
-          throw error;
-        }
+        // Always try server proxy as fallback for any presigned URL error
+        await uploadViaServerProxy(file);
       }
       
       updateFileStatus(file, 'success', 100);
@@ -278,15 +279,20 @@ export const S3FileUpload: React.FC<S3FileUploadProps> = ({
         if (xhr.status === 200) {
           resolve();
         } else {
-          reject(new Error(`Upload failed with status ${xhr.status}`));
+          reject(new Error(`S3 upload failed with status ${xhr.status}: ${xhr.statusText}`));
         }
       };
 
-      xhr.onerror = () => {
-        reject(new Error('Upload failed'));
+      xhr.onerror = (event) => {
+        reject(new Error(`S3 upload network error: ${event.type}`));
+      };
+
+      xhr.ontimeout = () => {
+        reject(new Error('S3 upload timed out'));
       };
 
       xhr.open('PUT', uploadUrl);
+      xhr.timeout = 60000; // 60 second timeout
       xhr.setRequestHeader('Content-Type', file.type);
       xhr.send(file);
     });
