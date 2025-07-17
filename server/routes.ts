@@ -61,36 +61,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Helper function to create or update content items
   async function createOrUpdateContentItem(jobCardId: number, serviceCategory: string, userId: string) {
     try {
-      // Get job card to get job ID
-      const jobCard = await storage.getJobCard(jobCardId);
-      if (!jobCard?.jobId) {
-        console.log(`Job card ${jobCardId} does not have a Job ID assigned`);
-        return;
-      }
-      
       // Get existing content items for this job and category
       const existingItems = await storage.getContentItems(jobCardId, serviceCategory);
       
-      // Generate content item name based on job ID and category
+      // Generate content item name based on category
       const categoryDisplayName = serviceCategory === 'photography' ? 'Images' : 
                                   serviceCategory === 'floor_plan' ? 'Floor Plans' :
                                   serviceCategory === 'drone' ? 'Drone' :
                                   serviceCategory === 'video' ? 'Video' :
                                   'Other';
       
-      const itemName = `#${jobCard.jobId} ${categoryDisplayName} ON`;
-      
-      // Get files for this category
+      // Get files for this category - only finished/final files
       const files = await storage.getProductionFiles(jobCardId);
       const categoryFiles = files.filter(f => f.serviceCategory === serviceCategory && (f.mediaType === 'finished' || f.mediaType === 'final'));
       
       if (existingItems.length === 0) {
+        // Generate unique content ID for this content item
+        const contentId = await storage.generateContentId();
+        const itemName = `#${contentId} ${categoryDisplayName} ON`;
+        
         // Create new content item
         const contentItem = {
           jobCardId,
+          contentId,
           category: serviceCategory,
           name: itemName,
-          description: `${categoryDisplayName} for job ${jobCard.jobId}`,
+          description: `${categoryDisplayName} for content ID ${contentId}`,
           fileCount: categoryFiles.length,
           s3Urls: categoryFiles.map(f => f.s3Key).filter(Boolean),
           status: 'draft',
@@ -99,7 +95,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
         
         await storage.createContentItem(contentItem);
-        console.log(`Created content item for job ${jobCardId}, category ${serviceCategory}`);
+        console.log(`Created content item for job ${jobCardId}, category ${serviceCategory}, content ID: ${contentId}`);
       } else {
         // Update existing content item
         const item = existingItems[0];
@@ -2970,6 +2966,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: 'Content items test failed',
         error: error.message
       });
+    }
+  });
+
+  // Content Items API endpoints
+  app.get('/api/job-cards/:id/content-items', isAuthenticated, async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const category = req.query.category as string;
+      
+      const contentItems = await storage.getContentItems(jobCardId, category);
+      res.json(contentItems);
+    } catch (error) {
+      console.error('Error fetching content items:', error);
+      res.status(500).json({ message: 'Failed to fetch content items' });
+    }
+  });
+
+  app.post('/api/job-cards/:id/content-items', isAuthenticated, async (req: any, res) => {
+    try {
+      const jobCardId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      
+      // Generate content ID
+      const contentId = await storage.generateContentId();
+      
+      const contentItem = {
+        ...req.body,
+        jobCardId,
+        contentId,
+        createdBy: userId,
+        updatedBy: userId
+      };
+      
+      const createdItem = await storage.createContentItem(contentItem);
+      res.status(201).json(createdItem);
+    } catch (error) {
+      console.error('Error creating content item:', error);
+      res.status(500).json({ message: 'Failed to create content item' });
+    }
+  });
+
+  app.put('/api/content-items/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      
+      const updates = {
+        ...req.body,
+        updatedBy: userId
+      };
+      
+      const updatedItem = await storage.updateContentItem(id, updates);
+      res.json(updatedItem);
+    } catch (error) {
+      console.error('Error updating content item:', error);
+      res.status(500).json({ message: 'Failed to update content item' });
+    }
+  });
+
+  app.delete('/api/content-items/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      await storage.deleteContentItem(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error('Error deleting content item:', error);
+      res.status(500).json({ message: 'Failed to delete content item' });
     }
   });
 

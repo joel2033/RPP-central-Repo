@@ -72,6 +72,10 @@ import {
   type InsertEditorServicePricing,
   type EditorServiceChangeLog,
   type InsertEditorServiceChangeLog,
+  contentItems,
+  contentIdCounter,
+  type ContentItem,
+  type InsertContentItem,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, count } from "drizzle-orm";
@@ -200,6 +204,15 @@ export interface IStorage {
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: string, product: Partial<InsertProduct>, licenseeId: string): Promise<Product>;
   deleteProduct(id: string, licenseeId: string): Promise<void>;
+  
+  // Content Items operations
+  getContentItems(jobCardId: number, category?: string): Promise<ContentItem[]>;
+  createContentItem(item: InsertContentItem): Promise<ContentItem>;
+  updateContentItem(id: number, item: Partial<InsertContentItem>): Promise<ContentItem>;
+  deleteContentItem(id: number): Promise<void>;
+  
+  // Content ID operations
+  generateContentId(): Promise<string>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1371,9 +1384,30 @@ export class DatabaseStorage implements IStorage {
     return updatedItem || null;
   }
 
-  async deleteContentItem(id: number): Promise<boolean> {
-    const result = await db.delete(contentItems).where(eq(contentItems.id, id));
-    return result.rowCount > 0;
+  async deleteContentItem(id: number): Promise<void> {
+    await db.delete(contentItems).where(eq(contentItems.id, id));
+  }
+
+  // Content ID generation
+  async generateContentId(): Promise<string> {
+    return await db.transaction(async (tx) => {
+      // Get or create counter
+      let [counter] = await tx.select().from(contentIdCounter).limit(1);
+      
+      if (!counter) {
+        [counter] = await tx.insert(contentIdCounter).values({ currentId: 0 }).returning();
+      }
+      
+      // Increment counter
+      const newId = counter.currentId + 1;
+      await tx.update(contentIdCounter).set({ 
+        currentId: newId, 
+        lastUpdated: new Date() 
+      }).where(eq(contentIdCounter.id, counter.id));
+      
+      // Return 5-digit padded content ID
+      return newId.toString().padStart(5, '0');
+    });
   }
 }
 

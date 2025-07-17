@@ -1,0 +1,45 @@
+Filter Uploads to JPEG Only, Add Gallery Views, and Display Content-Specific Job IDs in Job Cards for RPP SaaS Platform
+
+Project Context: RPP-central-Repo – Multi-tenant SaaS for real estate media. Modules: Bookings (Google Calendar), job cards (track photographer-editor jobs via 5-digit Job ID), temporary/raw uploads (3-day DNG/RAW), permanent finished uploads (JPEG), editor workflows (download raw → upload JPEG → QC), delivery pages (gallery previews), order status tracker (Pending → In Progress → Delivered). Tech: React/TypeScript frontend (TanStack Query, Radix UI/Tailwind), Node.js/Express backend, PostgreSQL/Drizzle ORM, AWS S3 storage.
+
+Issues from Screenshots and Description:
+
+Upload Filtering: Job card "Manage content" includes raw/DNG images; only finished JPEG files should upload/display here (post-editor).
+Gallery Options: Need tile view (grid thumbnails like second screenshot) and full gallery view (large previews/carousel like third screenshot) from licensee job card end.
+Job ID Display: Job ID is content-specific (for edited uploads tracking between photographer/editor), not job-wide. Display as orange tag (e.g., "#01268") on relevant sections (Photos, Floor plan, etc., like first screenshot).
+Task Overview:
+
+Filter uploads to accept/display only JPEG in job cards.
+Add gallery modes: Tiles (grid) and Gallery (full view) in "Manage content".
+Make Job ID content-specific: Auto-assign/display per category on upload.
+Detailed Requirements:
+
+Upload Filtering (JPEG Only):
+Frontend (e.g., UploadModal.tsx or ManageContent.tsx): Validate file extensions (.jpg/.jpeg) before submit; reject others with error ("Only JPEG finished files allowed").
+Backend (e.g., jobController.ts upload endpoint): Check MIME/type/extension on S3 PutObject; store in permanent path (e.g., jobs/${jobId}/finished/${category}/${filename}). Exclude raw/DNG from queries/fetching in job card.
+Integration: On editor upload, only JPEG trigger DB insert (content_items table: job_id, category, file_url, type: 'finished'). Update status to "Ready for QC".
+Gallery Options in Job Card:
+In "Manage content" (e.g., JobCard.tsx or ContentSection.tsx): Add toggle button (Tiles/Gallery) next to categories.
+Tile View: Grid layout (like second screenshot) with thumbnails (S3 presigned URLs), file names/sizes, folders (if grouped), upload button.
+Gallery View: Full-screen modal or inline carousel (like third screenshot) with large images, navigation arrows, download icons, zoom. Use libraries like react-photo-gallery or Radix for lightbox if needed (add dep minimally).
+Licensee End: Accessible to VA/Admin/Licensee roles; preview ties to delivery pages (client-facing branded views).
+Content-Specific Job ID Display:
+Job ID Logic: Generate 5-digit unique ID per content category on editor upload (not job-wide). Store in DB (e.g., add content_id field to content_items, display as "#${content_id}").
+UI: Show as orange tag in section headers (e.g., "Photos #01268 Images ON"), like first screenshot. Purpose: Track specific edited batches between photographer/editor.
+No global Job ID on card; only per-section for handover tracking.
+Workflow Integration:
+Editor: Uploads JPEG → Auto-creates/updates sections with Job ID, notifies VA for QC.
+Licensee/VA: View galleries in job card; edit names (e.g., input field for "Photos"), toggle ON/OFF.
+Permissions: Editor: Upload; Licensee/VA: View/edit galleries; Client: Gallery via delivery pages.
+Logging: Activity entries (e.g., "JPEG uploaded to #XXXXX [timestamp]"); sync order tracker.
+Technical Implementation:
+Frontend: Use Tailwind for grids/modals; fetch S3 thumbnails via presigned URLs.
+Backend: Update queries to filter 'finished' type; generate content-specific IDs (e.g., db sequence or UUID slice).
+Edge Cases: Non-JPEG rejects, empty sections, large galleries (lazy load), multi-licensee isolation.
+Dependencies: If needed, react-photo-gallery for carousel (npm install minimally).
+Output:
+
+Updated files (e.g., JobCard.tsx, ContentSection.tsx, jobController.ts, schema.ts if fields added).
+Summary of changes, DB migrations if needed.
+Testing: Upload JPEG/DNG (reject DNG), toggle views, check Job ID display per section.
+Ensure scalable, automated for editor-QC-delivery flow, and aligns with RPP's replacement of fragmented tools.

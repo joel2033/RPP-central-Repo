@@ -8,8 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Package, Filter, Search, RefreshCw } from 'lucide-react';
+import { Plus, Package, Filter, Search, RefreshCw, Upload } from 'lucide-react';
 import { ContentItemCard } from './ContentItemCard';
+import { ContentGallery } from './ContentGallery';
+import { JPEGFileUpload } from './JPEGFileUpload';
 import { ContentItem } from '@shared/schema';
 import { apiRequest } from '@/lib/queryClient';
 
@@ -22,6 +24,8 @@ export const ContentItemsManager: React.FC<ContentItemsManagerProps> = ({ jobCar
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('photography');
   const [newItem, setNewItem] = useState({
     name: '',
     description: '',

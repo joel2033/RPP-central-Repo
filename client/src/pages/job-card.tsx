@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { JobIdBadge } from "@/components/JobIdBadge";
-import { ContentItemsManager } from "@/components/ContentItemsManager";
+import { ContentItemsManager } from "@/components/ContentItemsManagerNew";
 
 interface JobCardDetails {
   id: number;

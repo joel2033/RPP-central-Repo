@@ -412,12 +412,20 @@ export const jobCardDeliverySettings = pgTable("job_card_delivery_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Content ID Counter table for generating unique content IDs
+export const contentIdCounter = pgTable("content_id_counter", {
+  id: serial("id").primaryKey(),
+  currentId: integer("current_id").notNull().default(0),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+});
+
 // Content Items table for job card content management
 export const contentItemsStatusEnum = pgEnum("content_items_status", ["draft", "ready_for_qc", "approved", "delivered", "in_revision"]);
 
 export const contentItems = pgTable("content_items", {
   id: serial("id").primaryKey(),
   jobCardId: integer("job_card_id").notNull(),
+  contentId: varchar("content_id", { length: 10 }).unique(), // e.g., "01268" - 5-digit content-specific ID
   category: serviceCategoryEnum("category").notNull(), // photos, floor_plans, video, virtual_tour, other
   name: varchar("name", { length: 255 }).notNull(), // e.g., "#01376 Images ON"
   description: text("description"),
