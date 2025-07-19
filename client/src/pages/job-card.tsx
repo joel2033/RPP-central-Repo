@@ -5,22 +5,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
 import { 
   MapPin, 
   Calendar, 
   User, 
   Building, 
   DollarSign,
-  Upload,
-  Download,
-  Eye,
   Clock,
-  FileImage,
-  Video,
-  Map,
-  FolderOpen,
   Activity
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -192,120 +184,9 @@ export default function JobCardPage() {
     return `https://www.google.com/maps/embed/v1/place?key=YOUR_API_KEY&q=${encodeURIComponent(address)}`;
   };
 
-  const getFilesByCategory = (category: string) => {
-    return productionFiles?.filter(file => file.serviceCategory === category) || [];
-  };
 
-  // Gallery modal state
-  const [galleryOpen, setGalleryOpen] = useState(false);
-  const [selectedFileIndex, setSelectedFileIndex] = useState(0);
-  const [galleryFiles, setGalleryFiles] = useState<ProductionFile[]>([]);
 
-  const openGallery = (fileId: number, files: ProductionFile[]) => {
-    const index = files.findIndex(f => f.id === fileId);
-    setSelectedFileIndex(index);
-    setGalleryFiles(files);
-    setGalleryOpen(true);
-  };
 
-  const getFileUrl = (file: ProductionFile) => {
-    if (file.filePath?.startsWith('http')) {
-      return file.filePath;
-    }
-    return `https://rppcentral.s3.ap-southeast-2.amazonaws.com/${file.filePath}`;
-  };
-
-  const getThumbnailUrl = (file: ProductionFile) => {
-    // For S3 files, try to get thumbnail by adding 'thumb_' prefix
-    if (file.filePath) {
-      const pathParts = file.filePath.split('/');
-      const fileName = pathParts[pathParts.length - 1];
-      const thumbPath = pathParts.slice(0, -1).join('/') + '/thumb_' + fileName;
-      return `https://rppcentral.s3.ap-southeast-2.amazonaws.com/${thumbPath}`;
-    }
-    return null;
-  };
-
-  const renderFileGrid = (files: ProductionFile[]) => {
-    if (files.length === 0) {
-      return (
-        <div className="text-center py-8 text-gray-500">
-          <FolderOpen className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-          <p>No files uploaded yet</p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {files.map((file) => (
-          <Card key={file.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-            <CardContent className="p-4">
-              <div 
-                className="aspect-square rounded-lg overflow-hidden mb-3 bg-gray-100"
-                onClick={() => openGallery(file.id, files)}
-              >
-                {file.mimeType?.startsWith('image/') ? (
-                  <img 
-                    src={getThumbnailUrl(file) || getFileUrl(file)} 
-                    alt={file.originalName || file.fileName}
-                    className="w-full h-full object-cover hover:scale-105 transition-transform"
-                    onError={(e) => {
-                      // Fallback to original file if thumbnail fails
-                      const target = e.target as HTMLImageElement;
-                      if (target.src !== getFileUrl(file)) {
-                        target.src = getFileUrl(file);
-                      }
-                    }}
-                  />
-                ) : file.mimeType?.startsWith('video/') ? (
-                  <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                    <Video className="h-8 w-8 text-gray-400" />
-                  </div>
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                    <FolderOpen className="h-8 w-8 text-gray-400" />
-                  </div>
-                )}
-              </div>
-              <p className="text-sm font-medium truncate" title={file.originalName}>
-                {file.originalName || file.fileName}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                {file.fileSize ? `${(file.fileSize / 1024 / 1024).toFixed(1)} MB` : 'Unknown size'} • {new Date(file.uploadedAt).toLocaleDateString()}
-              </p>
-              <div className="flex gap-1 mt-2">
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="flex-1"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openGallery(file.id, files);
-                  }}
-                >
-                  <Eye className="h-3 w-3 mr-1" />
-                  View
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="flex-1"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    window.open(getFileUrl(file), '_blank');
-                  }}
-                >
-                  <Download className="h-3 w-3 mr-1" />
-                  Download
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    );
-  };
 
   if (isLoading) {
     return (
@@ -528,91 +409,7 @@ export default function JobCardPage() {
         </div>
       </div>
 
-      {/* Gallery Modal */}
-      <Dialog open={galleryOpen} onOpenChange={setGalleryOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
-          <DialogHeader className="p-6 pb-0">
-            <DialogTitle>
-              {galleryFiles[selectedFileIndex]?.originalName || galleryFiles[selectedFileIndex]?.fileName}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="p-6">
-            {galleryFiles[selectedFileIndex] && (
-              <div className="space-y-4">
-                <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden">
-                  {galleryFiles[selectedFileIndex]?.mimeType?.startsWith('image/') ? (
-                    <img 
-                      src={getFileUrl(galleryFiles[selectedFileIndex])}
-                      alt={galleryFiles[selectedFileIndex].originalName || galleryFiles[selectedFileIndex].fileName}
-                      className="w-full h-full object-contain"
-                    />
-                  ) : galleryFiles[selectedFileIndex]?.mimeType?.startsWith('video/') ? (
-                    <video 
-                      src={getFileUrl(galleryFiles[selectedFileIndex])}
-                      controls
-                      className="w-full h-full"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <FolderOpen className="h-16 w-16 text-gray-400" />
-                    </div>
-                  )}
-                </div>
-                
-                {/* Gallery Navigation */}
-                {galleryFiles.length > 1 && (
-                  <div className="flex items-center justify-between">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setSelectedFileIndex(Math.max(0, selectedFileIndex - 1))}
-                      disabled={selectedFileIndex === 0}
-                    >
-                      Previous
-                    </Button>
-                    <span className="text-sm text-gray-500">
-                      {selectedFileIndex + 1} of {galleryFiles.length}
-                    </span>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setSelectedFileIndex(Math.min(galleryFiles.length - 1, selectedFileIndex + 1))}
-                      disabled={selectedFileIndex === galleryFiles.length - 1}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                )}
-                
-                {/* File Details */}
-                <div className="bg-gray-50 rounded-lg p-4 text-sm">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <span className="font-medium">File Size:</span> {galleryFiles[selectedFileIndex]?.fileSize ? `${(galleryFiles[selectedFileIndex].fileSize / 1024 / 1024).toFixed(1)} MB` : 'Unknown'}
-                    </div>
-                    <div>
-                      <span className="font-medium">Type:</span> {galleryFiles[selectedFileIndex]?.mimeType || 'Unknown'}
-                    </div>
-                    <div>
-                      <span className="font-medium">Uploaded:</span> {new Date(galleryFiles[selectedFileIndex]?.uploadedAt).toLocaleDateString()}
-                    </div>
-                    <div>
-                      <span className="font-medium">Category:</span> {galleryFiles[selectedFileIndex]?.serviceCategory}
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Download Button */}
-                <Button 
-                  className="w-full"
-                  onClick={() => window.open(getFileUrl(galleryFiles[selectedFileIndex]), '_blank')}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download File
-                </Button>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+
     </div>
   );
 }
