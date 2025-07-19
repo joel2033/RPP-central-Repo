@@ -55,21 +55,29 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
   });
 
   // Fetch finished content items (editor uploads)
-  const { data: contentItems = [], isLoading: isLoadingContent, refetch } = useQuery({
+  const { data: contentItems = [], isLoading: isLoadingContent, refetch, error: contentError } = useQuery({
     queryKey: ['content-items', jobCardId],
     queryFn: async () => {
-      console.log(`🔍 Fetching content items for job card ${jobCardId}`);
+      console.log(`🔍 UnifiedFileManagement - Fetching content items for job card ${jobCardId}`);
       try {
         const response = await apiRequest('GET', `/api/job-cards/${jobCardId}/content-items`);
-        console.log(`✅ Content items response:`, response);
+        console.log(`✅ UnifiedFileManagement - Content items response:`, response);
         return response || [];
       } catch (err) {
-        console.error(`❌ Error fetching content items:`, err);
+        console.error(`❌ UnifiedFileManagement - Error fetching content items:`, err);
+        // Return empty array on error to avoid breaking the UI
         return [];
       }
     },
     staleTime: 30000,
+    // Don't retry on auth errors
+    retry: false,
   });
+
+  // Log the content error if it exists
+  if (contentError) {
+    console.error('UnifiedFileManagement - Content items query error:', contentError);
+  }
 
   const isLoading = isLoadingFiles || isLoadingContent;
 
