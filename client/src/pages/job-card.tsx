@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { JobIdBadge } from "@/components/JobIdBadge";
-import { ContentItemsManager } from "@/components/ContentItemsManagerNew";
+import { ContentManagementGrid } from "@/components/ContentManagementGrid";
 
 interface JobCardDetails {
   id: number;
@@ -558,7 +558,7 @@ export default function JobCardPage() {
                   </TabsContent>
                   
                   <TabsContent value="content">
-                    <ContentItemsManager jobCardId={jobCard.id} />
+                    <ContentManagementGrid jobCardId={jobCard.id} />
                   </TabsContent>
                 </div>
               </Tabs>
