@@ -44,7 +44,7 @@ import { cn } from "@/lib/utils";
 import DeliverySettingsModal from "@/components/delivery-settings-modal";
 import JobStatusPanel from "@/components/job-status-panel";
 import DeliverySectionReorder from "@/components/delivery-section-reorder";
-import ContentManagement from "@/components/ContentManagement";
+
 
 interface JobDetail {
   id: number;
@@ -636,30 +636,9 @@ export default function JobDetailPage() {
                   <CardTitle>Content Management</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ContentManagement 
-                    jobId={job.jobId}
-                    contentPieces={files.map(file => ({
-                      id: file.id.toString(),
-                      jobId: job.jobId,
-                      fileName: file.fileName,
-                      serviceCategory: file.serviceCategory || 'other',
-                      mediaType: file.mediaType,
-                      cost: 0, // Will be calculated from service pricing
-                      completedBy: job.editor?.email || 'System',
-                      completedAt: job.completedAt || new Date().toISOString(),
-                      metadata: {
-                        editorName: job.editor ? `${job.editor.firstName} ${job.editor.lastName}` : 'Unknown',
-                        qcStatus: 'Ready for delivery',
-                        instructionsFollowed: 'All client instructions followed as specified',
-                        qcIssues: 'No issues flagged - ready for client delivery'
-                      }
-                    }))}
-                    finalCost={job.booking.totalPrice || 0}
-                    completionTimestamp={job.completedAt || new Date().toISOString()}
-                    editorName={job.editor ? `${job.editor.firstName} ${job.editor.lastName}` : 'Unknown'}
-                    instructionsFollowed="All client instructions followed as specified"
-                    qcIssues="No issues flagged - ready for client delivery"
-                  />
+                  <div className="text-center py-8 text-gray-500">
+                    Content management functionality moved to job card page.
+                  </div>
                 </CardContent>
               </Card>
             )}
