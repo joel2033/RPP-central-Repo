@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { JobIdBadge } from "@/components/JobIdBadge";
-import { ContentManagementGrid } from "@/components/ContentManagementGrid";
+import { UnifiedFileManagement } from "@/components/UnifiedFileManagement";
 
 interface JobCardDetails {
   id: number;
@@ -138,7 +138,7 @@ export default function JobCardPage() {
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState("photos");
+
   const jobId = params?.id;
 
   const { data: jobCard, isLoading } = useQuery<JobCardDetails>({
@@ -474,94 +474,14 @@ export default function JobCardPage() {
           </Card>
         </div>
 
-        {/* Right Column - Content Management */}
+        {/* Right Column - Files & Media Management */}
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle>Manage Content</CardTitle>
+              <CardTitle>Files & Media</CardTitle>
             </CardHeader>
             <CardContent>
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-6">
-                  <TabsTrigger value="photos">Photos</TabsTrigger>
-                  <TabsTrigger value="floorplan">Floor Plan</TabsTrigger>
-                  <TabsTrigger value="virtual">Virtual Tour</TabsTrigger>
-                  <TabsTrigger value="video">Video</TabsTrigger>
-                  <TabsTrigger value="other">Other Files</TabsTrigger>
-                  <TabsTrigger value="content">Content Management</TabsTrigger>
-                </TabsList>
-
-                <div className="mt-6">
-                  <TabsContent value="photos">
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-medium">Photography Files</h3>
-                        <Button size="sm">
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload Photos
-                        </Button>
-                      </div>
-                      {renderFileGrid(getFilesByCategory("photography"))}
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="floorplan">
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-medium">Floor Plan Files</h3>
-                        <Button size="sm">
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload Floor Plans
-                        </Button>
-                      </div>
-                      {renderFileGrid(getFilesByCategory("floor_plan"))}
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="virtual">
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-medium">Virtual Tour Files</h3>
-                        <Button size="sm">
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload Virtual Tours
-                        </Button>
-                      </div>
-                      {renderFileGrid(getFilesByCategory("virtual_tour"))}
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="video">
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-medium">Video Files</h3>
-                        <Button size="sm">
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload Videos
-                        </Button>
-                      </div>
-                      {renderFileGrid(getFilesByCategory("video"))}
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="other">
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-medium">Other Files</h3>
-                        <Button size="sm">
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload Files
-                        </Button>
-                      </div>
-                      {renderFileGrid(getFilesByCategory("other"))}
-                    </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="content">
-                    <ContentManagementGrid jobCardId={jobCard.id} />
-                  </TabsContent>
-                </div>
-              </Tabs>
+              <UnifiedFileManagement jobCardId={jobCard.id} />
             </CardContent>
           </Card>
 
