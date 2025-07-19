@@ -68,7 +68,6 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
 
   console.log('🔍 UnifiedFileManagement - All production files:', allProductionFiles.length);
   console.log('🔍 UnifiedFileManagement - Filtered production files (non-RAW):', productionFiles.length);
-  console.log('🔍 UnifiedFileManagement - Content items (editor uploads):', contentItems.length);
 
   // Fetch finished content items (editor uploads)
   const { data: contentItems = [], isLoading: isLoadingContent, refetch, error: contentError } = useQuery({
@@ -94,6 +93,9 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
   if (contentError) {
     console.error('UnifiedFileManagement - Content items query error:', contentError);
   }
+
+  // Debug: Log content items count after they're loaded
+  console.log('🔍 UnifiedFileManagement - Content items (editor uploads):', contentItems.length);
 
   const isLoading = isLoadingFiles || isLoadingContent;
 
