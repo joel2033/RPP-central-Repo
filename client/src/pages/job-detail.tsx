@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   MapPin, 
@@ -44,6 +44,7 @@ import { cn } from "@/lib/utils";
 import DeliverySettingsModal from "@/components/delivery-settings-modal";
 import JobStatusPanel from "@/components/job-status-panel";
 import DeliverySectionReorder from "@/components/delivery-section-reorder";
+import { UnifiedFileManagement } from "@/components/UnifiedFileManagement";
 
 
 interface JobDetail {
@@ -146,7 +147,6 @@ export default function JobDetailPage() {
   
   console.log("Job Detail Page - ID from params:", id);
   
-  const [activeTab, setActiveTab] = useState("photos");
   const [showActivity, setShowActivity] = useState(false);
   const [editingPreferences, setEditingPreferences] = useState(false);
   const [preferencesText, setPreferencesText] = useState("");
@@ -215,9 +215,7 @@ export default function JobDetailPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const getFilesByCategory = (category: string) => {
-    return files.filter(file => file.serviceCategory === category || file.mediaType === category);
-  };
+
 
   const getGoogleMapsUrl = (address: string) => {
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
@@ -514,7 +512,7 @@ export default function JobDetailPage() {
               </CardContent>
             </Card>
 
-            {/* File Management Section */}
+            {/* Unified File Management Section */}
             <Card className="mb-6">
               <CardHeader>
                 <div className="flex justify-between items-center">
@@ -526,122 +524,9 @@ export default function JobDetailPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="grid w-full grid-cols-5">
-                    <TabsTrigger value="photos" className="flex items-center gap-2">
-                      <Camera className="h-4 w-4" />
-                      Photos
-                    </TabsTrigger>
-                    <TabsTrigger value="floor_plans" className="flex items-center gap-2">
-                      <Building className="h-4 w-4" />
-                      Floor Plans
-                    </TabsTrigger>
-                    <TabsTrigger value="video" className="flex items-center gap-2">
-                      <Video className="h-4 w-4" />
-                      Video
-                    </TabsTrigger>
-                    <TabsTrigger value="virtual_tour" className="flex items-center gap-2">
-                      <Globe className="h-4 w-4" />
-                      Virtual Tour
-                    </TabsTrigger>
-                    <TabsTrigger value="other" className="flex items-center gap-2">
-                      <Folder className="h-4 w-4" />
-                      Other
-                    </TabsTrigger>
-                  </TabsList>
-
-                  {['photos', 'floor_plans', 'video', 'virtual_tour', 'other'].map((category) => (
-                    <TabsContent key={category} value={category} className="mt-6">
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8">
-                        <div className="text-center">
-                          <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                          <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                            Drop files here or click to upload
-                          </h3>
-                          <p className="text-gray-600 mb-4">
-                            Upload {category.replace('_', ' ')} files for this job
-                          </p>
-                          <Button>
-                            <Upload className="h-4 w-4 mr-2" />
-                            Choose Files
-                          </Button>
-                        </div>
-                        
-                        {/* Display existing files */}
-                        {getFilesByCategory(category).length > 0 && (
-                          <div className="mt-6 pt-6 border-t">
-                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                              {getFilesByCategory(category).map((file) => (
-                                <div key={file.id} className="group relative">
-                                  <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                                    {file.mediaType.startsWith('image/') ? (
-                                      <img 
-                                        src={file.filePath} 
-                                        alt={file.fileName}
-                                        className="w-full h-full object-cover"
-                                      />
-                                    ) : (
-                                      <div className="w-full h-full flex items-center justify-center">
-                                        <FileText className="h-8 w-8 text-gray-400" />
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="mt-2">
-                                    <p className="text-xs font-medium text-gray-900 truncate">
-                                      {file.fileName}
-                                    </p>
-                                    <p className="text-xs text-gray-500">
-                                      {formatFileSize(file.fileSize)}
-                                    </p>
-                                  </div>
-                                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <Button variant="secondary" size="sm">
-                                          <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent>
-                                        <DropdownMenuItem>
-                                          <Download className="h-4 w-4 mr-2" />
-                                          Download
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem>
-                                          <Edit className="h-4 w-4 mr-2" />
-                                          Rename
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem className="text-red-600">
-                                          <X className="h-4 w-4 mr-2" />
-                                          Delete
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </TabsContent>
-                  ))}
-                </Tabs>
+                <UnifiedFileManagement jobCardId={job.id} />
               </CardContent>
             </Card>
-
-            {/* Content Management Section - Show when job is completed */}
-            {(job.status === 'ready_for_qc' || job.status === 'delivered') && (
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle>Content Management</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-8 text-gray-500">
-                    Content management functionality moved to job card page.
-                  </div>
-                </CardContent>
-              </Card>
-            )}
 
             {/* Activity Log */}
             <Card>
