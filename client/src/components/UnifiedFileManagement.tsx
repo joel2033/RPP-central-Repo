@@ -48,10 +48,16 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
   const [activeView, setActiveView] = useState<'grid' | 'list'>('grid');
   const [folders] = useState(['2250x1500']);
 
+  // Debug: Log component mount and jobCardId
+  console.log('🚀 UnifiedFileManagement component rendered with jobCardId:', jobCardId);
+
   // Fetch regular production files
   const { data: productionFiles = [], isLoading: isLoadingFiles } = useQuery({
     queryKey: ['production-files', jobCardId],
-    queryFn: () => apiRequest('GET', `/api/jobs/${jobCardId}/files`),
+    queryFn: () => {
+      console.log('🔍 UnifiedFileManagement - Fetching production files for:', jobCardId);
+      return apiRequest('GET', `/api/jobs/${jobCardId}/files`);
+    },
   });
 
   // Fetch finished content items (editor uploads)
