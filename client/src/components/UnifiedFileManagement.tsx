@@ -138,7 +138,7 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
     
     // First try the generated thumbnailUrl (presigned URL)
     if (item.thumbnailUrl) {
-      console.log('✅ Using thumbnailUrl:', item.thumbnailUrl);
+      console.log('✅ Using thumbnailUrl (presigned):', item.thumbnailUrl.substring(0, 60) + '...');
       return item.thumbnailUrl;
     }
     
@@ -179,6 +179,7 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
   // Manual refetch button for testing
   const handleManualRefetch = () => {
     console.log('🔄 Manually refetching content items...');
+    // Add timestamp to force cache invalidation
     refetch();
   };
 
@@ -307,6 +308,12 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
             <Image className="h-5 w-5 text-gray-600" />
             <h2 className="text-lg font-medium">Files & Media</h2>
           </div>
+          <button 
+            onClick={handleManualRefetch}
+            className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            🔄 Refresh URLs
+          </button>
           <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200">
             #{jobCardId.toString().padStart(6, '0')}
           </Badge>

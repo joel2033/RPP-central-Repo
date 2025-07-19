@@ -3005,12 +3005,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const jobCardId = parseInt(req.params.id);
       const category = req.query.category as string;
       
-      console.log(`Fetching content items for job card ${jobCardId}, category: ${category}`);
+      console.log(`🔍 Fetching content items for job card ${jobCardId}, category: ${category}`);
+      console.log(`🔍 S3 Service available:`, !!s3Service);
       
       // Get all content items for the job card first
       const allItems = await storage.getContentItems(jobCardId);
-      console.log(`Found ${allItems.length} total content items for job card ${jobCardId}`);
-      console.log(`Sample item thumbUrls:`, allItems.slice(0, 2).map(item => ({ name: item.name, thumbUrl: item.thumbUrl })));
+      console.log(`🔍 Found ${allItems.length} total content items for job card ${jobCardId}`);
+      console.log(`🔍 Sample item thumbUrls:`, allItems.slice(0, 2).map(item => ({ name: item.name, thumbUrl: item.thumbUrl })));
       
       // Filter for only editor-uploaded finished content
       const filteredItems = allItems.filter(item => 
