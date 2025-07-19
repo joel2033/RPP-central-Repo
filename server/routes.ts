@@ -3023,14 +3023,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate presigned URLs for thumbnails if they exist
       const contentItemsWithThumbs = await Promise.all(
         filteredItems.map(async (item) => {
-          if (item.thumbUrl && s3Service) {
+          if (item.thumbUrl && s3Service && !item.thumbUrl.startsWith('http')) {
             try {
+              console.log(`Generating presigned URL for thumbnail: ${item.thumbUrl}`);
               const thumbnailUrl = await s3Service.getPresignedUrl(item.thumbUrl);
+              console.log(`✅ Generated thumbnail URL for ${item.name}: ${thumbnailUrl.substring(0, 100)}...`);
               return { ...item, thumbnailUrl };
             } catch (error) {
-              console.warn(`Failed to generate thumbnail URL for ${item.thumbUrl}:`, error);
+              console.warn(`❌ Failed to generate thumbnail URL for ${item.thumbUrl}:`, error);
               return item;
             }
+          } else if (item.thumbUrl && item.thumbUrl.startsWith('http')) {
+            // Use HTTP URLs as-is for thumbnailUrl
+            console.log(`Using HTTP thumbnail URL for ${item.name}: ${item.thumbUrl}`);
+            return { ...item, thumbnailUrl: item.thumbUrl };
           }
           return item;
         })

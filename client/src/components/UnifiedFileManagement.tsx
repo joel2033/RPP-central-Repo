@@ -84,7 +84,7 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
         return [];
       }
     },
-    staleTime: 30000,
+    staleTime: 0, // Force fresh data
     // Don't retry on auth errors
     retry: false,
   });
@@ -133,11 +133,36 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
   };
 
   const getImageUrl = (item: ContentFile): string => {
-    if (item.thumbnailUrl) return item.thumbnailUrl;
+    console.log('🖼️ Getting image URL for item:', item.name, 'thumbnailUrl:', item.thumbnailUrl, 'thumbUrl:', item.thumbUrl, 's3Urls:', item.s3Urls);
+    
+    // First try the generated thumbnailUrl (presigned URL)
+    if (item.thumbnailUrl) {
+      console.log('✅ Using thumbnailUrl:', item.thumbnailUrl);
+      return item.thumbnailUrl;
+    }
+    
+    // Fallback to thumbUrl if it's an HTTP URL
+    if (item.thumbUrl && item.thumbUrl.startsWith('http')) {
+      console.log('✅ Using thumbUrl (HTTP):', item.thumbUrl);
+      return item.thumbUrl;
+    }
+    
+    // Fallback to thumbUrl as S3 key
+    if (item.thumbUrl && !item.thumbUrl.startsWith('http')) {
+      const finalUrl = `https://rppcentral.s3.ap-southeast-2.amazonaws.com/${item.thumbUrl}`;
+      console.log('✅ Using thumbUrl as S3 key:', finalUrl);
+      return finalUrl;
+    }
+    
+    // Fallback to first s3Url
     if (item.s3Urls && item.s3Urls.length > 0) {
       const url = item.s3Urls[0];
-      return url.startsWith('http') ? url : `https://rppcentral.s3.ap-southeast-2.amazonaws.com/${url}`;
+      const finalUrl = url.startsWith('http') ? url : `https://rppcentral.s3.ap-southeast-2.amazonaws.com/${url}`;
+      console.log('✅ Using s3Url:', finalUrl);
+      return finalUrl;
     }
+    
+    console.log('❌ No image URL found for item:', item.name);
     return '';
   };
 
