@@ -1,0 +1,53 @@
+RPP-central-Repo – Multi-tenant SaaS for real estate media. Modules: Bookings (Google Calendar), job cards (5-digit content Job ID), temporary/raw uploads (3-day), permanent finished uploads (editor JPEG), editor workflows (download → upload → QC), delivery pages (galleries), order status tracker (Pending → In Progress → Ready for QC → Delivered). Tech: React/TypeScript frontend (TanStack Query, Radix UI/Tailwind), Node.js/Express backend, PostgreSQL/Drizzle ORM, AWS S3.
+
+Issue from Code & Screenshot: "Manage content" (in JobCardPage tabs, especially "content" via ContentItemsManager) shows list view (file names, costs, statuses, no images). renderFileGrid uses icons, not thumbnails. Fix to display tile grid with previews (thumbnails, names, sizes, hover/click for larger gallery), matching previous tile requests.
+
+Task Overview:
+
+Update renderFileGrid/ContentItemsManager to use thumbnail grid instead of icons/list.
+Load/generate thumbnails; add click for larger gallery.
+Unify views if needed (e.g., categories in one grid).
+Detailed Requirements:
+
+Thumbnail Integration:
+Backend: Ensure upload endpoints generate thumbs (sharp resize to 300x300, S3 store); add thumb_url to production_files DB.
+Frontend: In renderFileGrid, replace icons with <img src={file.thumbUrl || presignedS3Thumb} className="object-cover w-full h-full rounded-lg" /> in aspect-square div.
+Update UI to Tile Format:
+In JobCardPage/renderFileGrid: Grid cards with thumbnail top, name/size below, status badge, download button. Use Tailwind: grid-cols-1/2/3 responsive, hover:shadow.
+For ContentItemsManager: Convert list to tile grid (cards per file: thumbnail, name/category/cost below, QC status badge, instructions as tooltip). Match screenshot structure but with images.
+Categories: Group in tabs or sections (All/Photos/etc.); show totals (pieces, edit cost, completed by).
+Gallery on Click:
+Add onClick to thumbnails: Open Radix modal/carousel with full image, navigation, zoom, download.
+Reuse previous gallery code; array from filtered files.
+Workflow Integration:
+Filter: Only editor-finished JPEGs (uploader_role='editor', type='finished').
+QC: In tiles, show status ("Ready for delivery"), request changes button.
+Permissions: Licensee/VA view/edit; log previews.
+Technical Implementation:
+Update renderFileGrid:
+typescript
+
+Collapse
+
+Wrap
+
+Run
+
+Copy
+// Replace icon div with:
+<div className="aspect-square rounded-lg overflow-hidden mb-3">
+  <img 
+    src={file.thumbUrl || '/placeholder.png'} 
+    alt={file.fileName} 
+    className="w-full h-full object-cover"
+    onClick={() => openGallery(file.id)} // Add gallery handler
+  />
+</div>
+ContentItemsManager: Assume similar; convert to grid if list-based.
+Edge Cases: No thumbs (fallback icon), loading states, large grids (pagination/lazy).
+Output:
+
+Updated files (JobCardPage.tsx, ContentItemsManager.tsx if accessible, backend if thumbs needed).
+Summary of changes.
+Testing: Load job → Check "content" tab shows tiles with thumbs; click opens gallery.
+Ensure scalable, automates QC previews, aligns with RPP's streamlined tools replacement.
