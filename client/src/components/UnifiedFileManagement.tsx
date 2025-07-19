@@ -71,7 +71,7 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
 
   // Fetch finished content items (editor uploads)
   const { data: contentItems = [], isLoading: isLoadingContent, refetch, error: contentError } = useQuery({
-    queryKey: ['content-items', jobCardId],
+    queryKey: ['content-items', jobCardId], // Stable cache key
     queryFn: async () => {
       console.log(`🔍 UnifiedFileManagement - Fetching content items for job card ${jobCardId}`);
       try {
@@ -85,6 +85,7 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
       }
     },
     staleTime: 0, // Force fresh data
+    refetchInterval: false, // Disable auto-refetch
     // Don't retry on auth errors
     retry: false,
   });
@@ -175,6 +176,12 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
     });
   };
 
+  // Manual refetch button for testing
+  const handleManualRefetch = () => {
+    console.log('🔄 Manually refetching content items...');
+    refetch();
+  };
+
   // Render file grid with thumbnails for content items and file icons for production files
   const renderUnifiedFileGrid = (files: ProductionFile[], contentFiles: ContentFile[]) => {
     if (files.length === 0 && contentFiles.length === 0) {
@@ -199,7 +206,11 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
                     alt={item.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                     onError={(e) => {
+                      console.error(`❌ Failed to load image: ${getImageUrl(item)}`);
                       (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik04MCA2MEgxMjBWMTQwSDgwVjYwWiIgZmlsbD0iI0Q1RDdEQSIvPgo8L3N2Zz4K';
+                    }}
+                    onLoad={(e) => {
+                      console.log(`✅ Successfully loaded image: ${getImageUrl(item)}`);
                     }}
                   />
                 ) : (

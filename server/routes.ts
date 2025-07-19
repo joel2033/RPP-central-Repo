@@ -3010,6 +3010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get all content items for the job card first
       const allItems = await storage.getContentItems(jobCardId);
       console.log(`Found ${allItems.length} total content items for job card ${jobCardId}`);
+      console.log(`Sample item thumbUrls:`, allItems.slice(0, 2).map(item => ({ name: item.name, thumbUrl: item.thumbUrl })));
       
       // Filter for only editor-uploaded finished content
       const filteredItems = allItems.filter(item => 
@@ -3026,7 +3027,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (item.thumbUrl && s3Service && !item.thumbUrl.startsWith('http')) {
             try {
               console.log(`Generating presigned URL for thumbnail: ${item.thumbUrl}`);
-              const thumbnailUrl = await s3Service.getPresignedUrl(item.thumbUrl);
+              const thumbnailUrl = await s3Service.generatePresignedDownloadUrl(item.thumbUrl);
               console.log(`✅ Generated thumbnail URL for ${item.name}: ${thumbnailUrl.substring(0, 100)}...`);
               return { ...item, thumbnailUrl };
             } catch (error) {
