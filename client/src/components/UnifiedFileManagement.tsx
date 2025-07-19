@@ -22,6 +22,7 @@ interface ProductionFile {
   fileName: string;
   filePath?: string;
   mimeType?: string;
+  mediaType?: string; // raw, edited, final
   serviceCategory: string;
   fileSize?: number;
   uploadedAt: string;
@@ -51,14 +52,23 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
   // Debug: Log component mount and jobCardId
   console.log('🚀 UnifiedFileManagement component rendered with jobCardId:', jobCardId);
 
-  // Fetch regular production files
-  const { data: productionFiles = [], isLoading: isLoadingFiles } = useQuery({
+  // Fetch production files (only finished/edited files, exclude RAW files)
+  const { data: allProductionFiles = [], isLoading: isLoadingFiles } = useQuery({
     queryKey: ['production-files', jobCardId],
     queryFn: () => {
       console.log('🔍 UnifiedFileManagement - Fetching production files for:', jobCardId);
       return apiRequest('GET', `/api/jobs/${jobCardId}/files`);
     },
   });
+
+  // Filter out RAW files - only show finished/edited files uploaded via Files & Media
+  const productionFiles = allProductionFiles.filter((file: ProductionFile) => 
+    file.mediaType !== 'raw'
+  );
+
+  console.log('🔍 UnifiedFileManagement - All production files:', allProductionFiles.length);
+  console.log('🔍 UnifiedFileManagement - Filtered production files (non-RAW):', productionFiles.length);
+  console.log('🔍 UnifiedFileManagement - Content items (editor uploads):', contentItems.length);
 
   // Fetch finished content items (editor uploads)
   const { data: contentItems = [], isLoading: isLoadingContent, refetch, error: contentError } = useQuery({
@@ -191,7 +201,7 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
           </Card>
         ))}
 
-        {/* Render production files (raw uploads) with file icons */}
+        {/* Render production files (finished/edited uploads via Files & Media) with file icons */}
         {files.map((file: ProductionFile) => (
           <Card key={`file-${file.id}`} className="group hover:shadow-md transition-shadow bg-white overflow-hidden">
             <div className="relative">
@@ -206,14 +216,17 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
                   <FileText className="h-12 w-12 text-gray-400" />
                 )}
               </div>
-              <Badge className="absolute top-2 right-2 bg-blue-100 text-blue-800">Raw</Badge>
+              <Badge className="absolute top-2 right-2 bg-blue-100 text-blue-800">
+                {file.mediaType === 'final' ? 'Final' : 'Uploaded'}
+              </Badge>
             </div>
             <div className="p-3">
               <div className="text-sm font-medium text-gray-900 truncate mb-1">
                 {file.fileName}
               </div>
               <div className="text-xs text-gray-500">
-                {file.mimeType?.split('/')[1].toUpperCase()} • {formatFileSize(file.fileSize)} • Raw file
+                {file.mimeType?.split('/')[1].toUpperCase()} • {formatFileSize(file.fileSize)} • 
+                {file.mediaType === 'final' ? ' Ready for delivery' : ' Uploaded file'}
               </div>
               <div className="flex gap-1 mt-2">
                 <Button variant="ghost" size="sm" className="h-6 px-2">
