@@ -1,0 +1,51 @@
+RPP-central-Repo – Multi-tenant SaaS for real estate media. Modules: Bookings (Google Calendar), job cards (5-digit content Job ID), temporary/raw uploads (3-day), permanent finished uploads (editor JPEG via "Upload Finished Files" modal), editor workflows (download raw → upload finished → QC), delivery pages (galleries), order status tracker (Pending → In Progress → Ready for QC → Delivered). Tech: React/TypeScript frontend (TanStack Query, Radix UI/Tailwind), Node.js/Express backend, PostgreSQL/Drizzle ORM, AWS S3.
+
+Issue from Screenshot & Code: "Manage content" (in JobCardPage "content" tab via ContentItemsManager) shows list view (file names, costs, statuses, no images). Desired: Tile grid with thumbnails (like example: responsive cards, names "+ XX MB", folders chips, upload button, Job ID tag, ON/OFF toggle). Trigger on editor upload finished files modal. App can pull images (S3 URLs), but UI lacks thumbnails/grid.
+
+Task Overview:
+
+Update ContentItemsManager/JobCardPage to render tile gallery with thumbnails post-editor upload.
+Generate/load thumbs; add click for larger gallery.
+Ensure filters (editor-finished only); match example layout.
+Detailed Requirements:
+
+Thumbnail Pulling & Generation:
+Backend (upload endpoint for "Upload Finished Files"): On editor JPEG upload, generate thumb (sharp resize 300x300, S3 store as thumbs/${filename}_thumb.jpg); update DB (production_files: thumb_url, file_size for "+ XX MB").
+Frontend: In queries (productionFiles), include thumb_url; use presigned S3 URLs.
+UI Update to Tile Gallery:
+In ContentItemsManager.tsx (or JobCardPage renderFileGrid if integrated): Replace list with grid (Tailwind: grid-cols-1/2/3/4 responsive, gap-4).
+Per Tile: Card with thumbnail <img src="{thumbUrl}" class="object-cover w-full h-auto rounded-t-lg">, name below (e.g., "DJI_0386.jpg + 8.25 MB"), status badge ("Ready for delivery"), hover:shadow, click opens larger gallery.
+Layout Match Example: Header ("+ Photos" collapsible, orange Job ID "#XXXXX", "Images" label, ON/OFF toggle, ellipsis menu); Folders section (chips like "2250x1500 X", "New Folder" button); Files grid; top-right Upload button.
+Categories: Tabs (All/Photos/Floor Plans/Video) filter grid; totals (pieces, edit cost, completed by).
+Post-Upload Trigger:
+On modal submit: Mutation refreshes query (invalidate productionFiles); auto-switches to tile view if list.
+Integration: Only editor-finished JPEGs (filter uploader_role='editor', type='finished'); update QC status on display.
+Gallery on Click:
+Thumbnail onClick: Open Radix modal/carousel with full S3 image, nav arrows, zoom, download, QC notes/instructions.
+Technical Implementation:
+Update renderFileGrid/ContentItemsManager:
+typescript
+
+Collapse
+
+Wrap
+
+Run
+
+Copy
+// Example tile:
+<Card className="hover:shadow-md">
+  <img src={file.thumbUrl} alt={file.fileName} className="w-full h-40 object-cover rounded-t-lg" onClick={() => openGallery(index)} />
+  <div className="p-2">
+    <p className="text-sm font-medium truncate">{file.fileName} + {(file.fileSize / 1048576).toFixed(2)} MB</p>
+    <Badge className="mt-1">{file.status}</Badge>
+  </div>
+</Card>
+Folders: Array of chips with delete X; "New Folder" button.
+Edge Cases: No files (empty state), large files (lazy img), mobile grid (cols-2).
+Output:
+
+Updated files (ContentItemsManager.tsx, JobCardPage.tsx, backend upload if thumbs needed).
+Summary of changes.
+Testing: Editor uploads JPEG via modal → Check "Manage content" shows tile grid with thumbs; click opens gallery.
+Ensure scalable, automates post-upload previews, aligns with RPP's streamlined tools replacement.
