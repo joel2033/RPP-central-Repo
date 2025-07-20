@@ -98,4 +98,29 @@ export class JobService {
   }
 }
 
+  async createContentItem(jobCardId: number, contentItemData: any): Promise<any> {
+    const result = await storage.createContentItem({
+      ...contentItemData,
+      jobCardId,
+    });
+    
+    // Invalidate related caches
+    cache.delete(`${this.cachePrefix}${jobCardId}`);
+    
+    return result;
+  }
+
+  async logActivity(jobCardId: number, userId: string, description: string): Promise<void> {
+    await storage.createJobActivity({
+      jobCardId,
+      userId,
+      description,
+      createdAt: new Date(),
+    });
+    
+    // Invalidate caches
+    cache.delete(`${this.cachePrefix}${jobCardId}`);
+  }
+}
+
 export const jobService = new JobService();

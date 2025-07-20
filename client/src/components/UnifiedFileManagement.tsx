@@ -183,9 +183,45 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
     refetch();
   };
 
-  // Render file grid with thumbnails for content items and file icons for production files
-  const renderUnifiedFileGrid = (files: ProductionFile[], contentFiles: ContentFile[]) => {
-    if (files.length === 0 && contentFiles.length === 0) {
+  // Unified file grid renderer for all content types
+  const renderFileGrid = (category?: string) => {
+    // Filter content items by category if specified
+    const filteredContentItems = category 
+      ? contentItems.filter(item => item.category === category)
+      : contentItems;
+
+    // Filter production files by category if specified  
+    const filteredProductionFiles = category
+      ? productionFiles.filter(file => file.serviceCategory === category)
+      : productionFiles;
+
+    // Combine all files for unified display
+    const allFiles = [
+      ...filteredContentItems.map(item => ({
+        id: `content-${item.id}`,
+        name: item.name,
+        type: 'content' as const,
+        fileSize: item.fileSize,
+        status: 'Finished' as const,
+        badgeColor: 'bg-green-100 text-green-800',
+        thumbnailUrl: getImageUrl(item),
+        hasImage: true,
+        item
+      })),
+      ...filteredProductionFiles.map(file => ({
+        id: `file-${file.id}`,
+        name: file.fileName,
+        type: 'production' as const,
+        fileSize: file.fileSize,
+        status: file.mediaType === 'final' ? 'Final' : 'Uploaded',
+        badgeColor: 'bg-blue-100 text-blue-800',
+        thumbnailUrl: null,
+        hasImage: file.mimeType?.startsWith('image/'),
+        file
+      }))
+    ];
+
+    if (allFiles.length === 0) {
       return (
         <div className="text-center py-8 text-gray-500">
           <Image className="h-8 w-8 mx-auto mb-2" />
@@ -196,87 +232,71 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
 
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {/* Render content items (finished editor uploads) with thumbnails */}
-        {contentFiles.map((item: ContentFile) => (
-          <Card key={`content-${item.id}`} className="group hover:shadow-md transition-shadow bg-white overflow-hidden">
+        {allFiles.map((fileItem) => (
+          <Card key={fileItem.id} className="group hover:shadow-md transition-shadow bg-white overflow-hidden">
             <div className="relative">
               <div className="aspect-square bg-gray-100 overflow-hidden">
-                {getImageUrl(item) ? (
+                {fileItem.thumbnailUrl ? (
                   <img
-                    src={getImageUrl(item)}
-                    alt={item.name}
+                    src={fileItem.thumbnailUrl}
+                    alt={fileItem.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                     onError={(e) => {
-                      console.error(`❌ Failed to load image: ${getImageUrl(item)}`);
+                      console.error(`❌ Failed to load image: ${fileItem.thumbnailUrl}`);
                       (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik04MCA2MEgxMjBWMTQwSDgwVjYwWiIgZmlsbD0iI0Q1RDdEQSIvPgo8L3N2Zz4K';
                     }}
-                    onLoad={(e) => {
-                      console.log(`✅ Successfully loaded image: ${getImageUrl(item)}`);
+                    onLoad={() => {
+                      console.log(`✅ Successfully loaded image: ${fileItem.thumbnailUrl}`);
                     }}
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                    <Image className="h-8 w-8 text-gray-400" />
+                  <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                    {fileItem.hasImage ? (
+                      <Image className="h-12 w-12 text-gray-400" />
+                    ) : fileItem.type === 'production' && fileItem.file?.mimeType?.startsWith('video/') ? (
+                      <Video className="h-12 w-12 text-gray-400" />
+                    ) : fileItem.type === 'production' && fileItem.file?.serviceCategory === 'floor_plan' ? (
+                      <Map className="h-12 w-12 text-gray-400" />
+                    ) : (
+                      <FileText className="h-12 w-12 text-gray-400" />
+                    )}
                   </div>
                 )}
               </div>
+              
               <div className="absolute top-2 left-2">
                 <Checkbox
-                  checked={selectedFiles.has(item.id)}
-                  onCheckedChange={() => handleFileSelect(item.id)}
+                  checked={selectedFiles.has(fileItem.id)}
+                  onCheckedChange={() => handleFileSelect(fileItem.id)}
                   className="bg-white bg-opacity-90"
                 />
               </div>
-              <Badge className="absolute top-2 right-2 bg-green-100 text-green-800">Finished</Badge>
-            </div>
-            <div className="p-3">
-              <div className="text-sm font-medium text-gray-900 truncate mb-1">
-                {item.name}
-              </div>
-              <div className="text-xs text-gray-500">
-                JPG • {formatFileSize(item.fileSize)} • Ready for delivery
-              </div>
-            </div>
-          </Card>
-        ))}
-
-        {/* Render production files (finished/edited uploads via Files & Media) with file icons */}
-        {files.map((file: ProductionFile) => (
-          <Card key={`file-${file.id}`} className="group hover:shadow-md transition-shadow bg-white overflow-hidden">
-            <div className="relative">
-              <div className="aspect-square bg-gray-50 overflow-hidden flex items-center justify-center">
-                {file.mimeType?.startsWith('image/') ? (
-                  <Image className="h-12 w-12 text-gray-400" />
-                ) : file.mimeType?.startsWith('video/') ? (
-                  <Video className="h-12 w-12 text-gray-400" />
-                ) : file.serviceCategory === 'floor_plan' ? (
-                  <Map className="h-12 w-12 text-gray-400" />
-                ) : (
-                  <FileText className="h-12 w-12 text-gray-400" />
-                )}
-              </div>
-              <Badge className="absolute top-2 right-2 bg-blue-100 text-blue-800">
-                {file.mediaType === 'final' ? 'Final' : 'Uploaded'}
+              
+              <Badge className={`absolute top-2 right-2 ${fileItem.badgeColor}`}>
+                {fileItem.status}
               </Badge>
             </div>
+            
             <div className="p-3">
               <div className="text-sm font-medium text-gray-900 truncate mb-1">
-                {file.fileName}
+                {fileItem.name}
               </div>
               <div className="text-xs text-gray-500">
-                {file.mimeType?.split('/')[1].toUpperCase()} • {formatFileSize(file.fileSize)} • 
-                {file.mediaType === 'final' ? ' Ready for delivery' : ' Uploaded file'}
+                {fileItem.type === 'content' ? 'JPG' : fileItem.file?.mimeType?.split('/')[1].toUpperCase()} • {formatFileSize(fileItem.fileSize)} • {fileItem.status === 'Finished' ? 'Ready for delivery' : 'Uploaded file'}
               </div>
-              <div className="flex gap-1 mt-2">
-                <Button variant="ghost" size="sm" className="h-6 px-2">
-                  <Eye className="h-3 w-3 mr-1" />
-                  View
-                </Button>
-                <Button variant="ghost" size="sm" className="h-6 px-2">
-                  <Download className="h-3 w-3 mr-1" />
-                  Download
-                </Button>
-              </div>
+              
+              {fileItem.type === 'production' && (
+                <div className="flex gap-1 mt-2">
+                  <Button variant="ghost" size="sm" className="h-6 px-2">
+                    <Eye className="h-3 w-3 mr-1" />
+                    View
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-6 px-2">
+                    <Download className="h-3 w-3 mr-1" />
+                    Download
+                  </Button>
+                </div>
+              )}
             </div>
           </Card>
         ))}
@@ -376,7 +396,7 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
               <span>{productionFiles.length} raw</span>
             </div>
           </div>
-          {renderUnifiedFileGrid(productionFiles, contentItems)}
+          {renderFileGrid()}
         </TabsContent>
 
         <TabsContent value="photography" className="space-y-4">
@@ -387,10 +407,7 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
               Upload Photos
             </Button>
           </div>
-          {renderUnifiedFileGrid(
-            getFilesByCategory("photography"), 
-            getContentItemsByCategory("photography")
-          )}
+          {renderFileGrid("photography")}
         </TabsContent>
 
         <TabsContent value="floor_plan" className="space-y-4">
@@ -401,10 +418,7 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
               Upload Floor Plans
             </Button>
           </div>
-          {renderUnifiedFileGrid(
-            getFilesByCategory("floor_plan"), 
-            getContentItemsByCategory("floor_plan")
-          )}
+          {renderFileGrid("floor_plan")}
         </TabsContent>
 
         <TabsContent value="video" className="space-y-4">
@@ -415,10 +429,7 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
               Upload Videos
             </Button>
           </div>
-          {renderUnifiedFileGrid(
-            getFilesByCategory("video"), 
-            getContentItemsByCategory("video")
-          )}
+          {renderFileGrid("video")}
         </TabsContent>
 
         <TabsContent value="other" className="space-y-4">
@@ -429,10 +440,7 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
               Upload Files
             </Button>
           </div>
-          {renderUnifiedFileGrid(
-            getFilesByCategory("other"), 
-            getContentItemsByCategory("other")
-          )}
+          {renderFileGrid("other")}
         </TabsContent>
       </Tabs>
     </div>
