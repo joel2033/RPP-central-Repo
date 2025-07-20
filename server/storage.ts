@@ -491,20 +491,34 @@ export class DatabaseStorage implements IStorage {
   // Temporarily work with existing schema until enhanced schema is deployed
   async getMediaFilesByJobId(jobId: number, licenseeId?: string): Promise<MediaFile[]> {
     // For now, get files by booking ID since the jobId column doesn't exist yet
-    const jobCard = await this.getJobCard(jobId);
-    if (!jobCard) return [];
+    const jobCard = await db
+      .select()
+      .from(jobCards)
+      .leftJoin(bookings, eq(jobCards.bookingId, bookings.id))
+      .where(eq(jobCards.id, jobId))
+      .limit(1);
+    
+    if (!jobCard || jobCard.length === 0) {
+      console.log(`📁 Job card ${jobId} not found`);
+      return [];
+    }
+    
+    const bookingId = jobCard[0].job_cards.bookingId;
+    console.log(`📁 Looking for media files with booking_id=${bookingId} for job ${jobId}`);
     
     const files = await db
       .select()
       .from(mediaFiles)
-      .where(eq(mediaFiles.bookingId, jobCard.bookingId))
+      .where(eq(mediaFiles.bookingId, bookingId))
       .orderBy(desc(mediaFiles.uploadedAt));
+    
+    console.log(`📁 Found ${files.length} media files for job ${jobId} (booking ${bookingId}):`, files.map(f => ({ name: f.fileName, type: f.fileType })));
     
     // Map existing schema to enhanced format for compatibility
     return files.map(file => ({
       ...file,
       jobId: jobId,
-      address: jobCard.booking?.propertyAddress || 'Unknown Address',
+      address: jobCard[0].bookings?.propertyAddress || 'Unknown Address',
       uploaderId: licenseeId || '44695535',
       mediaType: file.fileType === 'dng' ? 'raw' : 'finished',
       contentType: file.fileType === 'dng' ? 'image/x-adobe-dng' : 'image/jpeg',
