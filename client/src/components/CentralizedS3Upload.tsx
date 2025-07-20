@@ -24,6 +24,8 @@ export const CentralizedS3Upload: React.FC<CentralizedS3UploadProps> = ({
 
     try {
       for (const file of Array.from(files)) {
+        console.log(`🚀 Starting upload for: ${file.name} (${file.size} bytes)`);
+
         // Step 1: Get upload URL and metadata
         const uploadData = await apiRequest('POST', `/api/jobs/${jobCardId}/upload-file`, {
           fileName: file.name,
@@ -33,7 +35,9 @@ export const CentralizedS3Upload: React.FC<CentralizedS3UploadProps> = ({
           mediaType: 'finished'
         });
 
-        // Step 2: Upload file to S3
+        console.log(`✅ Got upload URL for: ${file.name}`);
+
+        // Step 2: Upload file to S3 using presigned URL
         const uploadResponse = await fetch(uploadData.uploadUrl, {
           method: 'PUT',
           body: file,
@@ -43,11 +47,13 @@ export const CentralizedS3Upload: React.FC<CentralizedS3UploadProps> = ({
         });
 
         if (!uploadResponse.ok) {
-          throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+          throw new Error(`S3 upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
         }
 
+        console.log(`✅ File uploaded to S3: ${file.name}`);
+
         // Step 3: Process the uploaded file (generate thumbnail, save metadata)
-        await apiRequest('POST', `/api/jobs/${jobCardId}/process-file`, {
+        const processResult = await apiRequest('POST', `/api/jobs/${jobCardId}/process-file`, {
           s3Key: uploadData.s3Key,
           fileName: file.name,
           contentType: file.type,
@@ -55,6 +61,8 @@ export const CentralizedS3Upload: React.FC<CentralizedS3UploadProps> = ({
           category: 'photography',
           mediaType: 'finished'
         });
+
+        console.log(`✅ File processing complete: ${file.name}`, processResult);
 
         console.log(`✅ Successfully uploaded and processed: ${file.name}`);
       }

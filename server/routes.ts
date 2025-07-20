@@ -26,7 +26,7 @@ import { fileStorage } from "./fileStorage";
 import { requireEditor, requireAdmin, requireVA, requireAdminOrVA, requireProductionStaff } from "./middleware/roleAuth";
 import { googleCalendarService } from "./googleCalendar";
 import { s3Service } from "./services/s3Service";
-// import * as jobController from "./controllers/jobController"; // TODO: Re-enable when ready
+import * as jobController from "./controllers/jobController";
 import { thumbnailService } from "./services/thumbnailService";
 import { db } from "./db";
 import { jobCards, clients } from "@shared/schema";
@@ -3109,8 +3109,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // TODO: Add centralized S3 upload routes when jobController is ready
-  // Temporary placeholder - will be implemented shortly
+  // Centralized S3 upload routes
+  app.get('/api/jobs', isAuthenticated, jobController.getAllJobs);
+  app.get('/api/jobs/:id', isAuthenticated, jobController.getJobById);
+  app.get('/api/jobs/:id/files', isAuthenticated, jobController.getJobFiles);
+  app.get('/api/jobs/:id/activity', isAuthenticated, jobController.getJobActivity);
+  
+  // S3 file upload workflow
+  app.post('/api/jobs/:id/upload-file', isAuthenticated, jobController.uploadJobFile);
+  app.post('/api/jobs/:id/process-file', isAuthenticated, jobController.processUploadedFile);
 
   const httpServer = createServer(app);
   return httpServer;

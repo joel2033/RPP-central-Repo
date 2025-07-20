@@ -1,202 +1,269 @@
-import { Response } from 'express';
-import { z } from 'zod';
-import { asyncHandler, createError } from '../utils/errorHandler';
-import { jobService } from '../services/jobService';
-import { ThumbnailService } from '../services/thumbnailService';
+import { Request, Response } from 'express';
+import { storage } from '../storage';
 import { s3Service } from '../services/s3Service';
-import type { AuthenticatedRequest } from '../middleware/roleAuth';
+import { thumbnailService } from '../services/thumbnailService';
+import { jobService } from '../services/jobService';
+import { z } from 'zod';
 
-const idParamSchema = z.object({
-  id: z.string().transform(val => parseInt(val, 10)),
-});
-
-const jobQuerySchema = z.object({
-  status: z.string().optional(),
-  clientId: z.string().transform(val => parseInt(val, 10)).optional(),
-  limit: z.string().transform(val => parseInt(val, 10)).optional(),
-  offset: z.string().transform(val => parseInt(val, 10)).optional(),
-});
-
-const statusUpdateSchema = z.object({
-  status: z.string().min(1, 'Status is required'),
-});
-
-export const getJobs = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const filters = jobQuerySchema.parse(req.query);
-  const licenseeId = req.user.claims.sub;
-
-  const jobs = await jobService.getAllJobs(licenseeId, filters);
-  
-  res.json({
-    data: jobs,
-    pagination: {
-      total: jobs.length,
-      limit: filters.limit || 50,
-      offset: filters.offset || 0,
-      hasMore: false, // Could implement proper pagination
-    },
-  });
-});
-
-export const getJob = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { id } = idParamSchema.parse(req.params);
-  const licenseeId = req.user.claims.sub;
-
-  const job = await jobService.getJobById(id, licenseeId);
-  res.json(job);
-});
-
-export const updateJobStatus = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { id } = idParamSchema.parse(req.params);
-  const { status } = statusUpdateSchema.parse(req.body);
-  const licenseeId = req.user.claims.sub;
-
-  const updatedJob = await jobService.updateJobStatus(id, status, licenseeId);
-  res.json(updatedJob);
-});
-
-export const getJobFiles = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { id } = idParamSchema.parse(req.params);
-  const licenseeId = req.user.claims.sub;
-
-  const files = await jobService.getJobFiles(id, licenseeId);
-  res.json(files);
-});
-
-export const getJobActivity = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { id } = idParamSchema.parse(req.params);
-  const licenseeId = req.user.claims.sub;
-
-  const activity = await jobService.getJobActivity(id, licenseeId);
-  res.json(activity);
-});
-
-// Centralized S3 upload with thumbnail generation
+// Validation schemas
 const uploadFileSchema = z.object({
-  fileName: z.string().min(1, 'File name is required'),
-  contentType: z.string().min(1, 'Content type is required'),
-  fileSize: z.number().positive('File size must be positive'),
-  category: z.string().optional(),
-  mediaType: z.enum(['raw', 'finished']).default('finished'),
+  fileName: z.string(),
+  contentType: z.string(),
+  fileSize: z.number(),
+  category: z.string(),
+  mediaType: z.enum(['raw', 'finished']).default('finished')
 });
 
-export const uploadJobFile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { id } = idParamSchema.parse(req.params);
-  const licenseeId = req.user.claims.sub;
-  const userId = req.user.claims.sub;
-  
-  // Validate input
-  const fileData = uploadFileSchema.parse(req.body);
-  
-  if (!s3Service) {
-    throw createError(500, 'S3 service not configured');
-  }
+const processFileSchema = z.object({
+  s3Key: z.string(),
+  fileName: z.string(),
+  contentType: z.string(),
+  fileSize: z.number(),
+  category: z.string(),
+  mediaType: z.enum(['raw', 'finished']).default('finished')
+});
 
-  // Generate S3 key for the main file
-  const s3Key = s3Service.generateS3Key(id, fileData.fileName, fileData.mediaType);
-  
-  // Generate presigned URL for file upload
-  const uploadUrl = await s3Service.generatePresignedUploadUrl(
-    s3Key,
-    fileData.contentType,
-    { type: fileData.mediaType },
-    3600 // 1 hour expiry
-  );
+/**
+ * Step 1: Generate presigned URL for file upload
+ */
+export const uploadJobFile = async (req: Request, res: Response) => {
+  try {
+    const jobCardId = parseInt(req.params.id);
+    const userId = req.user?.claims?.sub || req.user?.id;
 
-  // Prepare thumbnail key (will be generated after upload)
-  const thumbnailService = ThumbnailService.getInstance();
-  const thumbnailKey = thumbnailService.generateThumbnailKey(s3Key);
-
-  res.json({
-    uploadUrl,
-    s3Key,
-    thumbnailKey,
-    metadata: {
-      jobCardId: id,
-      fileName: fileData.fileName,
-      contentType: fileData.contentType,
-      fileSize: fileData.fileSize,
-      category: fileData.category,
-      mediaType: fileData.mediaType,
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
     }
-  });
-});
 
-// Process uploaded file and generate thumbnail
-export const processUploadedFile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { id } = idParamSchema.parse(req.params);
-  const licenseeId = req.user.claims.sub;
-  const userId = req.user.claims.sub;
-  
-  const processData = z.object({
-    s3Key: z.string(),
-    fileName: z.string(),
-    contentType: z.string(),
-    fileSize: z.number(),
-    category: z.string().optional(),
-    mediaType: z.enum(['raw', 'finished']).default('finished'),
-  }).parse(req.body);
+    // Validate request body
+    const validation = uploadFileSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ 
+        message: 'Invalid request data',
+        errors: validation.error.errors 
+      });
+    }
 
-  if (!s3Service) {
-    throw createError(500, 'S3 service not configured');
+    const { fileName, contentType, fileSize, category, mediaType } = validation.data;
+
+    // Generate S3 key for the file
+    const timestamp = Date.now();
+    const s3Key = `job-${jobCardId}/${mediaType}/${timestamp}_${fileName}`;
+
+    // Generate presigned URL for upload
+    const uploadUrl = await s3Service.generatePresignedUploadUrl(s3Key, contentType, {
+      type: mediaType,
+      jobId: jobCardId.toString(),
+      uploadedBy: userId
+    });
+
+    console.log(`✅ Generated upload URL for ${fileName} (${fileSize} bytes)`);
+
+    res.json({
+      uploadUrl,
+      s3Key,
+      fileName,
+      contentType,
+      fileSize
+    });
+
+  } catch (error) {
+    console.error('❌ Error generating upload URL:', error);
+    res.status(500).json({ 
+      message: 'Failed to generate upload URL',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
+};
 
-  let thumbnailKey: string | null = null;
+/**
+ * Step 2: Process uploaded file (generate thumbnail, save metadata)
+ */
+export const processUploadedFile = async (req: Request, res: Response) => {
+  try {
+    const jobCardId = parseInt(req.params.id);
+    const userId = req.user?.claims?.sub || req.user?.id;
 
-  // Generate thumbnail for image files
-  if (processData.contentType.startsWith('image/') && processData.mediaType === 'finished') {
-    try {
-      // Download the uploaded file from S3
-      const fileStream = await s3Service.getFileStream(processData.s3Key);
-      
-      // Convert stream to buffer
-      const chunks: Buffer[] = [];
-      const readable = fileStream as any;
-      
-      for await (const chunk of readable) {
-        chunks.push(chunk);
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    // Validate request body
+    const validation = processFileSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ 
+        message: 'Invalid request data',
+        errors: validation.error.errors 
+      });
+    }
+
+    const { s3Key, fileName, contentType, fileSize, category, mediaType } = validation.data;
+
+    // Generate thumbnail if it's an image
+    let thumbS3Key = null;
+    if (contentType.startsWith('image/')) {
+      try {
+        console.log(`🖼️ Generating thumbnail for ${fileName}...`);
+        
+        // Download original file from S3
+        const originalFileBuffer = await s3Service.downloadFile(s3Key);
+        
+        // Generate thumbnail
+        const thumbnailBuffer = await thumbnailService.generateThumbnail(originalFileBuffer);
+        
+        // Upload thumbnail to S3
+        thumbS3Key = `job-${jobCardId}/${mediaType}/thumbs/thumb_${fileName}`;
+        await s3Service.uploadBuffer(thumbS3Key, thumbnailBuffer, 'image/jpeg', {
+          type: 'thumbnail',
+          originalFile: s3Key,
+          jobId: jobCardId.toString()
+        });
+        
+        console.log(`✅ Thumbnail generated and uploaded: ${thumbS3Key}`);
+      } catch (thumbError) {
+        console.error('❌ Thumbnail generation failed:', thumbError);
+        // Continue without thumbnail - don't fail the entire upload
       }
-      const fileBuffer = Buffer.concat(chunks);
-
-      // Generate and upload thumbnail
-      const thumbnailService = ThumbnailService.getInstance();
-      thumbnailKey = await thumbnailService.uploadThumbnail(
-        id,
-        processData.fileName,
-        fileBuffer,
-        { width: 300, height: 300, quality: 85 }
-      );
-
-      console.log(`✅ Thumbnail generated for ${processData.fileName}: ${thumbnailKey}`);
-    } catch (error) {
-      console.warn(`⚠️ Failed to generate thumbnail for ${processData.fileName}:`, error);
-      // Continue without thumbnail - not a critical error
     }
+
+    // Create content item in database
+    const contentItem = await jobService.createContentItem({
+      jobCardId,
+      contentId: `${jobCardId}-${Date.now()}`,
+      name: fileName.replace(/\.[^/.]+$/, ''), // Remove file extension
+      category,
+      type: mediaType,
+      s3Url: s3Key,
+      thumbUrl: thumbS3Key,
+      fileSize,
+      uploaderRole: 'editor', // Assuming editor uploads for now
+      status: 'ready_for_qc'
+    });
+
+    // Log activity
+    await jobService.logActivity(jobCardId, userId, `Uploaded ${mediaType} file: ${fileName}`, 'file_upload');
+
+    // Update job status if needed
+    if (mediaType === 'finished') {
+      await storage.updateJobCard(jobCardId, { status: 'ready_for_qa' });
+      await jobService.logActivity(jobCardId, userId, 'Job status updated to Ready for QC', 'status_change');
+    }
+
+    console.log(`✅ File processed successfully: ${fileName}`);
+
+    res.json({
+      success: true,
+      contentItem,
+      message: `File ${fileName} uploaded and processed successfully`
+    });
+
+  } catch (error) {
+    console.error('❌ Error processing uploaded file:', error);
+    res.status(500).json({ 
+      message: 'Failed to process uploaded file',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
+};
 
-  // Create content item record in database
-  const contentItem = await jobService.createContentItem(id, {
-    contentId: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    name: processData.fileName,
-    category: processData.category || 'general',
-    type: processData.mediaType,
-    uploaderRole: 'editor',
-    s3Urls: [processData.s3Key],
-    thumbUrl: thumbnailKey,
-    fileSize: processData.fileSize,
-    status: 'ready_for_qc',
-    createdBy: userId,
-    updatedBy: userId,
-  });
+/**
+ * Get all jobs (for /api/jobs endpoint)
+ */
+export const getAllJobs = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.claims?.sub || req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
 
-  // Log activity
-  await jobService.logActivity(id, userId, 
-    `Uploaded ${processData.mediaType} file: ${processData.fileName}${thumbnailKey ? ' (with thumbnail)' : ''}`
-  );
+    const jobCards = await storage.getJobCards(userId);
+    res.json(jobCards);
+  } catch (error) {
+    console.error('❌ Error fetching jobs:', error);
+    res.status(500).json({ message: 'Failed to fetch jobs' });
+  }
+};
 
-  res.json({
-    success: true,
-    contentItem,
-    thumbnailGenerated: !!thumbnailKey,
-  });
-});
+/**
+ * Get specific job by ID
+ */
+export const getJobById = async (req: Request, res: Response) => {
+  try {
+    const jobId = parseInt(req.params.id);
+    const userId = req.user?.claims?.sub || req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const job = await storage.getJobCard(jobId);
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+
+    res.json(job);
+  } catch (error) {
+    console.error('❌ Error fetching job:', error);
+    res.status(500).json({ message: 'Failed to fetch job' });
+  }
+};
+
+/**
+ * Get job files with presigned URLs
+ */
+export const getJobFiles = async (req: Request, res: Response) => {
+  try {
+    const jobId = parseInt(req.params.id);
+    const userId = req.user?.claims?.sub || req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    // Get production files
+    const productionFiles = await storage.getProductionFiles(jobId);
+    
+    // Get content items
+    const contentItems = await storage.getContentItems(jobId);
+
+    // Generate presigned URLs for thumbnails and full files
+    const filesWithUrls = await Promise.all([
+      ...productionFiles.map(async (file) => ({
+        ...file,
+        type: 'production',
+        downloadUrl: file.s3Key ? await s3Service.generatePresignedDownloadUrl(file.s3Key) : null
+      })),
+      ...contentItems.map(async (item) => ({
+        ...item,
+        type: 'content',
+        downloadUrl: item.s3Url ? await s3Service.generatePresignedDownloadUrl(item.s3Url) : null,
+        thumbnailUrl: item.thumbUrl ? await s3Service.generatePresignedDownloadUrl(item.thumbUrl) : null
+      }))
+    ]);
+
+    res.json(filesWithUrls);
+  } catch (error) {
+    console.error('❌ Error fetching job files:', error);
+    res.status(500).json({ message: 'Failed to fetch job files' });
+  }
+};
+
+/**
+ * Get job activity log
+ */
+export const getJobActivity = async (req: Request, res: Response) => {
+  try {
+    const jobId = parseInt(req.params.id);
+    const userId = req.user?.claims?.sub || req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const activity = await storage.getJobActivity(jobId);
+    res.json(activity);
+  } catch (error) {
+    console.error('❌ Error fetching job activity:', error);
+    res.status(500).json({ message: 'Failed to fetch job activity' });
+  }
+};

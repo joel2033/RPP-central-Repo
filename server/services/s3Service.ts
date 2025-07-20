@@ -264,6 +264,53 @@ export class S3Service {
 
     throw lastError;
   }
+
+  // Download file as buffer from S3 for thumbnail generation
+  async downloadFile(key: string): Promise<Buffer> {
+    console.log(`Downloading file from S3: ${key}`);
+    
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+    });
+
+    const response = await this.s3Client.send(command);
+    
+    if (!response.Body) {
+      throw new Error(`No body in S3 response for key: ${key}`);
+    }
+
+    // Convert stream to buffer
+    const chunks: Buffer[] = [];
+    const stream = response.Body as NodeJS.ReadableStream;
+    
+    return new Promise((resolve, reject) => {
+      stream.on('data', (chunk) => chunks.push(chunk));
+      stream.on('end', () => resolve(Buffer.concat(chunks)));
+      stream.on('error', reject);
+    });
+  }
+
+  // Upload buffer directly to S3 (for thumbnails)
+  async uploadBuffer(
+    key: string,
+    buffer: Buffer,
+    contentType: string,
+    tags?: Record<string, string>
+  ): Promise<void> {
+    console.log(`Uploading buffer to S3: ${key} (${buffer.length} bytes)`);
+
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+      Tagging: tags ? this.formatTagging(tags) : undefined,
+    });
+
+    await this.s3Client.send(command);
+    console.log(`✅ Buffer uploaded successfully: ${key}`);
+  }
 }
 
 // Create S3 service instance
