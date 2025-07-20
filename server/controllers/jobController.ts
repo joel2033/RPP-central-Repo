@@ -387,9 +387,11 @@ export const getJobMediaFiles = async (req: Request, res: Response) => {
     // Get all media files for this job
     let mediaFiles = await storage.getMediaFilesByJobId(jobId, userLicenseeId);
     
-    // Filter by media type if specified
+    // Filter by media type if specified  
     if (mediaType) {
-      mediaFiles = mediaFiles.filter(file => file.mediaType === mediaType);
+      // Handle both 'raw' and 'finished' queries but map to correct enum values
+      const targetType = mediaType === 'finished' ? 'final' : mediaType;
+      mediaFiles = mediaFiles.filter(file => file.mediaType === targetType);
     }
 
     console.log(`📁 Found ${mediaFiles.length} media files for job ${jobId} (type: ${mediaType || 'all'})`);

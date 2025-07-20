@@ -514,13 +514,13 @@ export class DatabaseStorage implements IStorage {
     
     console.log(`📁 Found ${files.length} media files for job ${jobId} (booking ${bookingId}):`, files.map(f => ({ name: f.fileName, type: f.fileType })));
     
-    // Map existing schema to enhanced format for compatibility
+    // Map existing schema to enhanced format for compatibility  
     return files.map(file => ({
       ...file,
       jobId: jobId,
       address: jobCard[0].bookings?.propertyAddress || 'Unknown Address',
       uploaderId: licenseeId || '44695535',
-      mediaType: file.fileType === 'dng' ? 'raw' : 'finished',
+      mediaType: file.fileType === 'dng' ? 'raw' as const : 'final' as const, // Use 'final' instead of 'finished'
       contentType: file.fileType === 'dng' ? 'image/x-adobe-dng' : 'image/jpeg',
       s3Key: file.fileUrl,
       licenseeId: licenseeId || '44695535',
