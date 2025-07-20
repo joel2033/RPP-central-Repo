@@ -92,12 +92,6 @@ export class JobService {
     return await storage.getJobActivityByJobCardId(jobId);
   }
 
-  private clearListCaches(licenseeId: string): void {
-    // This is a simple approach - in production you might want more sophisticated cache invalidation
-    cache.clear();
-  }
-}
-
   async createContentItem(jobCardId: number, contentItemData: any): Promise<any> {
     const result = await storage.createContentItem({
       ...contentItemData,
@@ -120,6 +114,11 @@ export class JobService {
     
     // Invalidate caches
     cache.delete(`${this.cachePrefix}${jobCardId}`);
+  }
+
+  private clearListCaches(licenseeId: string): void {
+    // This is a simple approach - in production you might want more sophisticated cache invalidation
+    cache.clear();
   }
 }
 

@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Upload, FolderPlus, MoreHorizontal, Image, Download, Eye, Video, Map, FileText } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { JPEGFileUpload } from './JPEGFileUpload';
+import { CentralizedS3Upload } from './CentralizedS3Upload';
 import { apiRequest } from '@/lib/queryClient';
 import { toast } from '@/hooks/use-toast';
 
@@ -100,15 +100,7 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
 
   const isLoading = isLoadingFiles || isLoadingContent;
 
-  // Categorize files
-  const getFilesByCategory = (category: string) => {
-    return productionFiles.filter((file: ProductionFile) => file.serviceCategory === category);
-  };
-
-  // Get content items by category
-  const getContentItemsByCategory = (category: string) => {
-    return contentItems.filter((item: ContentFile) => item.category === category);
-  };
+  // Removed getFilesByCategory and getContentItemsByCategory - now handled in unified renderFileGrid
 
   const handleSelectAll = () => {
     if (selectedFiles.size === contentItems.length) {
@@ -367,7 +359,7 @@ export const UnifiedFileManagement: React.FC<UnifiedFileManagementProps> = ({ jo
               <DialogHeader>
                 <DialogTitle>Upload Finished Files</DialogTitle>
               </DialogHeader>
-              <JPEGFileUpload
+              <CentralizedS3Upload
                 jobCardId={jobCardId}
                 onUploadSuccess={handleUploadSuccess}
               />

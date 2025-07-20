@@ -538,6 +538,17 @@ Changelog:
   - **Single Files & Media Section**: Combined all file types into unified grid with proper badges (Raw/Finished) and thumbnails
   - **Performance Optimization**: Content items API now loads 4 finished files with thumbnail previews for job card 16
   - **Workflow Integration**: Unified interface maintains all existing functionality while providing cleaner user experience
+- July 20, 2025. Completed major refactoring of duplicated content logic with centralized S3 upload system:
+  - **Unified Grid System**: Merged ContentItemsManager logic into single renderFileGrid() function used across all tabs
+  - **Centralized S3 Upload**: Enhanced jobController.ts with uploadJobFile() and processUploadedFile() endpoints for streamlined file handling
+  - **Automatic Thumbnail Generation**: Integrated ThumbnailService with Sharp library for 300x300 thumbnail creation on upload
+  - **Enhanced S3 Integration**: Improved S3Service with proper presigned URL generation and thumbnail storage
+  - **Content Display Unification**: Combined content items and production files into unified display with proper status badges
+  - **Category Filtering**: Maintained All/Photos/Floor Plans/Video/Other tab filtering while using single grid renderer
+  - **Badge System**: Clean status indicators (Finished=green, Final/Uploaded=blue) with proper file size display
+  - **API Enhancement**: Added jobService methods for content item creation and activity logging
+  - **Performance Optimization**: Eliminated duplicate grid rendering functions and streamlined file display logic
+  - **Upload Workflow**: Created CentralizedS3Upload component for consistent file upload experience with thumbnail generation
 ```
 
 ## User Preferences

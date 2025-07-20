@@ -26,6 +26,7 @@ import { fileStorage } from "./fileStorage";
 import { requireEditor, requireAdmin, requireVA, requireAdminOrVA, requireProductionStaff } from "./middleware/roleAuth";
 import { googleCalendarService } from "./googleCalendar";
 import { s3Service } from "./services/s3Service";
+// import * as jobController from "./controllers/jobController"; // TODO: Re-enable when ready
 import { thumbnailService } from "./services/thumbnailService";
 import { db } from "./db";
 import { jobCards, clients } from "@shared/schema";
@@ -3107,6 +3108,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: 'Failed to delete content item' });
     }
   });
+
+  // TODO: Add centralized S3 upload routes when jobController is ready
+  // Temporary placeholder - will be implemented shortly
 
   const httpServer = createServer(app);
   return httpServer;
