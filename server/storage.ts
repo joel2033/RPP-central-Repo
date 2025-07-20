@@ -484,7 +484,18 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(mediaFiles)
       .where(eq(mediaFiles.id, fileId));
-    return file;
+    
+    if (!file) return undefined;
+    
+    // Apply same mapping logic as getMediaFilesByJobId
+    return {
+      ...file,
+      // Enhanced computed fields for compatibility
+      mediaType: file.fileType === 'dng' ? 'raw' : 'final',
+      contentType: file.fileType === 'dng' ? 'image/x-adobe-dng' : 'image/jpeg',
+      s3Key: file.fileUrl, // fileUrl contains the S3 key directly
+      uploadTimestamp: file.uploadedAt
+    } as MediaFile;
   }
 
   // Get media files by job ID for the new workflow
