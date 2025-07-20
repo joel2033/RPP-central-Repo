@@ -121,7 +121,7 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
       // Handle single file download
       if (rawFiles.length === 1) {
         const file = rawFiles[0];
-        const response = await apiRequest('GET', `/api/media-files/${file.id}/download`);
+        const response = await apiRequest('GET', `/api/media/${file.id}/download`);
         return { type: 'single', data: response, file };
       }
 
@@ -129,7 +129,7 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
       const downloads = [];
       for (const file of rawFiles) {
         try {
-          const downloadData = await apiRequest('GET', `/api/media-files/${file.id}/download`);
+          const downloadData = await apiRequest('GET', `/api/media/${file.id}/download`);
           downloads.push({ file, downloadData });
         } catch (error) {
           console.error(`Failed to get download URL for ${file.fileName}:`, error);
