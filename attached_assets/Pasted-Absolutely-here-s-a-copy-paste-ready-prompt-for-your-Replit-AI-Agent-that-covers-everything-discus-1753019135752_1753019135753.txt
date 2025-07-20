@@ -1,0 +1,138 @@
+Absolutely — here’s a copy-paste ready prompt for your Replit AI Agent that covers everything discussed, structured in steps with precise actions.
+
+⸻
+
+🧠 Prompt for Replit AI Agent
+
+👇 Paste this into your Replit AI chat:
+
+⸻
+
+Hi Replit AI Agent, I need your help improving how RAW image uploads are handled in this app. Please carry out the following changes step-by-step:
+
+⸻
+
+🔧 GOAL
+
+Improve the RAW image upload workflow:
+	•	Save metadata to the database
+	•	Link uploads to the correct Job ID, address, and uploader
+	•	Auto-delete RAW files after 14 days via S3 lifecycle
+	•	Restrict access to only the right uploader or licensee
+
+⸻
+
+✅ 1. Create processUploadedFile() Controller
+
+In jobController.ts, add a new function:
+
+export const processUploadedFile = async (req: Request, res: Response) => {
+  const { jobId, fileName, s3Key, mediaType, fileSize, contentType } = req.body;
+  const userId = req.user?.id;
+
+  const job = await storage.getJobCard(jobId);
+  if (!job) return res.status(404).json({ message: "Job not found" });
+
+  await storage.insertMediaFile({
+    jobId,
+    address: job.propertyAddress,
+    uploaderId: userId,
+    fileName,
+    s3Key,
+    mediaType,
+    fileSize,
+    contentType,
+    uploadTimestamp: new Date(),
+  });
+
+  return res.status(200).json({ message: "File registered" });
+};
+
+
+⸻
+
+✅ 2. Add insertMediaFile() to storage.ts
+
+async insertMediaFile(file: InsertMediaFile): Promise<MediaFile> {
+  return await db.insert(mediaFiles).values(file).returning().then(r => r[0]);
+}
+
+
+⸻
+
+✅ 3. Update mediaFiles Table (if needed)
+
+Ensure the mediaFiles schema includes the following fields:
+	•	jobId (number)
+	•	address (string)
+	•	uploaderId (string)
+	•	fileName (string)
+	•	s3Key (string)
+	•	mediaType (enum: ‘raw’ | ‘finished’)
+	•	fileSize (number)
+	•	contentType (string)
+	•	uploadTimestamp (timestamp)
+
+Use InsertMediaFile and MediaFile types in @shared/schema.
+
+⸻
+
+✅ 4. Add Access Control for Media Files
+
+In your media download/view route, add this check:
+
+if (file.uploaderId !== user.id && file.licenseeId !== user.licenseeId) {
+  return res.status(403).json({ message: "Access denied" });
+}
+
+
+⸻
+
+✅ 5. Add S3 Lifecycle Policy for RAW Uploads
+
+Create a rule on the S3 bucket (or provide AWS CLI code if necessary):
+
+S3 Rule:
+
+{
+  "Rules": [
+    {
+      "ID": "DeleteRawAfter14Days",
+      "Prefix": "job-/raw/",
+      "Status": "Enabled",
+      "Expiration": {
+        "Days": 14
+      }
+    }
+  ]
+}
+
+
+⸻
+
+✅ 6. Optional: Log Upload in jobActivityLog
+
+If time allows, insert a log entry like:
+
+await storage.logJobActivity({
+  jobId,
+  type: 'upload',
+  message: `User ${userId} uploaded RAW file: ${fileName}`,
+  timestamp: new Date()
+});
+
+
+⸻
+
+Once complete, test this flow:
+	1.	Upload a file via presigned URL
+	2.	Call processUploadedFile with the metadata
+	3.	Confirm metadata is stored and tied to Job ID
+	4.	Check permissions for viewing the file
+	5.	Confirm lifecycle policy deletes the S3 file after 14 days
+
+Let me know if you need any more context or files. Thanks!
+
+⸻
+
+Let me know if you want a version tailored to Bubble, Odoo, or another framework instead.

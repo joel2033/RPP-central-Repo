@@ -3118,6 +3118,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // S3 file upload workflow
   app.post('/api/jobs/:id/upload-file', isAuthenticated, jobController.uploadJobFile);
   app.post('/api/jobs/:id/process-file', isAuthenticated, jobController.processUploadedFile);
+  
+  // Enhanced RAW image upload tracking
+  app.post('/api/jobs/:id/process-uploaded-file', isAuthenticated, jobController.processUploadedFile);
+  
+  // Media file download with access control
+  app.get('/api/media-files/:fileId/download', isAuthenticated, jobController.downloadMediaFile);
 
   const httpServer = createServer(app);
   return httpServer;

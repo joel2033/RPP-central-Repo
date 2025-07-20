@@ -111,15 +111,26 @@ export const bookings = pgTable("bookings", {
 });
 
 // Media files table
+// Enhanced Media Files table for RAW upload tracking
 export const mediaFiles = pgTable("media_files", {
   id: serial("id").primaryKey(),
-  bookingId: integer("booking_id").notNull(),
+  jobId: integer("job_id"), // Link to job card instead of booking
+  bookingId: integer("booking_id"), // Keep for backward compatibility
+  address: text("address"), // Property address from job
+  uploaderId: varchar("uploader_id"), // Track who uploaded the file
   fileName: varchar("file_name", { length: 255 }).notNull(),
   fileType: varchar("file_type", { length: 50 }).notNull(),
   fileUrl: text("file_url").notNull(),
+  s3Key: text("s3_key"), // S3 object key
   fileSize: integer("file_size"),
+  contentType: varchar("content_type", { length: 100 }), // MIME type
+  mediaType: mediaTypeEnum("media_type"), // raw, finished
   serviceType: serviceTypeEnum("service_type").notNull(),
+  uploadTimestamp: timestamp("upload_timestamp").defaultNow(),
+  licenseeId: varchar("licensee_id"), // For access control
+  isActive: boolean("is_active").default(true),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // QA checklist table
@@ -294,6 +305,8 @@ export const emailDeliveryLog = pgTable("email_delivery_log", {
   errorMessage: text("error_message"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+
 
 // Activity Log table for job tracking
 export const jobActivityLog = pgTable("job_activity_log", {
@@ -495,6 +508,14 @@ export const mediaFilesRelations = relations(mediaFiles, ({ one }) => ({
   booking: one(bookings, {
     fields: [mediaFiles.bookingId],
     references: [bookings.id],
+  }),
+  jobCard: one(jobCards, {
+    fields: [mediaFiles.jobId],
+    references: [jobCards.id],
+  }),
+  uploader: one(users, {
+    fields: [mediaFiles.uploaderId],
+    references: [users.id],
   }),
 }));
 

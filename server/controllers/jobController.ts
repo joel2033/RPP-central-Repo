@@ -126,6 +126,29 @@ export const processUploadedFile = async (req: Request, res: Response) => {
       }
     }
 
+    // Get job card for enhanced metadata tracking
+    const job = await storage.getJobCard(jobCardId);
+    
+    // Create enhanced media file record with RAW upload tracking
+    const mediaFileData = {
+      jobId: jobCardId,
+      address: job?.propertyAddress || 'Unknown Address',
+      uploaderId: userId,
+      fileName,
+      s3Key,
+      mediaType: mediaType || 'finished', // finished for editor uploads
+      fileSize,
+      contentType,
+      serviceType: category || 'photography',
+      fileType: contentType?.split('/')[1] || 'unknown',
+      fileUrl: s3Key, // Use s3Key as fileUrl
+      licenseeId: req.user?.licenseeId || userId,
+      uploadTimestamp: new Date(),
+    };
+
+    // Store in enhanced mediaFiles table
+    const savedMediaFile = await storage.insertMediaFile(mediaFileData);
+
     // Create content item in database
     const contentItem = await jobService.createContentItem({
       jobCardId,
@@ -140,8 +163,22 @@ export const processUploadedFile = async (req: Request, res: Response) => {
       status: 'ready_for_qc'
     });
 
-    // Log activity
-    await jobService.logActivity(jobCardId, userId, `Uploaded ${mediaType} file: ${fileName}`, 'file_upload');
+    // Enhanced activity logging with metadata
+    await storage.createJobActivityLog({
+      jobCardId,
+      userId,
+      action: 'upload',
+      description: `User ${userId} uploaded ${mediaType?.toUpperCase() || 'FINISHED'} file: ${fileName} to ${job?.propertyAddress || 'job'}`,
+      metadata: {
+        fileName,
+        fileSize,
+        contentType,
+        s3Key,
+        mediaType,
+        address: job?.propertyAddress,
+        mediaFileId: savedMediaFile.id
+      }
+    });
 
     // Update job status if needed
     if (mediaType === 'finished') {
@@ -265,5 +302,69 @@ export const getJobActivity = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('❌ Error fetching job activity:', error);
     res.status(500).json({ message: 'Failed to fetch job activity' });
+  }
+};
+
+/**
+ * Enhanced processUploadedFile - RAW image upload tracking with metadata
+ * Replaces the existing function with improved tracking capabilities
+ */
+
+/**
+ * Access control for media file downloads - Step 4
+ */
+export const downloadMediaFile = async (req: Request, res: Response) => {
+  try {
+    const fileId = parseInt(req.params.fileId);
+    const userId = req.user?.claims?.sub || req.user?.id;
+    const userLicenseeId = req.user?.licenseeId || userId;
+
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    // Get the media file
+    const file = await storage.getMediaFileById(fileId);
+    if (!file) {
+      return res.status(404).json({ message: 'File not found' });
+    }
+
+    // Access control check - Step 4 requirement
+    if (file.uploaderId !== userId && file.licenseeId !== userLicenseeId) {
+      console.log(`Access denied: userId=${userId}, uploaderId=${file.uploaderId}, licenseeId=${userLicenseeId}, fileLicenseeId=${file.licenseeId}`);
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    // Generate presigned download URL if file is in S3
+    if (file.s3Key && s3Service) {
+      const downloadUrl = await s3Service.generatePresignedDownloadUrl(file.s3Key);
+      
+      // Log the download activity
+      await storage.createJobActivityLog({
+        jobCardId: file.jobId || 0,
+        userId,
+        action: 'download',
+        description: `User ${userId} downloaded file: ${file.fileName}`,
+        metadata: {
+          fileId: file.id,
+          fileName: file.fileName,
+          fileSize: file.fileSize,
+          mediaType: file.mediaType
+        }
+      });
+
+      return res.json({
+        downloadUrl,
+        fileName: file.fileName,
+        fileSize: file.fileSize,
+        contentType: file.contentType
+      });
+    }
+
+    return res.status(404).json({ message: 'File not accessible' });
+    
+  } catch (error) {
+    console.error('❌ Error downloading media file:', error);
+    res.status(500).json({ message: 'Failed to download file' });
   }
 };

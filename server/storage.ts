@@ -478,12 +478,45 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(mediaFiles.uploadedAt));
   }
 
+  // Enhanced media file access with permission checks (Step 4)
+  async getMediaFileById(fileId: number): Promise<MediaFile | undefined> {
+    const [file] = await db
+      .select()
+      .from(mediaFiles)
+      .where(eq(mediaFiles.id, fileId));
+    return file;
+  }
+
+  // Get media files by job ID for the new workflow
+  async getMediaFilesByJobId(jobId: number, licenseeId?: string): Promise<MediaFile[]> {
+    const query = db
+      .select()
+      .from(mediaFiles)
+      .where(eq(mediaFiles.jobId, jobId))
+      .orderBy(desc(mediaFiles.uploadTimestamp));
+    
+    if (licenseeId) {
+      query.where(eq(mediaFiles.licenseeId, licenseeId));
+    }
+    
+    return await query;
+  }
+
   async createMediaFile(mediaFile: InsertMediaFile): Promise<MediaFile> {
     const [newMediaFile] = await db
       .insert(mediaFiles)
       .values(mediaFile)
       .returning();
     return newMediaFile;
+  }
+
+  // Enhanced method for RAW image upload tracking
+  async insertMediaFile(file: InsertMediaFile): Promise<MediaFile> {
+    const [newFile] = await db
+      .insert(mediaFiles)
+      .values(file)
+      .returning();
+    return newFile;
   }
 
   async deleteMediaFile(id: number): Promise<void> {

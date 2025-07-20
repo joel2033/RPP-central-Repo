@@ -549,6 +549,17 @@ Changelog:
   - **API Enhancement**: Added jobService methods for content item creation and activity logging
   - **Performance Optimization**: Eliminated duplicate grid rendering functions and streamlined file display logic
   - **Upload Workflow**: Created CentralizedS3Upload component for consistent file upload experience with thumbnail generation
+- July 20, 2025. Implemented enhanced RAW image upload workflow with comprehensive tracking and lifecycle management:
+  - **Enhanced MediaFiles Table**: Extended mediaFiles schema with jobId, address, uploaderId, licenseeId, mediaType, and uploadTimestamp fields
+  - **Improved processUploadedFile**: Added comprehensive metadata tracking linking uploads to Job ID, property address, and uploader
+  - **Access Control System**: Implemented role-based file access restricting downloads to only uploader or licensee members
+  - **Activity Logging**: Enhanced job activity logs with detailed upload metadata including file details, S3 keys, and property information
+  - **S3 Lifecycle Automation**: Created S3 lifecycle policy for automatic RAW file deletion after 14 days and finished file optimization
+  - **Database Relations**: Added proper foreign key relationships between mediaFiles, jobCards, and users tables
+  - **Secure Downloads**: Implemented downloadMediaFile controller with permission checks and presigned URL generation
+  - **Storage Methods**: Added getMediaFileById and getMediaFilesByJobId methods for enhanced file retrieval
+  - **Documentation**: Created comprehensive S3 lifecycle setup guide with AWS CLI, Console, and Terraform options
+  - **Workflow Integration**: Seamlessly integrated with existing upload system while maintaining backward compatibility
 ```
 
 ## User Preferences
