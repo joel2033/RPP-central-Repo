@@ -3123,7 +3123,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/jobs/:id/process-uploaded-file', isAuthenticated, jobController.processUploadedFile);
   
   // Media file download with access control
-  app.get('/api/media-files/:fileId/download', isAuthenticated, jobController.downloadMediaFile);
+  app.get('/api/media/:fileId/download', isAuthenticated, jobController.downloadMediaFile);
+  
+  // Test endpoint for debugging
+  app.get('/api/media/:fileId/test', isAuthenticated, (req, res) => {
+    console.log(`🧪 Test endpoint hit for fileId: ${req.params.fileId}`);
+    res.json({ success: true, fileId: req.params.fileId, userId: req.user?.claims?.sub });
+  });
   
   // Get media files by job ID - for editor dashboard
   app.get('/api/jobs/:id/media-files', isAuthenticated, jobController.getJobMediaFiles);

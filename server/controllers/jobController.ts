@@ -315,17 +315,23 @@ export const getJobActivity = async (req: Request, res: Response) => {
  */
 export const downloadMediaFile = async (req: Request, res: Response) => {
   try {
+    console.log(`🔍 Download request for fileId: ${req.params.fileId}`);
     const fileId = parseInt(req.params.fileId);
     const userId = req.user?.claims?.sub || req.user?.id;
     const userLicenseeId = req.user?.licenseeId || userId;
 
+    console.log(`📋 User: ${userId}, LicenseeId: ${userLicenseeId}, FileId: ${fileId}`);
+
     if (!userId) {
+      console.log('❌ No userId found, returning 401');
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
     // Get the media file
     const file = await storage.getMediaFileById(fileId);
+    console.log(`📁 File found:`, file ? { id: file.id, fileName: file.fileName, s3Key: file.s3Key } : 'null');
     if (!file) {
+      console.log('❌ File not found in database');
       return res.status(404).json({ message: 'File not found' });
     }
 
@@ -337,31 +343,42 @@ export const downloadMediaFile = async (req: Request, res: Response) => {
     }
 
     // Generate presigned download URL if file is in S3
+    console.log(`🔧 S3 Service available: ${!!s3Service}, File has s3Key: ${!!file.s3Key}`);
     if (file.s3Key && s3Service) {
+      console.log(`📥 Generating presigned URL for s3Key: ${file.s3Key}`);
       const downloadUrl = await s3Service.generatePresignedDownloadUrl(file.s3Key);
+      console.log(`✅ Generated download URL: ${downloadUrl ? 'Success' : 'Failed'}`);
       
       // Log the download activity
-      await storage.createJobActivityLog({
-        jobCardId: file.jobId || 0,
-        userId,
-        action: 'download',
-        description: `User ${userId} downloaded file: ${file.fileName}`,
-        metadata: {
-          fileId: file.id,
-          fileName: file.fileName,
-          fileSize: file.fileSize,
-          mediaType: file.mediaType
-        }
-      });
+      try {
+        await storage.createJobActivityLog({
+          jobCardId: file.jobId || 0,
+          userId,
+          action: 'download',
+          description: `User ${userId} downloaded file: ${file.fileName}`,
+          metadata: {
+            fileId: file.id,
+            fileName: file.fileName,
+            fileSize: file.fileSize,
+            mediaType: file.mediaType
+          }
+        });
+        console.log(`📝 Activity logged successfully`);
+      } catch (logError) {
+        console.error('⚠️ Failed to log activity:', logError);
+      }
 
-      return res.json({
+      const response = {
         downloadUrl,
         fileName: file.fileName,
         fileSize: file.fileSize,
         contentType: file.contentType
-      });
+      };
+      console.log(`📤 Returning response:`, response);
+      return res.json(response);
     }
 
+    console.log('❌ File not accessible - no S3 key or S3 service unavailable');
     return res.status(404).json({ message: 'File not accessible' });
     
   } catch (error) {
