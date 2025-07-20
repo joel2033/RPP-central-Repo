@@ -3124,6 +3124,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Media file download with access control
   app.get('/api/media-files/:fileId/download', isAuthenticated, jobController.downloadMediaFile);
+  
+  // Get media files by job ID - for editor dashboard
+  app.get('/api/jobs/:id/media-files', isAuthenticated, jobController.getJobMediaFiles);
 
   const httpServer = createServer(app);
   return httpServer;

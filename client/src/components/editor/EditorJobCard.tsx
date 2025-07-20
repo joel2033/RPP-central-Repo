@@ -83,20 +83,21 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
     };
   }, []);
 
-  // Fetch raw files for download
-  const { data: rawFiles, isLoading: rawFilesLoading } = useQuery<ProductionFile[]>({
-    queryKey: ["/api/job-cards", job.id, "files", "raw"],
+  // Fetch raw files for download - using enhanced media file system
+  const { data: rawFiles, isLoading: rawFilesLoading } = useQuery({
+    queryKey: ["/api/jobs", job.id, "media-files", "raw"],
     queryFn: async () => {
-      const response = await apiRequest('GET', `/api/job-cards/${job.id}/files?mediaType=raw`);
+      const response = await apiRequest('GET', `/api/jobs/${job.id}/media-files?mediaType=raw`);
+      console.log(`📁 Fetched ${response.length} raw media files for job ${job.id}:`, response);
       return response;
     },
   });
 
-  // Fetch final files
-  const { data: finalFiles } = useQuery<ProductionFile[]>({
-    queryKey: ["/api/job-cards", job.id, "files", "final"],
+  // Fetch finished files - using enhanced media file system
+  const { data: finalFiles } = useQuery({
+    queryKey: ["/api/jobs", job.id, "media-files", "finished"],
     queryFn: async () => {
-      const response = await apiRequest('GET', `/api/job-cards/${job.id}/files?mediaType=final`);
+      const response = await apiRequest('GET', `/api/jobs/${job.id}/media-files?mediaType=finished`);
       return response;
     },
   });
@@ -110,37 +111,36 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
     },
   });
 
-  // Download raw files mutation
+  // Enhanced download raw files mutation - using new media file system
   const downloadRawFilesMutation = useMutation({
     mutationFn: async () => {
-      try {
-        const response = await fetch(`/api/job-cards/${job.id}/download-raw-files`, {
-          method: 'POST',
-          credentials: 'include',
-        });
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to download raw files: ${response.status} - ${errorText}`);
-        }
-        
-        // Check if response is JSON (single file) or blob (ZIP file)
-        const contentType = response.headers.get('content-type');
-        
-        if (contentType && contentType.includes('application/json')) {
-          // Single file - return JSON with download URL
-          const data = await response.json();
-          return { type: 'single', data };
-        } else {
-          // Multiple files - return blob for ZIP download
-          const blob = await response.blob();
-          const filename = response.headers.get('content-disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'raw_files.zip';
-          return { type: 'zip', blob, filename };
-        }
-      } catch (error) {
-        console.error('Download fetch error:', error);
-        throw error;
+      if (!rawFiles || rawFiles.length === 0) {
+        throw new Error('No raw files available');
       }
+
+      // Handle single file download
+      if (rawFiles.length === 1) {
+        const file = rawFiles[0];
+        const response = await apiRequest('GET', `/api/media-files/${file.id}/download`);
+        return { type: 'single', data: response, file };
+      }
+
+      // Handle multiple files - download each file individually and create ZIP
+      const downloads = [];
+      for (const file of rawFiles) {
+        try {
+          const downloadData = await apiRequest('GET', `/api/media-files/${file.id}/download`);
+          downloads.push({ file, downloadData });
+        } catch (error) {
+          console.error(`Failed to get download URL for ${file.fileName}:`, error);
+        }
+      }
+
+      if (downloads.length === 0) {
+        throw new Error('No files could be prepared for download');
+      }
+
+      return { type: 'multiple', downloads };
     },
     onSuccess: (result) => {
       try {
@@ -148,23 +148,22 @@ export default function EditorJobCard({ job, onStatusChange }: EditorJobCardProp
           // Single file - open download URL in new tab
           window.open(result.data.downloadUrl, '_blank');
           toast({
-            title: "Download Complete",
-            description: "Raw file download has been initiated.",
+            title: "Download Started",
+            description: `Downloading ${result.file.fileName}`,
           });
-        } else if (result.type === 'zip') {
-          // Multiple files - trigger ZIP download
-          const url = window.URL.createObjectURL(result.blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = result.filename;
-          document.body.appendChild(a);
-          a.click();
-          window.URL.revokeObjectURL(url);
-          document.body.removeChild(a);
+        } else if (result.type === 'multiple') {
+          // Multiple files - open each download URL in a new tab
+          result.downloads.forEach((download: any, index: number) => {
+            if (download.downloadData.downloadUrl) {
+              setTimeout(() => {
+                window.open(download.downloadData.downloadUrl, '_blank');
+              }, index * 500); // Stagger downloads by 500ms
+            }
+          });
           
           toast({
-            title: "Download Complete",
-            description: `ZIP file with ${rawFiles?.length || 'multiple'} raw files has been downloaded.`,
+            title: "Downloads Started",
+            description: `Starting download of ${result.downloads.length} raw files. Check your downloads folder.`,
           });
         }
         

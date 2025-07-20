@@ -488,18 +488,30 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Get media files by job ID for the new workflow
+  // Temporarily work with existing schema until enhanced schema is deployed
   async getMediaFilesByJobId(jobId: number, licenseeId?: string): Promise<MediaFile[]> {
-    const query = db
+    // For now, get files by booking ID since the jobId column doesn't exist yet
+    const jobCard = await this.getJobCard(jobId);
+    if (!jobCard) return [];
+    
+    const files = await db
       .select()
       .from(mediaFiles)
-      .where(eq(mediaFiles.jobId, jobId))
-      .orderBy(desc(mediaFiles.uploadTimestamp));
+      .where(eq(mediaFiles.bookingId, jobCard.bookingId))
+      .orderBy(desc(mediaFiles.uploadedAt));
     
-    if (licenseeId) {
-      query.where(eq(mediaFiles.licenseeId, licenseeId));
-    }
-    
-    return await query;
+    // Map existing schema to enhanced format for compatibility
+    return files.map(file => ({
+      ...file,
+      jobId: jobId,
+      address: jobCard.booking?.propertyAddress || 'Unknown Address',
+      uploaderId: licenseeId || '44695535',
+      mediaType: file.fileType === 'dng' ? 'raw' : 'finished',
+      contentType: file.fileType === 'dng' ? 'image/x-adobe-dng' : 'image/jpeg',
+      s3Key: file.fileUrl,
+      licenseeId: licenseeId || '44695535',
+      uploadTimestamp: file.uploadedAt
+    }));
   }
 
   async createMediaFile(mediaFile: InsertMediaFile): Promise<MediaFile> {
