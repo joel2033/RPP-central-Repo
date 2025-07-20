@@ -110,27 +110,16 @@ export const bookings = pgTable("bookings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Media files table
-// Enhanced Media Files table for RAW upload tracking
+// Media files table - matches current database structure
 export const mediaFiles = pgTable("media_files", {
   id: serial("id").primaryKey(),
-  jobId: integer("job_id"), // Link to job card instead of booking
-  bookingId: integer("booking_id"), // Keep for backward compatibility
-  address: text("address"), // Property address from job
-  uploaderId: varchar("uploader_id"), // Track who uploaded the file
+  bookingId: integer("booking_id"), // Current database structure
   fileName: varchar("file_name", { length: 255 }).notNull(),
   fileType: varchar("file_type", { length: 50 }).notNull(),
   fileUrl: text("file_url").notNull(),
-  s3Key: text("s3_key"), // S3 object key
   fileSize: integer("file_size"),
-  contentType: varchar("content_type", { length: 100 }), // MIME type
-  mediaType: mediaTypeEnum("media_type"), // raw, finished
   serviceType: serviceTypeEnum("service_type").notNull(),
-  uploadTimestamp: timestamp("upload_timestamp").defaultNow(),
-  licenseeId: varchar("licensee_id"), // For access control
-  isActive: boolean("is_active").default(true),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // QA checklist table
@@ -508,14 +497,6 @@ export const mediaFilesRelations = relations(mediaFiles, ({ one }) => ({
   booking: one(bookings, {
     fields: [mediaFiles.bookingId],
     references: [bookings.id],
-  }),
-  jobCard: one(jobCards, {
-    fields: [mediaFiles.jobId],
-    references: [jobCards.id],
-  }),
-  uploader: one(users, {
-    fields: [mediaFiles.uploaderId],
-    references: [users.id],
   }),
 }));
 
