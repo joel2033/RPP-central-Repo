@@ -69,7 +69,7 @@ export const CentralizedS3Upload: React.FC<CentralizedS3UploadProps> = ({
 
       toast({
         title: "Upload Successful",
-        description: `${files.length} file(s) uploaded with thumbnails generated.`,
+        description: `${files.length} file(s) uploaded with thumbnails generated. Refreshing content...`,
       });
 
       onUploadSuccess();
