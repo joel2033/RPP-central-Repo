@@ -532,7 +532,7 @@ export class DatabaseStorage implements IStorage {
       uploaderId: licenseeId || '44695535',
       mediaType: file.fileType === 'dng' ? 'raw' : 'final', // Map file type to media type
       contentType: file.fileType === 'dng' ? 'image/x-adobe-dng' : 'image/jpeg',
-      s3Key: file.fileUrl, // fileUrl is the S3 key in current structure
+      s3Key: file.fileUrl, // fileUrl contains the S3 key directly
       licenseeId: licenseeId || '44695535',
       uploadTimestamp: file.uploadedAt
     }));
