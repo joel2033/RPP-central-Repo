@@ -618,6 +618,13 @@ Changelog:
   - **Upload Path Structure**: Files upload directly to temp_uploads/{jobCardId}/{fileName} pattern bypassing server validation
   - **Promise-based Completion**: Used Promise.all to wait for all upload tasks with proper error handling and download URL retrieval
   - **Removed Server Dependency**: Eliminated server-side FormData validation by uploading directly to Firebase Storage client-side
+- July 21, 2025. **UPDATED ALL FIREBASE STORAGE BUCKET REFERENCES** - Corrected all Firebase Storage bucket references to use proper .firebasestorage.app domain:
+   - **Client Configuration**: Updated client/src/lib/firebase.ts storageBucket from .appspot.com to .firebasestorage.app
+   - **Server Configuration**: Updated server/utils/firebaseAdmin.ts all three initialization blocks to use .firebasestorage.app
+   - **Service Configuration**: Updated server/services/firebaseService.ts config object to use .firebasestorage.app
+   - **Upload Module**: Updated client/src/lib/firebaseUpload.ts configuration to use .firebasestorage.app
+   - **Test Files**: Updated test-firebase-upload.js configuration to use correct bucket domain
+   - **Complete Migration**: All Firebase Storage bucket references now use rpp-central-database.firebasestorage.app as requested
 - July 21, 2025. **FIXED FIREBASE CLIENT CONFIGURATION** - Corrected Firebase client-side configuration causing network upload errors:
    - **AuthDomain Fix**: Changed incorrect `gs://rpp-central-database.firebasestorage.app` to proper `rpp-central-database.firebaseapp.com`
    - **StorageBucket Verification**: Confirmed all storageBucket configurations use correct `.appspot.com` domain

@@ -13,21 +13,21 @@ function initializeFirebaseAdmin(): admin.app.App {
         const serviceAccount = JSON.parse(serviceAccountJson);
         firebaseAdmin = admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),
-          storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'rpp-central-database.appspot.com'
+          storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'rpp-central-database.firebasestorage.app'
         });
         console.log('Firebase Admin initialized with service account');
       } catch (error) {
         console.error('Error parsing Firebase service account:', error);
         // Fall back to default credentials
         firebaseAdmin = admin.initializeApp({
-          storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'rpp-central-database.appspot.com'
+          storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'rpp-central-database.firebasestorage.app'
         });
         console.log('Firebase Admin initialized with default credentials (service account parse failed)');
       }
     } else {
       // Initialize with default credentials (for environments like Google Cloud)
       firebaseAdmin = admin.initializeApp({
-        storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'rpp-central-database.appspot.com'
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'rpp-central-database.firebasestorage.app'
       });
       console.log('Firebase Admin initialized with default credentials');
     }

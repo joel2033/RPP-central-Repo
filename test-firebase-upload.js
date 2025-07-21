@@ -6,7 +6,7 @@ const firebaseConfig = {
   apiKey: process.env.VITE_GOOGLE_API_KEY,
   authDomain: "rpp-central-database.firebaseapp.com",
   projectId: "rpp-central-database",
-  storageBucket: "rpp-central-database.appspot.com",
+  storageBucket: "rpp-central-database.firebasestorage.app",
   messagingSenderId: "308973286016",
   appId: "1:308973286016:web:dd689d8c6ea79713242c65",
   measurementId: "G-2WHBQW1QES"
