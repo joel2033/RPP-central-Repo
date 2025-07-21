@@ -91,26 +91,47 @@ const upload = multer({
   }
 });
 
+// Define upload schema for FormData validation
+const uploadFormDataSchema = z.object({
+  fileName: z.string(),
+  contentType: z.string(),
+  fileSize: z.string(), // String from FormData
+  category: z.string(),
+  mediaType: z.string()
+});
+
 // POST /api/jobs/:id/upload-file - Direct file upload with FormData (must be before /upload route)
 router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
+  console.log('📥 /upload-file route hit');
+  console.log('Request body:', req.body);
+  console.log('File:', req.file ? { name: req.file.originalname, size: req.file.size } : 'No file');
+  
   try {
     const { id: jobId } = req.params;
-    const { fileName, contentType } = req.body;
     const file = req.file;
     
     if (!file) throw new Error('No file provided');
+    
+    // Validate request body with Zod
+    const parsedBody = uploadFormDataSchema.parse(req.body);
+    const { fileName, contentType, fileSize, category, mediaType } = parsedBody;
     
     // Import Firebase Admin
     const { adminBucket } = await import('../utils/firebaseAdmin');
     
     // Use temp_uploads path as specified in requirements
-    const firebasePath = `temp_uploads/${jobId}/${fileName || file.originalname}`;
+    const firebasePath = `temp_uploads/${jobId}/${fileName}`;
     const firebaseFile = adminBucket.file(firebasePath);
     
     // Upload file to Firebase Storage
     await firebaseFile.save(file.buffer, { 
       metadata: { 
-        contentType: file.mimetype || contentType 
+        contentType: file.mimetype || contentType,
+        metadata: {
+          jobId: jobId,
+          category: category,
+          mediaType: mediaType
+        }
       } 
     });
     
@@ -136,9 +157,18 @@ router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
     });
   } catch (error) {
     console.error('Upload error:', error);
-    res.status(500).json({ 
-      message: error instanceof Error ? error.message : 'Unknown error' 
-    });
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ 
+        error: 'Validation failed', 
+        message: 'Invalid request data', 
+        reason: JSON.stringify(error.issues),
+        issues: error.issues 
+      });
+    } else {
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : 'Unknown error' 
+      });
+    }
   }
 });
 

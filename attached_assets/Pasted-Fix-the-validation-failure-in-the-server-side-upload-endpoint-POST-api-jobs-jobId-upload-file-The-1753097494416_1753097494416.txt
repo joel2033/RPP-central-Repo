@@ -1,0 +1,52 @@
+Fix the validation failure in the server-side upload endpoint POST /api/jobs/:jobId/upload-file. The error indicates Zod or similar schema validation failing on request data (expected string, received mismatch). Update to use Multer for multipart/form-data and a Zod schema matching the client's FormData fields: fileName (string), contentType (string), fileSize (string), category (string), mediaType (string). Handle the 'file' as req.file. Then upload to Firebase Storage in temp_uploads/{jobId}/{fileName} using firebase-admin, and return { firebasePath, downloadUrl }.
+
+Steps to implement:
+1. Install dependencies if missing: Run 'npm install multer zod' in server directory.
+2. In server/routes/jobs.js (or equivalent, e.g., if it's in controllers, adjust accordingly), update or create the route with multer.single('file').
+3. Define Zod schema: const uploadSchema = z.object({ fileName: z.string(), contentType: z.string(), fileSize: z.string(), category: z.string(), mediaType: z.string() });
+4. In the handler: Parse req.body with uploadSchema.parse(req.body). Get file from req.file. Validate jobId and permissions optionally.
+5. If utils/firebaseAdmin.js doesn't exist, create it with admin.initializeApp({ credential: admin.credential.cert(serviceAccount), storageBucket: 'your-bucket' }) – use env for serviceAccount.
+6. Ensure no conflicting body-parser.json() for this route; Multer handles parsing.
+7. On success, update Job Card status in DB to 'In Progress' if applicable.
+
+Example code:
+const express = require('express');
+const multer = require('multer');
+const z = require('zod');
+const admin = require('../utils/firebaseAdmin');
+const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage() });
+
+const uploadSchema = z.object({
+  fileName: z.string(),
+  contentType: z.string(),
+  fileSize: z.string(),
+  category: z.string(),
+  mediaType: z.string(),
+});
+
+router.post('/:jobId/upload-file', upload.single('file'), async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const parsedBody = uploadSchema.parse(req.body);
+    const file = req.file;
+    if (!file) throw new Error('No file provided');
+    const bucket = admin.storage().bucket();
+    const firebaseFile = bucket.file(`temp_uploads/${jobId}/${parsedBody.fileName}`);
+    await firebaseFile.save(file.buffer, { metadata: { contentType: file.mimetype || parsedBody.contentType } });
+    const [downloadUrl] = await firebaseFile.getSignedUrl({ action: 'read', expires: '03-09-2491' });
+    // Optional: DB update for Job Status
+    res.json({ firebasePath: `temp_uploads/${jobId}/${parsedBody.fileName}`, downloadUrl });
+  } catch (error) {
+    console.error('Upload error:', error);
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation failed', message: 'Invalid request data', reason: error.issues });
+    } else {
+      res.status(500).json({ message: error.message || 'Unknown error' });
+    }
+  }
+});
+
+module.exports = router;
+
+This resolves the type mismatch by validating exactly the sent fields. Commit with message: "Fix validation in upload endpoint with Zod schema and Multer for FormData handling"
