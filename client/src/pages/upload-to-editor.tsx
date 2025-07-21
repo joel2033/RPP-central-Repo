@@ -792,17 +792,5 @@ export default function UploadToEditor() {
     return null;
   }
 
-  return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <TopBar title="Upload to Editor" />
-        
-        <div className="flex-1 overflow-y-auto">
-          <UploadToEditorContent />
-        </div>
-      </div>
-    </div>
-  );
+  return <UploadToEditorContent />;
 }

@@ -1,5 +1,5 @@
 import sharp from 'sharp';
-import { s3Service } from './s3Service';
+
 
 export interface ThumbnailOptions {
   width?: number;
@@ -62,51 +62,26 @@ export class ThumbnailService {
   }
 
   /**
-   * Generate thumbnail S3 key
+   * Generate thumbnail Firebase path
    */
-  generateThumbnailKey(originalS3Key: string): string {
-    // Extract path components
-    const pathParts = originalS3Key.split('/');
-    const fileName = pathParts[pathParts.length - 1];
-    const fileNameWithoutExt = fileName.split('.').slice(0, -1).join('.');
-    const pathWithoutFile = pathParts.slice(0, -1).join('/');
-    
-    return `${pathWithoutFile}/thumbs/${fileNameWithoutExt}_thumb.jpg`;
+  generateThumbnailPath(jobId: string, originalFileName: string): string {
+    const fileNameWithoutExt = originalFileName.split('.').slice(0, -1).join('.');
+    return `jobs/${jobId}/thumbs/${fileNameWithoutExt}_thumb.jpg`;
   }
 
   /**
-   * Upload thumbnail to S3 and return the S3 key
+   * Generate thumbnail from file buffer and return the buffer
+   * Firebase upload should be handled by the caller
    */
-  async uploadThumbnail(
-    jobCardId: number,
-    originalFileName: string,
+  async createThumbnail(
     fileBuffer: Buffer,
     options: ThumbnailOptions = {}
-  ): Promise<string> {
+  ): Promise<Buffer> {
     try {
-      // Generate thumbnail
-      const thumbnailBuffer = await this.generateThumbnail(fileBuffer, options);
-      
-      // Generate S3 key for thumbnail
-      const fileNameWithoutExt = originalFileName.split('.').slice(0, -1).join('.');
-      const thumbnailKey = `job-cards/${jobCardId}/thumbs/${fileNameWithoutExt}_thumb.jpg`;
-      
-      // Upload to S3
-      if (s3Service) {
-        await s3Service.uploadFileToS3(
-          thumbnailKey,
-          thumbnailBuffer,
-          'image/jpeg',
-          { type: 'thumbnail' }
-        );
-        
-        console.log(`Thumbnail uploaded successfully: ${thumbnailKey}`);
-        return thumbnailKey;
-      } else {
-        throw new Error('S3 service not available');
-      }
+      // Use the existing generateThumbnail method
+      return await this.generateThumbnail(fileBuffer, options);
     } catch (error) {
-      console.error('Error uploading thumbnail:', error);
+      console.error('Error creating thumbnail:', error);
       throw error;
     }
   }

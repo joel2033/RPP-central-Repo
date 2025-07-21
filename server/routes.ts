@@ -25,7 +25,7 @@ import multer from "multer";
 import { fileStorage } from "./fileStorage";
 import { requireEditor, requireAdmin, requireVA, requireAdminOrVA, requireProductionStaff } from "./middleware/roleAuth";
 import { googleCalendarService } from "./googleCalendar";
-import { s3Service } from "./services/s3Service";
+
 import * as jobController from "./controllers/jobController";
 import { thumbnailService } from "./services/thumbnailService";
 import { db } from "./db";
@@ -90,7 +90,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: itemName,
           description: `${categoryDisplayName} for content ID ${contentId}`,
           fileCount: categoryFiles.length,
-          s3Urls: categoryFiles.map(f => f.s3Key).filter(Boolean),
+          s3Urls: categoryFiles.map(f => f.downloadUrl).filter(Boolean),
           thumbUrl: thumbnailKey,
           status: 'draft',
           uploaderRole: 'editor', // Flag editor uploads
@@ -106,7 +106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const item = existingItems[0];
         const updateData: any = {
           fileCount: categoryFiles.length,
-          s3Urls: categoryFiles.map(f => f.s3Key).filter(Boolean),
+          s3Urls: categoryFiles.map(f => f.downloadUrl).filter(Boolean),
           updatedBy: userId,
         };
         
@@ -1390,340 +1390,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         files = await storage.getProductionFiles(jobCardId);
       }
       
-      // Add download URLs for S3 files
-      if (s3Service) {
-        const filesWithUrls = await Promise.all(
-          files.map(async (file) => {
-            if (file.s3Key) {
-              try {
-                const downloadUrl = await s3Service.withRetry(() => 
-                  s3Service.generatePresignedDownloadUrl(file.s3Key)
-                );
-                return { ...file, downloadUrl };
-              } catch (error) {
-                console.error(`Failed to generate download URL for ${file.s3Key}:`, error);
-                return file;
-              }
-            }
-            return file;
-          })
-        );
-        res.json(filesWithUrls);
-      } else {
-        res.json(files);
-      }
+      // Files should already have downloadUrl from Firebase
+      res.json(files);
     } catch (error) {
       console.error("Error fetching production files:", error);
       res.status(500).json({ message: "Failed to fetch production files" });
     }
   });
 
-  // Server-side S3 upload proxy (fallback for CORS issues)
-  app.post('/api/job-cards/:id/files/upload-proxy', isAuthenticated, upload.single('file'), async (req: any, res) => {
-    try {
-      const jobCardId = parseInt(req.params.id);
-      const userId = req.user.claims.sub;
-      const file = req.file;
-      const { mediaType, serviceCategory, instructions, exportType, customDescription } = req.body;
-
-      if (!file) {
-        return res.status(400).json({ message: "No file provided" });
-      }
-
-      console.log(`Server-side upload proxy for job card ${jobCardId}:`, { 
-        fileName: file.originalname, 
-        contentType: file.mimetype, 
-        size: file.size,
-        mediaType 
-      });
-
-      // Check AWS environment variables
-      if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_REGION || !process.env.S3_BUCKET) {
-        return res.status(500).json({ 
-          message: "S3 service not configured - missing AWS credentials"
-        });
-      }
-
-      if (!s3Service) {
-        return res.status(503).json({ message: "S3 service not configured" });
-      }
-
-      // Check if Job ID has been assigned - REQUIRED for uploads
-      const hasJobId = await storage.hasJobId(jobCardId);
-      if (!hasJobId) {
-        return res.status(400).json({ 
-          message: "Job ID must be assigned before uploading files. Please assign a Job ID first." 
-        });
-      }
-
-      // Validate file
-      const validation = s3Service.validateFile({ size: file.size, type: file.mimetype });
-      if (!validation.valid) {
-        return res.status(400).json({ message: validation.error });
-      }
-
-      const s3Key = s3Service.generateS3Key(jobCardId, file.originalname, mediaType || 'raw');
-      
-      // Determine tags based on media type
-      const tags: Record<string, string> = {};
-      if (mediaType === 'raw') {
-        tags.type = 'raw';
-      } else if (mediaType === 'final' || mediaType === 'finished') {
-        tags.type = 'finished';
-      }
-      
-      try {
-        // Upload directly to S3 using server-side putObject
-        console.log(`Uploading ${file.originalname} to S3 server-side with key: ${s3Key}`);
-        await s3Service.uploadFileToS3(s3Key, file.buffer, file.mimetype, tags);
-        
-        // Save metadata to database
-        const fileData = insertProductionFileSchema.parse({
-          originalName: file.originalname,
-          fileName: file.originalname,
-          s3Key: s3Key,
-          s3Bucket: process.env.S3_BUCKET,
-          mediaType: mediaType || "raw",
-          serviceCategory: serviceCategory || "photography",
-          fileSize: file.size,
-          mimeType: file.mimetype,
-          jobCardId,
-          uploadedBy: userId,
-          instructions: instructions || "",
-          exportType: exportType || "",
-          customDescription: customDescription || "",
-        });
-
-        const savedFile = await storage.createProductionFile(fileData);
-        console.log(`Successfully uploaded ${file.originalname} to S3 and saved metadata`);
-        
-        // Auto-create/update content items after upload
-        if (mediaType === 'finished' || mediaType === 'final') {
-          // Generate thumbnail for images
-          let thumbnailKey = null;
-          if (thumbnailService.isImageFile(file.mimetype)) {
-            try {
-              thumbnailKey = await thumbnailService.uploadThumbnail(
-                jobCardId, 
-                file.originalname, 
-                file.buffer
-              );
-              console.log(`Thumbnail generated: ${thumbnailKey}`);
-            } catch (error) {
-              console.error('Failed to generate thumbnail:', error);
-              // Continue without thumbnail - not a critical failure
-            }
-          }
-          
-          await createOrUpdateContentItem(jobCardId, serviceCategory || "photography", userId, thumbnailKey);
-          
-          // Auto-update job status to "Ready for QC" when editor uploads finished files
-          await storage.updateJobCardStatus(jobCardId, "ready_for_qc", userId, "Finished files uploaded by editor");
-        }
-        
-        res.status(201).json(savedFile);
-      } catch (s3Error: any) {
-        console.error("Server-side S3 upload error:", {
-          message: s3Error.message,
-          code: s3Error.code,
-          name: s3Error.name,
-          key: s3Key,
-          fileName: file.originalname
-        });
-        res.status(500).json({ 
-          message: "Failed to upload file to S3",
-          details: s3Error.message
-        });
-      }
-    } catch (error) {
-      console.error("Server-side upload proxy error:", error);
-      res.status(500).json({ message: "Internal server error" });
-    }
+  // This endpoint is no longer needed as we use Firebase Storage now
+  app.post('/api/job-cards/:id/files/upload-proxy', isAuthenticated, (req: any, res) => {
+    res.status(410).json({ 
+      message: "This endpoint has been deprecated. Please use Firebase Storage upload instead." 
+    });
   });
 
-  // S3 presigned upload URL endpoint
-  app.post('/api/job-cards/:id/files/upload-url', isAuthenticated, async (req: any, res) => {
-    try {
-      const jobCardId = parseInt(req.params.id);
-      const userId = req.user.claims.sub;
-      const { fileName, contentType, mediaType } = req.body;
 
-      console.log(`Upload URL request for job card ${jobCardId}:`, { fileName, contentType, mediaType });
-
-      // Check AWS environment variables
-      if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_REGION || !process.env.S3_BUCKET) {
-        console.error("AWS environment variables missing:", {
-          AWS_ACCESS_KEY_ID: !!process.env.AWS_ACCESS_KEY_ID,
-          AWS_SECRET_ACCESS_KEY: !!process.env.AWS_SECRET_ACCESS_KEY,
-          AWS_REGION: !!process.env.AWS_REGION,
-          S3_BUCKET: !!process.env.S3_BUCKET
-        });
-        return res.status(500).json({ 
-          message: "S3 service not configured - missing AWS credentials",
-          details: "AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, and S3_BUCKET must be set"
-        });
-      }
-
-      if (!s3Service) {
-        console.error("S3 service instance not available");
-        return res.status(503).json({ message: "S3 service not configured" });
-      }
-
-      // Check if Job ID has been assigned - REQUIRED for uploads
-      const hasJobId = await storage.hasJobId(jobCardId);
-      if (!hasJobId) {
-        console.log(`Job card ${jobCardId} does not have a Job ID assigned`);
-        return res.status(400).json({ 
-          message: "Job ID must be assigned before uploading files. Please assign a Job ID first." 
-        });
-      }
-
-      // Validate file
-      const validation = s3Service.validateFile({ size: req.body.fileSize || 0, type: contentType });
-      if (!validation.valid) {
-        console.log(`File validation failed for ${fileName}:`, validation.error);
-        return res.status(400).json({ message: validation.error });
-      }
-
-      const s3Key = s3Service.generateS3Key(jobCardId, fileName, mediaType || 'raw');
-      
-      // Determine tags based on media type
-      const tags: Record<string, string> = {};
-      if (mediaType === 'raw') {
-        tags.type = 'raw';
-        console.log(`Generated S3 upload URL with tags for raw content: ${s3Key}`, tags);
-      } else if (mediaType === 'final' || mediaType === 'finished') {
-        tags.type = 'finished';
-        console.log(`Generated S3 upload URL with tags for finished content: ${s3Key}`, tags);
-      }
-      
-      try {
-        const uploadUrl = await s3Service.withRetry(() => 
-          s3Service.generatePresignedUploadUrl(s3Key, contentType, tags)
-        );
-
-        console.log(`Successfully generated presigned upload URL for ${s3Key}`);
-        res.json({ uploadUrl, s3Key, tags });
-      } catch (s3Error: any) {
-        console.error("AWS S3 SDK Error:", {
-          message: s3Error.message,
-          code: s3Error.code,
-          name: s3Error.name,
-          requestId: s3Error.$metadata?.requestId,
-          statusCode: s3Error.$metadata?.httpStatusCode,
-          stack: s3Error.stack
-        });
-        
-        // Provide specific error messages based on AWS error codes
-        let errorMessage = "Failed to generate S3 upload URL";
-        if (s3Error.code === 'AccessDenied') {
-          errorMessage = "Access denied to S3 bucket. Check IAM permissions for s3:PutObject";
-        } else if (s3Error.code === 'NoSuchBucket') {
-          errorMessage = "S3 bucket does not exist";
-        } else if (s3Error.code === 'InvalidBucketName') {
-          errorMessage = "Invalid S3 bucket name";
-        } else if (s3Error.code === 'CredentialsError') {
-          errorMessage = "Invalid AWS credentials";
-        }
-        
-        return res.status(500).json({ 
-          message: errorMessage,
-          details: s3Error.message,
-          errorCode: s3Error.code
-        });
-      }
-    } catch (error: any) {
-      console.error("Error generating upload URL:", {
-        message: error.message,
-        stack: error.stack,
-        jobCardId: req.params.id,
-        fileName: req.body.fileName
-      });
-      res.status(500).json({ 
-        message: "Failed to generate upload URL",
-        details: error.message 
-      });
-    }
+  // This endpoint is no longer needed as we use Firebase Storage now
+  app.post('/api/job-cards/:id/files/upload-url', isAuthenticated, (req: any, res) => {
+    res.status(410).json({ 
+      message: "This endpoint has been deprecated. Please use Firebase Storage upload instead." 
+    });
   });
 
-  // Test S3 tagging endpoint
-  app.get('/api/test-s3-tags', isAuthenticated, async (req: any, res) => {
-    try {
-      if (!s3Service) {
-        return res.status(503).json({ message: "S3 service not configured" });
-      }
-
-      const testKey = 'test-files/test-upload.txt';
-      const rawTags = { type: 'raw' };
-      const finishedTags = { type: 'finished' };
-
-      const rawUploadUrl = await s3Service.generatePresignedUploadUrl(testKey + '-raw', 'text/plain', rawTags);
-      const finishedUploadUrl = await s3Service.generatePresignedUploadUrl(testKey + '-finished', 'text/plain', finishedTags);
-
-      res.json({
-        message: "S3 tagging test URLs generated successfully",
-        rawUpload: {
-          url: rawUploadUrl,
-          key: testKey + '-raw',
-          tags: rawTags
-        },
-        finishedUpload: {
-          url: finishedUploadUrl,
-          key: testKey + '-finished',
-          tags: finishedTags
-        }
-      });
-    } catch (error) {
-      console.error("Error testing S3 tags:", error);
-      res.status(500).json({ message: "Failed to test S3 tags", error: error.message });
-    }
+  // This endpoint is no longer needed as we use Firebase Storage now
+  app.get('/api/test-s3-tags', isAuthenticated, (req: any, res) => {
+    res.status(410).json({ 
+      message: "This endpoint has been deprecated. Please use Firebase Storage instead." 
+    });
   });
-
-  // S3 file metadata endpoint (after successful upload)
-  app.post('/api/job-cards/:id/files/metadata', isAuthenticated, async (req: any, res) => {
-    try {
-      const jobCardId = parseInt(req.params.id);
-      const userId = req.user.claims.sub;
-      const { 
-        fileName, 
-        originalName, 
-        s3Key, 
-        fileSize, 
-        mimeType, 
-        mediaType, 
-        serviceCategory, 
-        instructions, 
-        exportType, 
-        customDescription 
-      } = req.body;
-
-      if (!s3Service) {
-        return res.status(503).json({ message: "S3 service not configured" });
-      }
-
-      // Create database record
-      const fileData = insertProductionFileSchema.parse({
-        originalName: originalName || fileName,
-        fileName: fileName,
-        s3Key: s3Key,
-        s3Bucket: process.env.S3_BUCKET,
-        mediaType: mediaType || "raw",
-        serviceCategory: serviceCategory || "general",
-        fileSize: fileSize,
-        mimeType: mimeType,
-        jobCardId,
-        uploadedBy: userId,
-        instructions: instructions || "",
-        exportType: exportType || "",
-        customDescription: customDescription || "",
-      });
-
-      const savedFile = await storage.createProductionFile(fileData);
-      res.status(201).json(savedFile);
-    } catch (error) {
-      console.error("Error saving file metadata:", error);
-      res.status(400).json({ message: "Failed to save file metadata" });
-    }
+  // This endpoint is no longer needed as we use Firebase Storage now
+  app.post('/api/job-cards/:id/files/metadata', isAuthenticated, (req: any, res) => {
+    res.status(410).json({ 
+      message: "This endpoint has been deprecated. Please use Firebase Storage upload instead." 
+    });
   });
 
   // Legacy file upload endpoint (with S3 integration and fallback)
@@ -1754,75 +1454,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let s3Key: string | null = null;
         let s3Bucket: string | null = null;
         
-        // Try S3 upload first, fallback to local storage
-        if (s3Service) {
-          try {
-            // Validate file before upload
-            const validation = s3Service.validateFile({ size: file.size, type: file.mimetype });
-            if (!validation.valid) {
-              console.error('File validation failed:', validation.error);
-              return res.status(400).json({ message: `File ${file.originalname}: ${validation.error}` });
-            }
-
-            // Generate S3 key
-            const mediaType = req.body.mediaType || "raw";
-            s3Key = s3Service.generateS3Key(jobCardId, file.originalname, mediaType);
-            s3Bucket = process.env.S3_BUCKET;
-            
-            // Determine tags based on media type
-            const tags: Record<string, string> = {};
-            if (mediaType === 'raw') {
-              tags.type = 'raw';
-            } else if (mediaType === 'final' || mediaType === 'finished') {
-              tags.type = 'finished';
-            }
-            
-            console.log('Uploading to S3 with tags:', s3Key, tags);
-            
-            // Upload to S3 with retry logic
-            await s3Service.withRetry(async () => {
-              const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
-              const s3Client = new S3Client({
-                region: process.env.AWS_REGION,
-                credentials: {
-                  accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-                  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-                },
-              });
-
-              const command = new PutObjectCommand({
-                Bucket: s3Bucket,
-                Key: s3Key,
-                Body: file.buffer,
-                ContentType: file.mimetype,
-                Tagging: tags.type ? `type=${encodeURIComponent(tags.type)}` : undefined,
-              });
-
-              await s3Client.send(command);
-            });
-            
-            fileName = file.originalname; // Use original name for S3 uploads
-            console.log('S3 upload successful:', s3Key);
-            
-          } catch (s3Error) {
-            console.error('S3 upload failed, falling back to local storage:', s3Error);
-            // Fallback to local storage
-            s3Key = null;
-            s3Bucket = null;
-            fileName = await fileStorage.saveFile(file.buffer, file.originalname, jobCardId);
-          }
-        } else {
-          // S3 not configured, use local storage
-          console.log('S3 not configured, using local storage');
-          fileName = await fileStorage.saveFile(file.buffer, file.originalname, jobCardId);
-        }
+        // Files should be uploaded via Firebase Storage from the client
+        // This legacy endpoint only saves to local storage as fallback
+        console.log('Using local storage for file:', file.originalname);
+        fileName = await fileStorage.saveFile(file.buffer, file.originalname, jobCardId);
         
         // Create database record
         const fileData = insertProductionFileSchema.parse({
           originalName: file.originalname,
           fileName: fileName,
-          s3Key: s3Key,
-          s3Bucket: s3Bucket,
+          s3Key: null,
+          s3Bucket: null,
           mediaType: req.body.mediaType || "raw",
           serviceCategory: req.body.serviceCategory || "photography",
           fileSize: file.size,
@@ -1941,161 +1583,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "No raw files found" });
       }
       
-      // If S3 is configured, generate download URLs
-      if (s3Service) {
+      // Files should have Firebase download URLs already
+      if (rawFiles.length === 1 && rawFiles[0].downloadUrl) {
         // For single file, return direct download URL
-        if (rawFiles.length === 1 && rawFiles[0].s3Key) {
-          const downloadUrl = await s3Service.generatePresignedDownloadUrl(rawFiles[0].s3Key);
-          
-          // Log download activity
-          await storage.createJobActivityLog({
-            jobCardId,
-            userId,
-            action: 'raw_files_downloaded',
-            description: `Editor downloaded raw files for editing (${rawFiles.length} file)`,
-            metadata: {
-              fileCount: rawFiles.length,
-              downloadType: 'single',
-              timestamp: new Date().toISOString()
-            }
-          });
-          
-          return res.json({ downloadUrl, fileCount: rawFiles.length });
-        }
-        
-        // For multiple files, create a ZIP file
-        if (rawFiles.length > 1) {
-          console.log(`Creating ZIP archive for ${rawFiles.length} files`);
-          
-          try {
-            // Set response headers for ZIP download
-            const jobId = jobCard.jobId || `job_${jobCardId}`;
-            const zipFileName = `${jobId}_raw_files.zip`;
-            
-            res.setHeader('Content-Type', 'application/zip');
-            res.setHeader('Content-Disposition', `attachment; filename="${zipFileName}"`);
-            
-            // Create ZIP archive with faster compression
-            const archive = archiver('zip', {
-              zlib: { level: 1 } // Fastest compression (was 9 - maximum)
-            });
-            
-            // Handle archive errors
-            archive.on('error', (err) => {
-              console.error('Archive error:', err);
-              if (!res.headersSent) {
-                res.status(500).json({ message: "Error creating ZIP file" });
-              }
-            });
-            
-            // Handle archive completion
-            archive.on('end', () => {
-              console.log(`ZIP archive completed: ${zipFileName}`);
-            });
-            
-            // Progress tracking
-            let filesProcessed = 0;
-            archive.on('progress', (progress) => {
-              if (progress.entries && progress.entries.processed !== filesProcessed) {
-                filesProcessed = progress.entries.processed;
-                console.log(`ZIP Progress: ${filesProcessed}/${rawFiles.length} files processed`);
-              }
-            });
-            
-            // Pipe archive to response
-            archive.pipe(res);
-            
-            // Process files sequentially to avoid overwhelming S3 and archiver
-            let processedFiles = 0;
-            const startTime = Date.now();
-            
-            for (const file of rawFiles) {
-              if (file.s3Key) {
-                try {
-                  const fileStartTime = Date.now();
-                  console.log(`[${processedFiles + 1}/${rawFiles.length}] Adding file to ZIP: ${file.fileName}`);
-                  
-                  // Get file stream from S3 with retry logic
-                  const fileStream = await s3Service.withRetry(
-                    () => s3Service.getFileStream(file.s3Key),
-                    3, // Max retries
-                    100 // Base delay ms
-                  );
-                  
-                  // Add file to archive with original filename
-                  archive.append(fileStream, { name: file.fileName });
-                  
-                  processedFiles++;
-                  const fileTime = Date.now() - fileStartTime;
-                  console.log(`✓ File ${file.fileName} added to ZIP in ${fileTime}ms`);
-                } catch (error) {
-                  console.error(`✗ Error adding file ${file.fileName} to ZIP:`, error);
-                  // Continue with other files
-                }
-              }
-            }
-            
-            const totalTime = Date.now() - startTime;
-            console.log(`ZIP Processing Complete: ${processedFiles}/${rawFiles.length} files processed in ${totalTime}ms`);
-            console.log(`Average time per file: ${Math.round(totalTime / processedFiles)}ms`);
-            
-            // Finalize archive
-            await archive.finalize();
-            
-            // Log download activity asynchronously to avoid blocking response
-            setTimeout(async () => {
-              try {
-                await storage.createJobActivityLog({
-                  jobCardId,
-                  userId,
-                  action: 'raw_files_downloaded',
-                  description: `Editor downloaded raw files for editing (${rawFiles.length} files as ZIP)`,
-                  metadata: {
-                    fileCount: rawFiles.length,
-                    downloadType: 'zip',
-                    zipFileName,
-                    timestamp: new Date().toISOString()
-                  }
-                });
-              } catch (logError) {
-                console.error('Error logging download activity:', logError);
-              }
-            }, 100);
-            
-            return; // Response handled by stream
-          } catch (zipError) {
-            console.error('Error creating ZIP file:', zipError);
-            if (!res.headersSent) {
-              res.status(500).json({ message: "Failed to create ZIP file" });
-            }
-            return;
-          }
-        }
-      }
-      
-      // Fallback to local storage
-      if (rawFiles[0].fileName) {
-        const fileBuffer = await fileStorage.getFile(rawFiles[0].fileName);
+        const downloadUrl = rawFiles[0].downloadUrl;
         
         // Log download activity
         await storage.createJobActivityLog({
           jobCardId,
           userId,
           action: 'raw_files_downloaded',
-          description: `Editor downloaded raw files for editing (${rawFiles.length} files)`,
+          description: `Editor downloaded raw files for editing (${rawFiles.length} file)`,
           metadata: {
             fileCount: rawFiles.length,
-            downloadType: 'local',
+            downloadType: 'single',
             timestamp: new Date().toISOString()
           }
         });
         
-        res.setHeader('Content-Type', 'application/octet-stream');
-        res.setHeader('Content-Disposition', `attachment; filename="${rawFiles[0].originalName}"`);
-        res.send(fileBuffer);
-      } else {
-        return res.status(404).json({ message: "File not accessible" });
+        return res.json({ downloadUrl, fileCount: rawFiles.length });
       }
+      
+      // For multiple files or files without Firebase URLs, return file list
+      if (rawFiles.length > 0) {
+        // Log download activity
+        await storage.createJobActivityLog({
+          jobCardId,
+          userId,
+          action: 'raw_files_listed',
+          description: `Editor viewed raw files list (${rawFiles.length} files)`,
+          metadata: {
+            fileCount: rawFiles.length,
+            timestamp: new Date().toISOString()
+          }
+        });
+        
+        return res.json({ files: rawFiles, fileCount: rawFiles.length });
+      }
+      
+      return res.status(404).json({ message: "No files found" });
     } catch (error) {
       console.error("Error downloading raw files:", error);
       res.status(500).json({ message: "Failed to download raw files" });
@@ -3007,8 +2533,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const category = req.query.category as string;
       
       console.log(`🔍 Fetching content items for job card ${jobCardId}, category: ${category}`);
-      console.log(`🔍 S3 Service available:`, !!s3Service);
-      
       // Get all content items for the job card first
       const allItems = await storage.getContentItems(jobCardId);
       console.log(`🔍 Found ${allItems.length} total content items for job card ${jobCardId}`);
@@ -3023,27 +2547,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`After filtering for editor/finished: ${filteredItems.length} items`);
       
-      // Generate presigned URLs for thumbnails if they exist
-      const contentItemsWithThumbs = await Promise.all(
-        filteredItems.map(async (item) => {
-          if (item.thumbUrl && s3Service && !item.thumbUrl.startsWith('http')) {
-            try {
-              console.log(`Generating presigned URL for thumbnail: ${item.thumbUrl}`);
-              const thumbnailUrl = await s3Service.generatePresignedDownloadUrl(item.thumbUrl);
-              console.log(`✅ Generated thumbnail URL for ${item.name}: ${thumbnailUrl.substring(0, 100)}...`);
-              return { ...item, thumbnailUrl };
-            } catch (error) {
-              console.warn(`❌ Failed to generate thumbnail URL for ${item.thumbUrl}:`, error);
-              return item;
-            }
-          } else if (item.thumbUrl && item.thumbUrl.startsWith('http')) {
-            // Use HTTP URLs as-is for thumbnailUrl
-            console.log(`Using HTTP thumbnail URL for ${item.name}: ${item.thumbUrl}`);
-            return { ...item, thumbnailUrl: item.thumbUrl };
-          }
-          return item;
-        })
-      );
+      // Use Firebase URLs directly - no need for presigned URLs
+      const contentItemsWithThumbs = filteredItems.map((item) => {
+        if (item.thumbUrl) {
+          // Firebase URLs are already accessible
+          console.log(`Using Firebase thumbnail URL for ${item.name}`);
+          return { ...item, thumbnailUrl: item.thumbUrl };
+        }
+        return item;
+      });
       
       console.log(`Returning ${contentItemsWithThumbs.length} content items with thumbnails`);
       res.json(contentItemsWithThumbs);

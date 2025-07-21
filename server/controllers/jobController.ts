@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { storage } from '../storage';
-import { s3Service } from '../services/s3Service';
+
 import { firebaseStorageService } from '../services/firebaseService';
 import { thumbnailService } from '../services/thumbnailService';
 import { jobService } from '../services/jobService';
@@ -290,12 +290,12 @@ export const getJobFiles = async (req: Request, res: Response) => {
       ...productionFiles.map(async (file) => ({
         ...file,
         type: 'production',
-        downloadUrl: file.downloadUrl || (file.s3Key ? await s3Service.generatePresignedDownloadUrl(file.s3Key) : null) // Fallback to S3 for legacy files
+        downloadUrl: file.downloadUrl || null // Use Firebase URLs only
       })),
       ...contentItems.map(async (item) => ({
         ...item,
         type: 'content',
-        downloadUrl: item.downloadUrls?.[0] || item.s3Url || (item.s3Url ? await s3Service.generatePresignedDownloadUrl(item.s3Url) : null), // Use Firebase URLs first, fallback to S3
+        downloadUrl: item.downloadUrls?.[0] || null, // Use Firebase URLs only
         thumbnailUrl: item.thumbUrl || null
       }))
     ]);
@@ -351,7 +351,7 @@ export const downloadMediaFile = async (req: Request, res: Response) => {
 
     // Get the media file
     const file = await storage.getMediaFileById(fileId);
-    console.log(`📁 File found:`, file ? { id: file.id, fileName: file.fileName, s3Key: file.s3Key } : 'null');
+    console.log(`📁 File found:`, file ? { id: file.id, fileName: file.fileName, downloadUrl: file.downloadUrl } : 'null');
     if (!file) {
       console.log('❌ File not found in database');
       return res.status(404).json({ message: 'File not found' });
@@ -364,12 +364,10 @@ export const downloadMediaFile = async (req: Request, res: Response) => {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    // Generate presigned download URL if file is in S3
-    console.log(`🔧 S3 Service available: ${!!s3Service}, File has s3Key: ${!!file.s3Key}`);
-    if (file.s3Key && s3Service) {
-      console.log(`📥 Generating presigned URL for s3Key: ${file.s3Key}`);
-      const downloadUrl = await s3Service.generatePresignedDownloadUrl(file.s3Key);
-      console.log(`✅ Generated download URL: ${downloadUrl ? 'Success' : 'Failed'}`);
+    // Use Firebase download URL if available
+    console.log(`🔧 File has downloadUrl: ${!!file.downloadUrl}`);
+    if (file.downloadUrl) {
+      console.log(`📥 Using Firebase download URL`);
       
       // Log the download activity
       try {
@@ -391,7 +389,7 @@ export const downloadMediaFile = async (req: Request, res: Response) => {
       }
 
       const response = {
-        downloadUrl,
+        downloadUrl: file.downloadUrl,
         fileName: file.fileName,
         fileSize: file.fileSize,
         contentType: file.contentType
@@ -400,7 +398,7 @@ export const downloadMediaFile = async (req: Request, res: Response) => {
       return res.json(response);
     }
 
-    console.log('❌ File not accessible - no S3 key or S3 service unavailable');
+    console.log('❌ File not accessible - no download URL available');
     return res.status(404).json({ message: 'File not accessible' });
     
   } catch (error) {
@@ -442,7 +440,7 @@ export const getJobMediaFiles = async (req: Request, res: Response) => {
       fileSize: file.fileSize,
       contentType: file.contentType,
       mediaType: file.mediaType,
-      s3Key: file.s3Key,
+      downloadUrl: file.downloadUrl,
       uploaderId: file.uploaderId,
       uploadTimestamp: file.uploadTimestamp,
       address: file.address
