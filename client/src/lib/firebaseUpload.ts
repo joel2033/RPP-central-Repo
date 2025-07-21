@@ -15,10 +15,21 @@ const firebaseConfig = {
 
 // Initialize Firebase app
 const getFirebaseApp = () => {
+  console.log('🔥 Getting Firebase app...');
+  console.log('🔥 Current apps count:', getApps().length);
+  console.log('🔥 Firebase config:', {
+    ...firebaseConfig,
+    apiKey: firebaseConfig.apiKey ? `${firebaseConfig.apiKey.substring(0, 10)}...` : 'NOT SET'
+  });
+  
   if (getApps().length === 0) {
-    return initializeApp(firebaseConfig);
+    console.log('🔥 Initializing new Firebase app...');
+    const app = initializeApp(firebaseConfig);
+    console.log('🔥 Firebase app initialized:', app.name);
+    return app;
   }
-  return getApp();
+  console.log('🔥 Using existing Firebase app:', getApps()[0].name);
+  return getApps()[0];
 };
 
 export interface UploadProgress {
@@ -67,10 +78,18 @@ export const uploadFileToFirebase = async (
     console.log(`📤 Uploading to Firebase path: ${firebasePath}`);
 
     // Step 2: Upload directly to Firebase Storage
+    console.log('🔥 Initializing Firebase for upload...');
     const app = getFirebaseApp();
+    console.log('🔥 Firebase app initialized:', app ? 'SUCCESS' : 'FAILED');
+    
     const storage = getStorage(app);
+    console.log('🔥 Firebase storage initialized:', storage ? 'SUCCESS' : 'FAILED');
+    
     const storageRef = ref(storage, firebasePath);
+    console.log('🔥 Storage reference created for path:', firebasePath);
+    
     const uploadTask = uploadBytesResumable(storageRef, file);
+    console.log('🔥 Upload task created for file:', file.name, 'size:', file.size);
 
     return new Promise((resolve, reject) => {
       uploadTask.on(
