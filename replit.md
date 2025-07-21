@@ -256,7 +256,10 @@ Changelog:
   - **Enhanced Upload Features**: Drag-and-drop interface, progress tracking, error handling, and retry functionality
   - **Direct Upload Workflow**: Files upload directly to Firebase Storage, then metadata is processed and stored in database
   - **Download URL Management**: Firebase download URLs replace S3 presigned URLs for permanent file access future customer portal separation
-  - **Workflow Prevention**: Fixed automatic form submission to ensure all 4 steps are properly navigated
+  - **Production Upload Migration**: Completely replaced S3 upload logic in /production/upload workflow with direct Firebase uploads using uploadBytesResumable
+  - **Removed S3 Dependencies**: Eliminated all upload-url, upload-proxy endpoints and S3 presigned URL generation from production workflow
+  - **Firebase Path Structure**: Files now upload to Firebase under job-{jobId}/raw/{filename} pattern as requested
+  - **Progress Tracking**: Maintained real-time upload progress using Firebase's uploadBytesResumable with state_changed callbacks
 - July 08, 2025. Enhanced date and time picker components with modern UI and functionality:
   - **Modern Date Picker**: Implemented react-day-picker with calendar UI, month/year navigation, and proper date formatting
   - **Advanced Time Picker**: Created dropdown with 15-minute intervals, proper AM/PM formatting, and smooth scrolling

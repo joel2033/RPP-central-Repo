@@ -34,6 +34,9 @@ import {
 import LoadingSpinner from "@/components/shared/loading-spinner";
 import type { JobCard, Client, User, EditorServiceCategory, EditorServiceOption } from "@shared/schema";
 import { editorServiceApi } from "@/lib/api/editorServiceApi";
+// Firebase imports
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { initializeApp, getApps } from "firebase/app";
 
 interface JobCardWithDetails extends JobCard {
   client: Client;
@@ -66,6 +69,25 @@ const exportTypes = [
   "LinkedIn Banner",
   "Custom"
 ];
+
+// Firebase configuration
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_GOOGLE_API_KEY,
+  authDomain: "rpp-central-database.firebaseapp.com",
+  projectId: "rpp-central-database",
+  storageBucket: "rpp-central-database.appspot.com",
+  messagingSenderId: "308973286016",
+  appId: "1:308973286016:web:dd689d8c6ea79713242c65",
+  measurementId: "G-2WHBQW1QES"
+};
+
+// Initialize Firebase app
+const getFirebaseApp = () => {
+  if (getApps().length === 0) {
+    return initializeApp(firebaseConfig);
+  }
+  return getApps()[0];
+};
 
 // File Upload Modal Component
 function FileUploadModal({ 
@@ -121,7 +143,43 @@ function FileUploadModal({
     onFilesUpload(newUploadedFiles);
   };
 
-  // Helper function for presigned URL upload
+  // Firebase Upload Function - replaces all S3 logic
+  const uploadFileToFirebase = async (file: File, jobId: string): Promise<string> => {
+    const app = getFirebaseApp();
+    const storage = getStorage(app);
+    const fileRef = ref(storage, `job-${jobId}/raw/${file.name}`);
+    const uploadTask = uploadBytesResumable(fileRef, file);
+
+    return new Promise((resolve, reject) => {
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          // Progress tracking
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadingFiles(prev => {
+            const newMap = new Map(prev);
+            newMap.set(file.name, Math.round(progress));
+            return newMap;
+          });
+        },
+        (error) => {
+          console.error('Firebase upload error:', error);
+          reject(error);
+        },
+        async () => {
+          try {
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            console.log("File uploaded to Firebase:", downloadURL);
+            resolve(downloadURL);
+          } catch (error) {
+            reject(error);
+          }
+        }
+      );
+    });
+  };
+
+  // DEPRECATED - Helper function for presigned URL upload (old S3 logic)
   const uploadViaPresignedUrl = async (file: File, fileName: string, jobCardId: number) => {
     // Get presigned upload URL with timeout and CORS
     const controller = new AbortController();
@@ -290,19 +348,19 @@ function FileUploadModal({
     return result;
   };
 
-  const uploadFileToS3 = async (file: File, jobCardId: number): Promise<void> => {
+  const uploadFile = async (file: File, jobCardId: number): Promise<void> => {
     const fileName = file.name;
     const maxRetries = 3;
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`Starting S3 upload for ${fileName}, size: ${file.size} (attempt ${attempt}/${maxRetries})`);
+        console.log(`Starting Firebase upload for ${fileName}, size: ${file.size} (attempt ${attempt}/${maxRetries})`);
         
-        // Try presigned URL upload first
+        // Upload to Firebase directly
         try {
-          await uploadViaPresignedUrl(file, fileName, jobCardId);
-          console.log(`Successfully uploaded ${fileName} via presigned URL`);
+          const firebaseUrl = await uploadFileToFirebase(file, jobCardId.toString());
+          console.log(`Successfully uploaded ${fileName} to Firebase:`, firebaseUrl);
           
           // Clean up progress tracking
           setUploadingFiles(prev => {
@@ -318,46 +376,25 @@ function FileUploadModal({
             return newMap;
           });
           
+          
+          // Optional: Save metadata to backend
+          // await apiRequest('POST', `/api/jobs/${jobCardId}/process-file`, {
+          //   firebasePath: `job-${jobCardId}/raw/${file.name}`,
+          //   downloadUrl: firebaseUrl,
+          //   fileName: file.name,
+          //   contentType: file.type,
+          //   fileSize: file.size,
+          //   category: 'photography',
+          //   mediaType: 'raw'
+          // });
+          
           return; // Success, exit retry loop
-        } catch (presignedError: any) {
-          console.log(`Presigned URL upload failed for ${fileName}:`, presignedError.message);
-          console.error('Full presigned URL error:', presignedError);
+        } catch (firebaseError: any) {
+          console.log(`Firebase upload failed for ${fileName}:`, firebaseError.message);
+          console.error('Full Firebase error:', firebaseError);
           
-          // Handle timeout errors with toast notification
-          if (presignedError.message.includes('Request timed out')) {
-            toast({
-              title: "Upload Timeout",
-              description: "Request timed out - try again",
-              variant: "destructive"
-            });
-            throw presignedError;
-          }
-          
-          // If it's a CORS error, fall back to server-side proxy
-          if (presignedError.message.includes('CORS') || presignedError.message.includes('Network error')) {
-            console.log(`Falling back to server-side proxy for ${fileName}`);
-            await uploadViaServerProxy(file, fileName, jobCardId);
-            console.log(`Successfully uploaded ${fileName} via server proxy`);
-            
-            // Clean up progress tracking
-            setUploadingFiles(prev => {
-              const newMap = new Map(prev);
-              newMap.delete(fileName);
-              return newMap;
-            });
-            
-            // Clear any previous errors
-            setUploadErrors(prev => {
-              const newMap = new Map(prev);
-              newMap.delete(fileName);
-              return newMap;
-            });
-            
-            return; // Success, exit retry loop
-          } else {
-            // Re-throw non-CORS errors for retry
-            throw presignedError;
-          }
+          // Re-throw error for retry logic
+          throw firebaseError;
         }
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
@@ -422,32 +459,28 @@ function FileUploadModal({
       // For now, use job card ID 1 as a test, but this should be passed from parent component
       const jobCardId = 1;
       
-      // Check if S3 is configured by trying to get an upload URL
-      let s3Available = false;
-      try {
-        const testResponse = await fetch(`/api/job-cards/${jobCardId}/files/upload-url`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ fileName: 'test', contentType: 'text/plain', fileSize: 1 })
-        });
-        s3Available = testResponse.status !== 503;
-        console.log(`S3 availability check: ${s3Available ? 'available' : 'not available'}`);
-      } catch (error) {
-        console.log('S3 availability check failed, using simulation');
-        s3Available = false;
-      }
+      // Upload directly to Firebase (no S3 fallback needed)
+      console.log('Using Firebase upload for all files');
+      for (const file of files) {
+        try {
+          const firebaseUrl = await uploadFileToFirebase(file, jobCardId.toString());
+          console.log("File uploaded to Firebase:", firebaseUrl);
 
-      if (s3Available) {
-        // Use S3 upload
-        console.log('Using S3 upload');
-        const uploadPromises = files.map(file => uploadFileToS3(file, jobCardId));
-        await Promise.all(uploadPromises);
-      } else {
-        // Fallback to simulation
-        console.log('Using simulation upload');
-        const uploadPromises = files.map(file => simulateUpload(file));
-        await Promise.all(uploadPromises);
+          // Optional: POST this firebaseUrl to your backend to store in jobCard or media table
+          // Uncomment if you want to save metadata to backend:
+          // await apiRequest('POST', `/api/jobs/${jobCardId}/process-file`, {
+          //   firebasePath: `job-${jobCardId}/raw/${file.name}`,
+          //   downloadUrl: firebaseUrl,
+          //   fileName: file.name,
+          //   contentType: file.type,
+          //   fileSize: file.size,
+          //   category: 'photography',
+          //   mediaType: 'raw'
+          // });
+        } catch (err) {
+          console.error("Firebase upload error:", err);
+          throw err; // Re-throw to trigger error handling below
+        }
       }
       
       // Add files to uploaded files
