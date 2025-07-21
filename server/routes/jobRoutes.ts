@@ -98,21 +98,14 @@ const upload = multer({
 });
 
 // POST /api/jobs/:id/upload-file - Direct file upload with FormData
-router.post('/:id/upload-file', validateParams(idParamSchema), upload.single('file'), async (req, res) => {
+router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
   try {
-    console.log('🔍 === UPLOAD REQUEST DEBUG START ===');
-    console.log('🔍 Method:', req.method);
-    console.log('🔍 Headers:', {
-      'content-type': req.headers['content-type'],
-      'content-length': req.headers['content-length']
-    });
-    console.log('🔍 Body:', req.body);
-    console.log('🔍 File:', req.file ? {
-      fieldname: req.file.fieldname,
-      originalname: req.file.originalname,
-      mimetype: req.file.mimetype,
-      size: req.file.size
-    } : 'No file');
+    console.log("🔥 Upload route hit");
+    console.log("Request method:", req.method);
+    console.log("Request headers:", req.headers);
+    console.log("Request body keys:", Object.keys(req.body || {}));
+    console.log("req.file:", req.file);
+    console.log("req.files:", (req as any).files);
 
     const jobId = parseInt(req.params.id);
     const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
@@ -123,10 +116,11 @@ router.post('/:id/upload-file', validateParams(idParamSchema), upload.single('fi
     }
 
     if (!req.file) {
-      console.log('❌ Missing file in request');
-      return res.status(400).json({ 
-        message: 'Missing file in request', 
-        body: req.body 
+      return res.status(400).json({
+        error: "Missing file",
+        fileReceived: !!req.file,
+        message: "No file received from client",
+        body: req.body
       });
     }
 
@@ -134,12 +128,18 @@ router.post('/:id/upload-file', validateParams(idParamSchema), upload.single('fi
     const { category = 'photography', mediaType = 'raw' } = req.body;
 
     // Validate required fields
-    if (!mediaType) {
-      return res.status(400).json({ message: 'Missing mediaType' });
+    if (!req.body.mediaType) {
+      return res.status(400).json({
+        error: "Missing mediaType",
+        body: req.body
+      });
     }
 
-    if (!category) {
-      return res.status(400).json({ message: 'Missing category' });
+    if (!req.body.category) {
+      return res.status(400).json({
+        error: "Missing category", 
+        body: req.body
+      });
     }
 
     console.log(`📤 Processing upload: ${fileName} (${fileSize} bytes) for job ${jobId}`);
@@ -191,21 +191,28 @@ router.post('/:id/upload-file', validateParams(idParamSchema), upload.single('fi
     });
 
   } catch (error) {
-    console.error('❌ Upload error:', error);
+    console.error("❌ Firebase upload failed:", error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
     // Check for specific Firebase errors
     if (errorMessage.includes('Firebase')) {
-      return res.status(500).json({ message: 'Failed to connect to Firebase', error: errorMessage });
+      return res.status(500).json({ 
+        error: "Firebase upload failure",
+        details: errorMessage 
+      });
     }
     
     if (errorMessage.includes('Unsupported file type')) {
-      return res.status(400).json({ message: 'Unsupported file type', error: errorMessage });
+      return res.status(400).json({ 
+        error: "Unsupported file type",
+        details: errorMessage 
+      });
     }
 
-    res.status(500).json({
-      message: 'Upload failed',
-      error: errorMessage
+    return res.status(500).json({
+      error: "Upload failed",
+      message: errorMessage,
+      details: error instanceof Error ? error.stack : error
     });
   }
 });

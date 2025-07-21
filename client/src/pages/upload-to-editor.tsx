@@ -139,7 +139,9 @@ function FileUploadModal({
           });
           
           if (!response.ok) {
-            throw new Error(`Server upload failed: ${response.status}`);
+            const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+            console.error('Server upload error response:', errorData);
+            throw new Error(`Server upload failed: ${errorData.message || errorData.error || response.status}`);
           }
           
           const result = await response.json();

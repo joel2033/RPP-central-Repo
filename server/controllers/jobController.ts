@@ -44,7 +44,9 @@ export const uploadJobFile = async (req: Request, res: Response) => {
     // Validate request body
     const validation = uploadFileSchema.safeParse(req.body);
     if (!validation.success) {
-      return res.status(400).json({ 
+      return res.status(400).json({
+        error: "Validation failed",
+        reason: validation.error,
         message: 'Invalid request data',
         errors: validation.error.errors 
       });
