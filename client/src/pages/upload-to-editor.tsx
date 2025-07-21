@@ -117,19 +117,45 @@ function FileUploadModal({
     
     try {
       // Upload all files to Firebase
-      console.log('Using Firebase upload for all files');
-      const uploadResults = await uploadMultipleFilesToFirebase(
-        files,
-        jobCardId,
-        'raw', // mediaType
-        (fileName, progress) => {
-          setUploadingFiles(prev => {
-            const newMap = new Map(prev);
-            newMap.set(fileName, progress.progress);
-            return newMap;
+      console.log('Using server-side upload due to Firebase client issues');
+      
+      // Upload files using server-side endpoint as fallback
+      const uploadResults = [];
+      
+      for (const file of files) {
+        try {
+          // Create form data for server upload
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('category', 'photography');
+          formData.append('mediaType', 'raw');
+          
+          console.log(`📤 Uploading ${file.name} via server...`);
+          
+          const response = await fetch(`/api/jobs/${jobCardId}/upload-file`, {
+            method: 'POST',
+            body: formData,
+            credentials: 'include'
           });
+          
+          if (!response.ok) {
+            throw new Error(`Server upload failed: ${response.status}`);
+          }
+          
+          const result = await response.json();
+          console.log(`✅ Server upload successful:`, result);
+          
+          uploadResults.push({
+            fileName: file.name,
+            firebasePath: result.firebasePath,
+            downloadUrl: result.downloadUrl
+          });
+          
+        } catch (error) {
+          console.error('Server upload error for', file.name + ':', error);
+          throw error;
         }
-      );
+      }
       
       console.log('All files uploaded successfully:', uploadResults);
       
