@@ -20,6 +20,7 @@ import { uploadFileToFirebase, uploadMultipleFilesToFirebase } from "@/lib/fireb
 interface JobCardWithDetails extends JobCard {
   client: Client;
   photographer?: User | null;
+  propertyAddress?: string;
 }
 
 interface ServiceBlock {
@@ -493,14 +494,32 @@ function UploadToEditorContent() {
   React.useEffect(() => {
     const loadData = async () => {
       try {
-        // Load job cards - include more statuses so jobs don't disappear after upload
+        // Load job cards with booking details
         const jobsResponse = await apiRequest('GET', '/api/job-cards');
-        setJobCards(jobsResponse.filter((job: JobCardWithDetails) => 
+        const filteredJobs = jobsResponse.filter((job: any) => 
           job.status === 'unassigned' || 
           job.status === 'pending' ||
           job.status === 'in_progress' || 
           job.status === 'editing'
-        ));
+        );
+        
+        // Get property address from booking data for each job
+        const jobsWithAddress = await Promise.all(filteredJobs.map(async (job: any) => {
+          try {
+            const bookingResponse = await apiRequest('GET', `/api/bookings/${job.bookingId}`);
+            return {
+              ...job,
+              propertyAddress: bookingResponse.propertyAddress || 'No address'
+            };
+          } catch (error) {
+            return {
+              ...job,
+              propertyAddress: 'No address'
+            };
+          }
+        }));
+        
+        setJobCards(jobsWithAddress);
 
         // Load editors
         const usersResponse = await apiRequest('GET', '/api/users');
@@ -602,12 +621,30 @@ function UploadToEditorContent() {
 
       // Refresh job list to reflect any status changes
       const jobsResponse = await apiRequest('GET', '/api/job-cards');
-      setJobCards(jobsResponse.filter((job: JobCardWithDetails) => 
+      const filteredJobs = jobsResponse.filter((job: any) => 
         job.status === 'unassigned' || 
         job.status === 'pending' ||
         job.status === 'in_progress' || 
         job.status === 'editing'
-      ));
+      );
+      
+      // Get property address from booking data for each job
+      const jobsWithAddress = await Promise.all(filteredJobs.map(async (job: any) => {
+        try {
+          const bookingResponse = await apiRequest('GET', `/api/bookings/${job.bookingId}`);
+          return {
+            ...job,
+            propertyAddress: bookingResponse.propertyAddress || 'No address'
+          };
+        } catch (error) {
+          return {
+            ...job,
+            propertyAddress: 'No address'
+          };
+        }
+      }));
+      
+      setJobCards(jobsWithAddress);
 
       // Reset form but keep job selected to allow multiple uploads to same job
       // setSelectedJob(null); // Don't reset job selection
@@ -628,8 +665,12 @@ function UploadToEditorContent() {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-8">Upload to Editor</h1>
+    <div className="flex h-screen">
+      <Sidebar />
+      <div className="flex-1 ml-64 overflow-auto">
+        <TopBar title="Upload to Editor" />
+        <div className="container mx-auto p-6 max-w-4xl">
+          <h1 className="text-3xl font-bold mb-8">Upload to Editor</h1>
 
       {/* Step 1: Select Job */}
       <Card className="mb-6">
@@ -651,7 +692,7 @@ function UploadToEditorContent() {
             <SelectContent>
               {jobCards.map((job) => (
                 <SelectItem key={job.id} value={job.id.toString()}>
-                  Job {job.jobId || job.id} - {job.client.name}
+                  Job {job.jobId || job.id} - {job.client.name} - {job.propertyAddress || 'No address'}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -784,6 +825,8 @@ function UploadToEditorContent() {
           )}
         </Button>
       )}
+        </div>
+      </div>
     </div>
   );
 }
