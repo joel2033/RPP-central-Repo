@@ -481,7 +481,7 @@ function ServiceBlockComponent({
 
 function UploadToEditorContent() {
   const [selectedJob, setSelectedJob] = useState<JobCardWithDetails | null>(null);
-  const [selectedEditor, setSelectedEditor] = useState<number | null>(null);
+  const [selectedEditor, setSelectedEditor] = useState<string | null>(null);
   const [serviceBlocks, setServiceBlocks] = useState<ServiceBlock[]>([]);
   const [instructions, setInstructions] = useState("");
   const [loading, setLoading] = useState(false);
@@ -537,7 +537,9 @@ function UploadToEditorContent() {
     if (selectedEditor) {
       const loadEditorServices = async () => {
         try {
-          const categories = await editorServiceApi.getEditorServices(selectedEditor.toString());
+          console.log('Loading services for editor:', selectedEditor);
+          const categories = await editorServiceApi.getEditorServices(selectedEditor);
+          console.log('Loaded editor categories:', categories);
           setEditorCategories(categories);
         } catch (error) {
           console.error('Error loading editor services:', error);
@@ -545,6 +547,8 @@ function UploadToEditorContent() {
       };
 
       loadEditorServices();
+    } else {
+      setEditorCategories([]);
     }
   }, [selectedEditor]);
 
@@ -709,8 +713,11 @@ function UploadToEditorContent() {
           </CardHeader>
           <CardContent>
             <Select
-              value={selectedEditor?.toString() || ""}
-              onValueChange={(value) => setSelectedEditor(parseInt(value))}
+              value={selectedEditor || ""}
+              onValueChange={(value) => {
+                console.log('Selected editor:', value);
+                setSelectedEditor(value);
+              }}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select an editor" />
