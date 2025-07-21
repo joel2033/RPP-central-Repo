@@ -636,6 +636,13 @@ Changelog:
   - **Toast Enhancement**: Special toast message "Upload interrupted - retry or check connection" for canceled/timeout errors
   - **Upload Task Logging**: Added console logging before each upload task initialization for debugging
   - **Network Issue Handling**: Better handling of network interruptions and connection issues during large file uploads
+- July 21, 2025. **INTEGRATED FIREBASE AUTH WITH USEAUTH SYSTEM** - Fixed unauthorized upload errors:
+  - **Firebase Auth Integration**: Added signInAnonymously integration when useAuth shows authenticated user
+  - **Authentication Check**: Upload modal now requires authenticated Firebase user before proceeding with uploads
+  - **Auth State Logging**: Enhanced logging to show Firebase user ID and authentication status
+  - **Error Handling**: Clear error messages when no authenticated user exists for uploads
+  - **useEffect Integration**: Automatic Firebase sign-in when user is authenticated through existing useAuth system
+  - **Anonymous Sign-In**: Using Firebase anonymous auth as bridge between existing auth and Firebase Storage requirements
 ```
 
 ## User Preferences

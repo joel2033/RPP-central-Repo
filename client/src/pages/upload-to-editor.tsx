@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import React from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
@@ -18,6 +18,7 @@ import { editorServiceApi } from "@/lib/api/editorServiceApi";
 import { uploadFileToFirebase, uploadMultipleFilesToFirebase } from "@/lib/firebaseUpload";
 import { storage, auth } from '@/lib/firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { signInWithCustomToken, signInAnonymously } from 'firebase/auth';
 
 interface JobCardWithDetails extends JobCard {
   client: Client;
@@ -121,10 +122,12 @@ function FileUploadModal({
       // Use client-side Firebase upload
       console.log('🔥 Using client-side Firebase upload...');
       
-      // Check authentication before upload (optional - Firebase Storage rules will handle this)
-      console.log('Firebase auth state:', auth.currentUser ? 'authenticated' : 'anonymous');
-      if (!auth.currentUser) {
-        console.warn('No Firebase user; uploads may fail if rules require auth');
+      // Check authentication before upload 
+      const user = auth.currentUser;
+      console.log('Auth state:', { userId: user?.uid, isAuthenticated: !!user });
+      
+      if (!user) {
+        throw new Error('No authenticated user - login required for uploads');
       }
       
       const uploadResults: any[] = [];
@@ -919,6 +922,21 @@ function UploadToEditorContent() {
 
 export default function UploadToEditor() {
   const { isAuthenticated, isLoading } = useAuth();
+
+  // Integrate Firebase Auth with existing useAuth
+  useEffect(() => {
+    if (isAuthenticated && !auth.currentUser) {
+      // For now, sign in anonymously to enable uploads
+      // TODO: Replace with custom token from backend auth system
+      signInAnonymously(auth)
+        .then((result) => {
+          console.log('Firebase anonymous sign-in successful:', result.user.uid);
+        })
+        .catch((err) => {
+          console.error('Firebase auth failed:', err);
+        });
+    }
+  }, [isAuthenticated]);
 
   if (isLoading) {
     return (
