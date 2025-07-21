@@ -60,12 +60,6 @@ router.get('/:id/files', validateParams(idParamSchema), getJobFiles);
 // GET /api/jobs/:id/activity - Get job activity
 router.get('/:id/activity', validateParams(idParamSchema), getJobActivity);
 
-// POST /api/jobs/:id/upload - Prepare Firebase upload
-router.post('/:id/upload', validateParams(idParamSchema), uploadJobFile);
-
-// POST /api/jobs/:id/process-file - Process uploaded Firebase file
-router.post('/:id/process-file', validateParams(idParamSchema), validateBody(processFileSchema), processUploadedFile);
-
 // Configure multer for multipart uploads
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -97,7 +91,7 @@ const upload = multer({
   }
 });
 
-// POST /api/jobs/:id/upload-file - Direct file upload with FormData
+// POST /api/jobs/:id/upload-file - Direct file upload with FormData (must be before /upload route)
 router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
   try {
     console.log("🔥 Upload route hit");
@@ -216,5 +210,11 @@ router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
     });
   }
 });
+
+// POST /api/jobs/:id/upload - Prepare Firebase upload (JSON endpoint)
+router.post('/:id/upload', validateParams(idParamSchema), uploadJobFile);
+
+// POST /api/jobs/:id/process-file - Process uploaded Firebase file
+router.post('/:id/process-file', validateParams(idParamSchema), validateBody(processFileSchema), processUploadedFile);
 
 export default router;

@@ -44,11 +44,12 @@ export const uploadJobFile = async (req: Request, res: Response) => {
     // Validate request body
     const validation = uploadFileSchema.safeParse(req.body);
     if (!validation.success) {
-      return res.status(400).json({
-        error: "Validation failed",
-        reason: validation.error,
+      console.error("🔥 Zod validation failed", validation.error.format());
+      return res.status(400).json({ 
+        error: 'Validation failed',
         message: 'Invalid request data',
-        errors: validation.error.errors 
+        reason: validation.error.message,
+        issues: validation.error.issues
       });
     }
 
