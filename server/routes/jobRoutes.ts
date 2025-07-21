@@ -8,6 +8,7 @@ import {
   updateJobStatus,
   getJobFiles,
   getJobActivity,
+  processUploadedFile,
 } from '../controllers/jobController';
 
 const router = Router();
@@ -27,6 +28,16 @@ const statusUpdateSchema = z.object({
   status: z.string().min(1, 'Status is required'),
 });
 
+const processFileSchema = z.object({
+  firebasePath: z.string().min(1, 'Firebase path is required'),
+  downloadUrl: z.string().url('Valid download URL is required'),
+  fileName: z.string().min(1, 'File name is required'),
+  contentType: z.string().min(1, 'Content type is required'),
+  fileSize: z.number().positive('File size must be positive'),
+  category: z.string().min(1, 'Category is required'),
+  mediaType: z.enum(['raw', 'finished']).default('finished'),
+});
+
 // All routes require authentication
 router.use(isAuthenticated);
 
@@ -44,5 +55,8 @@ router.get('/:id/files', validateParams(idParamSchema), getJobFiles);
 
 // GET /api/jobs/:id/activity - Get job activity
 router.get('/:id/activity', validateParams(idParamSchema), getJobActivity);
+
+// POST /api/jobs/:id/process-file - Process uploaded Firebase file
+router.post('/:id/process-file', validateParams(idParamSchema), validateBody(processFileSchema), processUploadedFile);
 
 export default router;

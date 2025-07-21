@@ -110,13 +110,17 @@ export const bookings = pgTable("bookings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Media files table - matches current database structure
+// Media files table - enhanced with Firebase Storage support
 export const mediaFiles = pgTable("media_files", {
   id: serial("id").primaryKey(),
-  bookingId: integer("booking_id"), // Current database structure
+  jobId: integer("job_id"), // Job ID reference
+  bookingId: integer("booking_id"), // Current database structure - kept for compatibility
   fileName: varchar("file_name", { length: 255 }).notNull(),
   fileType: varchar("file_type", { length: 50 }).notNull(),
-  fileUrl: text("file_url").notNull(),
+  fileUrl: text("file_url").notNull(), // Legacy S3 URL or Firebase download URL
+  firebasePath: text("firebase_path"), // Firebase Storage path
+  downloadUrl: text("download_url"), // Firebase download URL  
+  mediaType: varchar("media_type", { length: 20 }).notNull(), // raw or finished
   fileSize: integer("file_size"),
   serviceType: serviceTypeEnum("service_type").notNull(),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
@@ -184,8 +188,10 @@ export const productionFiles = pgTable("production_files", {
   fileName: varchar("file_name", { length: 255 }).notNull(),
   originalName: varchar("original_name", { length: 255 }),
   filePath: text("file_path"), // Keep for backward compatibility
-  s3Key: text("s3_key"), // S3 object key
-  s3Bucket: varchar("s3_bucket", { length: 255 }), // S3 bucket name
+  s3Key: text("s3_key"), // S3 object key - deprecated, use firebasePath
+  s3Bucket: varchar("s3_bucket", { length: 255 }), // S3 bucket name - deprecated
+  firebasePath: text("firebase_path"), // Firebase Storage path
+  downloadUrl: text("download_url"), // Firebase download URL
   fileSize: integer("file_size"),
   mimeType: varchar("mime_type", { length: 100 }),
   mediaType: mediaTypeEnum("media_type").notNull(), // raw, edited, final
@@ -437,8 +443,11 @@ export const contentItems = pgTable("content_items", {
   isActive: boolean("is_active").default(true),
   status: contentItemsStatusEnum("status").default("draft"),
   fileCount: integer("file_count").default(0),
-  s3Urls: jsonb("s3_urls").$type<string[]>().default([]), // Array of S3 URLs
-  thumbUrl: varchar("thumb_url", { length: 500 }), // Thumbnail S3 URL
+  s3Urls: jsonb("s3_urls").$type<string[]>().default([]), // Legacy S3 URLs
+  s3Url: varchar("s3_url", { length: 500 }), // Legacy S3 URL - kept for compatibility  
+  thumbUrl: varchar("thumb_url", { length: 500 }), // Thumbnail URL (S3 or Firebase)
+  firebasePaths: jsonb("firebase_paths").$type<string[]>().default([]), // Array of Firebase paths
+  downloadUrls: jsonb("download_urls").$type<string[]>().default([]), // Array of Firebase download URLs
   displayOrder: integer("display_order").default(0),
   uploaderRole: uploaderRoleEnum("uploader_role").default("editor"), // Track who uploaded this content
   type: contentTypeEnum("type").default("finished"), // Track content type

@@ -243,7 +243,19 @@ Changelog:
   - **Price Field Updates**: Form price automatically syncs with selected product variants
   - **API Request Resolution**: Fixed parameter order in apiRequest function for successful booking creation
   - **Complete Integration**: Booking modal now creates jobs with proper service types, product details, and pricing
-  - **Customer Booking Toggle**: Added showOnCustomerBookingForm field for future customer portal separation
+  - **Customer Booking Toggle**: Added showOnCustomerBookingForm field for customer-facing bookings
+- July 21, 2025. **COMPLETE FIREBASE STORAGE MIGRATION** - Migrated entire application from AWS S3 to Firebase Storage:
+  - **Firebase SDK Integration**: Added Firebase SDK with proper configuration for project "rpp-central-database"
+  - **Database Schema Migration**: Updated productionFiles, mediaFiles, and contentItems tables with Firebase-specific fields (firebasePath, downloadUrl, mediaType)
+  - **Structured File Organization**: Implemented Firebase Storage paths: jobs/{jobId}/raw/{filename} and jobs/{jobId}/finished/{filename}
+  - **Backend Migration**: Updated jobController.ts to use Firebase upload/download URLs instead of S3 presigned URLs
+  - **Frontend Component Migration**: Replaced CentralizedS3Upload and JPEGFileUpload components with FirebaseFileUpload
+  - **Multi-Format Support**: Maintains support for .dng (RAW), .jpg, .mp4, .zip files up to 2GB each
+  - **Firebase API Configuration**: Added VITE_GOOGLE_API_KEY environment variable for Firebase authentication
+  - **Legacy Compatibility**: Maintained fallback support for existing S3 files during transition period
+  - **Enhanced Upload Features**: Drag-and-drop interface, progress tracking, error handling, and retry functionality
+  - **Direct Upload Workflow**: Files upload directly to Firebase Storage, then metadata is processed and stored in database
+  - **Download URL Management**: Firebase download URLs replace S3 presigned URLs for permanent file access future customer portal separation
   - **Workflow Prevention**: Fixed automatic form submission to ensure all 4 steps are properly navigated
 - July 08, 2025. Enhanced date and time picker components with modern UI and functionality:
   - **Modern Date Picker**: Implemented react-day-picker with calendar UI, month/year navigation, and proper date formatting

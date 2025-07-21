@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { storage } from '../storage';
 import { s3Service } from '../services/s3Service';
+import { firebaseStorageService } from '../services/firebaseService';
 import { thumbnailService } from '../services/thumbnailService';
 import { jobService } from '../services/jobService';
 import { z } from 'zod';
@@ -15,7 +16,8 @@ const uploadFileSchema = z.object({
 });
 
 const processFileSchema = z.object({
-  s3Key: z.string(),
+  firebasePath: z.string(),
+  downloadUrl: z.string(),
   fileName: z.string(),
   contentType: z.string(),
   fileSize: z.number(),
@@ -24,7 +26,7 @@ const processFileSchema = z.object({
 });
 
 /**
- * Step 1: Generate presigned URL for file upload
+ * Step 1: Prepare Firebase upload (client-side upload flow)
  */
 export const uploadJobFile = async (req: Request, res: Response) => {
   try {
@@ -33,6 +35,10 @@ export const uploadJobFile = async (req: Request, res: Response) => {
 
     if (!userId) {
       return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    if (!firebaseStorageService) {
+      return res.status(500).json({ message: 'Firebase Storage not configured' });
     }
 
     // Validate request body
@@ -46,31 +52,41 @@ export const uploadJobFile = async (req: Request, res: Response) => {
 
     const { fileName, contentType, fileSize, category, mediaType } = validation.data;
 
-    // Generate S3 key for the file
-    const timestamp = Date.now();
-    const s3Key = `job-${jobCardId}/${mediaType}/${timestamp}_${fileName}`;
-
-    // Generate presigned URL for upload
-    const uploadUrl = await s3Service.generatePresignedUploadUrl(s3Key, contentType, {
-      type: mediaType,
-      jobId: jobCardId.toString(),
-      uploadedBy: userId
+    // Validate file
+    const fileValidation = firebaseStorageService.validateFile({ 
+      size: fileSize, 
+      type: contentType 
     });
+    
+    if (!fileValidation.valid) {
+      return res.status(400).json({ 
+        message: fileValidation.error 
+      });
+    }
 
-    console.log(`✅ Generated upload URL for ${fileName} (${fileSize} bytes)`);
+    // Generate Firebase path
+    const firebasePath = firebaseStorageService.generateFirebasePath(
+      jobCardId, 
+      fileName, 
+      mediaType as 'raw' | 'finished'
+    );
+
+    console.log(`✅ Prepared Firebase upload for ${fileName} (${fileSize} bytes)`);
 
     res.json({
-      uploadUrl,
-      s3Key,
+      firebasePath,
       fileName,
       contentType,
-      fileSize
+      fileSize,
+      mediaType,
+      category,
+      uploadMethod: 'firebase'
     });
 
   } catch (error) {
-    console.error('❌ Error generating upload URL:', error);
+    console.error('❌ Error preparing Firebase upload:', error);
     res.status(500).json({ 
-      message: 'Failed to generate upload URL',
+      message: 'Failed to prepare upload',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
@@ -97,29 +113,35 @@ export const processUploadedFile = async (req: Request, res: Response) => {
       });
     }
 
-    const { s3Key, fileName, contentType, fileSize, category, mediaType } = validation.data;
+    const { firebasePath, downloadUrl, fileName, contentType, fileSize, category, mediaType } = validation.data;
+
+    if (!firebaseStorageService) {
+      return res.status(500).json({ message: 'Firebase Storage not configured' });
+    }
 
     // Generate thumbnail if it's an image
-    let thumbS3Key = null;
+    let thumbnailFirebasePath = null;
+    let thumbnailDownloadUrl = null;
+    
     if (contentType.startsWith('image/')) {
       try {
         console.log(`🖼️ Generating thumbnail for ${fileName}...`);
         
-        // Download original file from S3
-        const originalFileBuffer = await s3Service.downloadFile(s3Key);
+        // Download original file from Firebase
+        const originalFileBuffer = await firebaseStorageService.downloadFile(firebasePath);
         
         // Generate thumbnail
         const thumbnailBuffer = await thumbnailService.generateThumbnail(originalFileBuffer);
         
-        // Upload thumbnail to S3
-        thumbS3Key = `job-${jobCardId}/${mediaType}/thumbs/thumb_${fileName}`;
-        await s3Service.uploadBuffer(thumbS3Key, thumbnailBuffer, 'image/jpeg', {
-          type: 'thumbnail',
-          originalFile: s3Key,
-          jobId: jobCardId.toString()
-        });
+        // Upload thumbnail to Firebase
+        thumbnailFirebasePath = `jobs/${jobCardId}/${mediaType}/thumbs/thumb_${fileName}`;
+        thumbnailDownloadUrl = await firebaseStorageService.uploadBuffer(
+          thumbnailFirebasePath,
+          thumbnailBuffer,
+          'image/jpeg'
+        );
         
-        console.log(`✅ Thumbnail generated and uploaded: ${thumbS3Key}`);
+        console.log(`✅ Thumbnail generated and uploaded: ${thumbnailFirebasePath}`);
       } catch (thumbError) {
         console.error('❌ Thumbnail generation failed:', thumbError);
         // Continue without thumbnail - don't fail the entire upload
@@ -129,25 +151,21 @@ export const processUploadedFile = async (req: Request, res: Response) => {
     // Get job card for enhanced metadata tracking
     const job = await storage.getJobCard(jobCardId);
     
-    // Create enhanced media file record with RAW upload tracking
+    // Create enhanced media file record with Firebase paths
     const mediaFileData = {
       jobId: jobCardId,
-      address: job?.propertyAddress || 'Unknown Address',
-      uploaderId: userId,
       fileName,
-      s3Key,
-      mediaType: mediaType || 'finished', // finished for editor uploads
-      fileSize,
-      contentType,
-      serviceType: category || 'photography',
       fileType: contentType?.split('/')[1] || 'unknown',
-      fileUrl: s3Key, // Use s3Key as fileUrl
-      licenseeId: req.user?.licenseeId || userId,
-      uploadTimestamp: new Date(),
+      fileUrl: downloadUrl, // Firebase download URL
+      firebasePath: firebasePath,
+      downloadUrl: downloadUrl,
+      mediaType: mediaType || 'finished',
+      fileSize,
+      serviceType: category || 'photography',
     };
 
     // Store in enhanced mediaFiles table
-    const savedMediaFile = await storage.insertMediaFile(mediaFileData);
+    const savedMediaFile = await storage.createMediaFile(mediaFileData);
 
     // Create content item in database
     const contentItem = await jobService.createContentItem({
@@ -156,8 +174,10 @@ export const processUploadedFile = async (req: Request, res: Response) => {
       name: fileName.replace(/\.[^/.]+$/, ''), // Remove file extension
       category,
       type: mediaType,
-      s3Url: s3Key,
-      thumbUrl: thumbS3Key,
+      s3Url: downloadUrl, // Use Firebase download URL for compatibility
+      thumbUrl: thumbnailDownloadUrl,
+      firebasePaths: [firebasePath],
+      downloadUrls: [downloadUrl],
       fileSize,
       uploaderRole: 'editor', // Assuming editor uploads for now
       status: 'ready_for_qc'
@@ -173,10 +193,12 @@ export const processUploadedFile = async (req: Request, res: Response) => {
         fileName,
         fileSize,
         contentType,
-        s3Key,
+        firebasePath,
+        downloadUrl,
         mediaType,
         address: job?.propertyAddress,
-        mediaFileId: savedMediaFile.id
+        mediaFileId: savedMediaFile.id,
+        uploadMethod: 'firebase'
       }
     });
 
@@ -263,18 +285,18 @@ export const getJobFiles = async (req: Request, res: Response) => {
     // Get content items
     const contentItems = await storage.getContentItems(jobId);
 
-    // Generate presigned URLs for thumbnails and full files
+    // Use Firebase download URLs (no need for presigned URLs with Firebase)
     const filesWithUrls = await Promise.all([
       ...productionFiles.map(async (file) => ({
         ...file,
         type: 'production',
-        downloadUrl: file.s3Key ? await s3Service.generatePresignedDownloadUrl(file.s3Key) : null
+        downloadUrl: file.downloadUrl || (file.s3Key ? await s3Service.generatePresignedDownloadUrl(file.s3Key) : null) // Fallback to S3 for legacy files
       })),
       ...contentItems.map(async (item) => ({
         ...item,
         type: 'content',
-        downloadUrl: item.s3Url ? await s3Service.generatePresignedDownloadUrl(item.s3Url) : null,
-        thumbnailUrl: item.thumbUrl ? await s3Service.generatePresignedDownloadUrl(item.thumbUrl) : null
+        downloadUrl: item.downloadUrls?.[0] || item.s3Url || (item.s3Url ? await s3Service.generatePresignedDownloadUrl(item.s3Url) : null), // Use Firebase URLs first, fallback to S3
+        thumbnailUrl: item.thumbUrl || null
       }))
     ]);
 
