@@ -102,6 +102,7 @@ const uploadFormDataSchema = z.object({
 
 // POST /api/jobs/:id/upload-file - Direct file upload with FormData (must be before /upload route)
 router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
+  console.log('🎯 ENTERING /upload-file endpoint - this is the correct path!');
   console.log('📥 Server upload request received');
   console.log('Request body:', req.body);
   console.log('File:', req.file ? { name: req.file.originalname, size: req.file.size, mimetype: req.file.mimetype } : 'No file');
@@ -171,23 +172,17 @@ router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
     });
   } catch (error) {
     console.error('Upload error:', error);
-    if (error instanceof z.ZodError) {
-      res.status(400).json({ 
-        error: 'Validation failed', 
-        message: 'Invalid request data', 
-        reason: JSON.stringify(error.issues),
-        issues: error.issues 
-      });
-    } else {
-      res.status(500).json({ 
-        message: error instanceof Error ? error.message : 'Unknown error' 
-      });
-    }
+    res.status(500).json({ 
+      message: error instanceof Error ? error.message : 'Unknown error' 
+    });
   }
 });
 
 // POST /api/jobs/:id/upload - Prepare Firebase upload (JSON endpoint)
-router.post('/:id/upload', validateParams(idParamSchema), uploadJobFile);
+router.post('/:id/upload', validateParams(idParamSchema), (req, res, next) => {
+  console.log('🚫 WRONG ENDPOINT - this should NOT be called for FormData uploads!');
+  next();
+}, uploadJobFile);
 
 // POST /api/jobs/:id/process-file - Process uploaded Firebase file
 router.post('/:id/process-file', validateParams(idParamSchema), validateBody(processFileSchema), processUploadedFile);
