@@ -17,8 +17,9 @@ const firebaseConfig = {
 // Initialize Firebase app
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-// Export Firebase Storage and Auth instances
-export const storage = getStorage(app);
+// Export Firebase Storage and Auth instances  
+// Use explicit bucket URL for Firebase Storage to ensure correct bucket
+export const storage = getStorage(app, "gs://rpp-central-database.firebasestorage.app");
 export const auth = getAuth(app);
 
 // Connect to emulators in development to avoid network issues

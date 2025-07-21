@@ -129,104 +129,138 @@ function FileUploadModal({
     console.log(`Starting upload of ${files.length} files`);
     
     try {
-      console.log('🔧 Using server-side upload due to Replit network restrictions...');
-      
+      // Try Firebase direct upload first, fallback to server on failure
       const uploadResults: any[] = [];
       
-      // Upload each file via server-side proxy to Firebase
-      const uploadPromises = files.map((file) => {
-        return new Promise<void>((resolve, reject) => {
-          const uploadFile = async () => {
-            try {
-              console.log(`⬆️ Uploading ${file.name} via server...`);
-              
-              // Create FormData for multipart upload
-              const formData = new FormData();
-              formData.append('file', file);
-              formData.append('fileName', file.name);
-              formData.append('contentType', file.type || 'application/octet-stream');
-              formData.append('fileSize', file.size.toString());
-              formData.append('category', 'photography');
-              
-              console.log('Sending FormData for', file.name);
-              
-              // Upload via server-side proxy
-              const xhr = new XMLHttpRequest();
-              
-              xhr.upload.onprogress = (e) => {
-                if (e.lengthComputable) {
-                  const progress = (e.loaded / e.total) * 100;
-                  console.log(`Upload progress for ${file.name}: ${progress.toFixed(1)}%`);
-                  setUploadingFiles(prev => new Map(prev).set(file.name, progress));
-                }
-              };
-              
-              xhr.onload = () => {
-                console.log(`🔍 Server upload response for ${file.name}: Status ${xhr.status}`);
-                console.log(`🔍 Response body: ${xhr.responseText}`);
-                
-                if (xhr.status === 200) {
-                  try {
-                    const response = JSON.parse(xhr.responseText);
-                    
-                    uploadResults.push({
-                      fileName: file.name,
-                      firebasePath: response.firebasePath,
-                      downloadUrl: response.downloadUrl,
-                      contentType: file.type || 'application/octet-stream',
-                      fileSize: file.size,
-                      category: 'photography'
-                    });
-                    
-                    console.log(`✅ Server upload complete for ${file.name}`);
-                    resolve();
-                  } catch (error) {
-                    console.error(`Failed to parse server response for ${file.name}:`, error);
-                    setUploadErrors(prev => new Map(prev).set(file.name, 'Invalid server response'));
-                    reject(error);
-                  }
-                } else {
-                  const errorMsg = `Server upload failed with status ${xhr.status}`;
-                  console.error(`❌ ${errorMsg} for ${file.name}`);
-                  console.error(`❌ Server response: ${xhr.responseText}`);
-                  setUploadErrors(prev => new Map(prev).set(file.name, errorMsg));
-                  reject(new Error(errorMsg));
-                }
-              };
-              
-              xhr.onerror = (event) => {
-                console.error(`❌ Server upload network error for ${file.name}:`, event);
-                console.error('Error name:', event.type, 'Event details:', event);
-                const errorMsg = 'Server upload failed - network issue';
-                setUploadErrors(prev => new Map(prev).set(file.name, errorMsg));
-                reject(new Error(errorMsg));
-              };
-              
-              xhr.ontimeout = () => {
-                const errorMsg = 'Server upload timeout - file too large or slow connection';
-                console.error(`❌ Server upload timeout for ${file.name}`);
-                setUploadErrors(prev => new Map(prev).set(file.name, errorMsg));
-                reject(new Error(errorMsg));
-              };
-              
-              // Configure and start server upload
-              xhr.open('POST', `/api/jobs/${jobCardId}/upload-file`);
-              xhr.timeout = 120000; // 2 minute timeout for server upload
-              xhr.send(formData);
-              
-            } catch (error) {
-              console.error(`Failed to upload ${file.name}:`, error);
-              console.error('Error name:', error.name, 'Error message:', error.message);
-              setUploadErrors(prev => new Map(prev).set(file.name, error.message || 'Upload failed'));
-              reject(error);
-            }
-          };
+      // Upload each file 
+      for (const file of files) {
+        try {
+          console.log(`🚀 Uploading ${file.name} to Firebase...`);
           
-          uploadFile();
-        });
+          // Set initial progress
+          setUploadingFiles(prev => new Map(prev).set(file.name, 5));
+          
+          // Create Firebase path: temp_uploads/{jobId}/{filename}
+          const firebasePath = `temp_uploads/${jobCardId}/${file.name}`;
+          
+          // Get storage instance with explicit bucket
+          const storageRef = ref(storage, firebasePath);
+          
+          // Use uploadBytesResumable for progress tracking
+          const uploadTask = uploadBytesResumable(storageRef, file, {
+            contentType: file.type || 'application/octet-stream'
+          });
+          
+          // Create promise to handle upload
+          const uploadResult = await new Promise<any>((resolve, reject) => {
+            // Progress tracking
+            uploadTask.on('state_changed', 
+              (snapshot) => {
+                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                console.log(`Firebase upload progress for ${file.name}: ${progress.toFixed(1)}%`);
+                setUploadingFiles(prev => new Map(prev).set(file.name, progress));
+              },
+              (error) => {
+                console.error(`Firebase upload error for ${file.name}:`, {
+                  code: error.code,
+                  message: error.message,
+                  name: error.name,
+                  customData: error.customData
+                });
+                setUploadErrors(prev => new Map(prev).set(file.name, `Firebase error: ${error.message}`));
+                reject(error);
+              },
+              async () => {
+                try {
+                  // Get download URL after successful upload
+                  const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                  console.log(`✅ Firebase upload complete for ${file.name}`);
+                  
+                  resolve({
+                    fileName: file.name,
+                    firebasePath,
+                    downloadUrl,
+                    contentType: file.type || 'application/octet-stream',
+                    fileSize: file.size,
+                    category: 'photography'
+                  });
+                } catch (urlError) {
+                  console.error(`Failed to get download URL for ${file.name}:`, urlError);
+                  reject(urlError);
+                }
+              }
+            );
+          });
+          
+          uploadResults.push(uploadResult);
+          console.log(`✅ Firebase upload successful for ${file.name}`);
+          
+        } catch (firebaseError) {
+          console.error(`Firebase upload failed for ${file.name}, trying server upload...`, firebaseError);
+          
+          // Fallback to server upload
+          try {
+            console.log(`🔧 Fallback: Uploading ${file.name} via server...`);
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('fileName', file.name);
+            formData.append('contentType', file.type || 'application/octet-stream');
+            formData.append('fileSize', file.size.toString());
+            formData.append('category', 'photography');
+            
+            const response = await fetch(`/api/jobs/${jobCardId}/upload-file`, {
+              method: 'POST',
+              body: formData,
+            });
+            
+            if (!response.ok) {
+              throw new Error(`Server upload failed with status ${response.status}`);
+            }
+            
+            const result = await response.json();
+            uploadResults.push({
+              fileName: file.name,
+              firebasePath: result.firebasePath,
+              downloadUrl: result.downloadUrl,
+              contentType: file.type || 'application/octet-stream',
+              fileSize: file.size,
+              category: 'photography'
+            });
+            
+            console.log(`✅ Server upload successful for ${file.name}`);
+            setUploadingFiles(prev => new Map(prev).set(file.name, 100));
+            
+          } catch (serverError) {
+            console.error(`Both Firebase and server upload failed for ${file.name}:`, serverError);
+            const errorMsg = serverError instanceof Error ? serverError.message : 'Upload failed';
+            setUploadErrors(prev => new Map(prev).set(file.name, errorMsg));
+            throw serverError;
+          }
+        }
+      }
+      
+      console.log('All files uploaded successfully:', uploadResults);
+      
+      // Clear progress tracking
+      setUploadingFiles(new Map());
+      
+      // Add files to uploaded files
+      onFilesUpload([...uploadedFiles, ...files]);
+      
+      setFiles([]);
+      setUrlLink("");
+      
+      // Show success toast
+      const successMethod = uploadResults.some(r => r.firebasePath.startsWith('temp_uploads/')) ? 'Firebase' : 'Server';
+      toast({
+        title: "Upload Successful",
+        description: `Successfully uploaded ${uploadResults.length} file(s) via ${successMethod}`,
       });
       
-      await Promise.all(uploadPromises);
+      setCanClose(true); // Re-enable modal close
+      // Close modal after successful upload
+      setTimeout(() => onClose(), 1000);
       
       console.log('All files uploaded successfully:', uploadResults);
       

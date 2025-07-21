@@ -627,9 +627,18 @@ Changelog:
    - **Complete Migration**: All Firebase Storage bucket references now use rpp-central-database.firebasestorage.app as requested
 - July 21, 2025. **FIXED FIREBASE CLIENT CONFIGURATION** - Corrected Firebase client-side configuration causing network upload errors:
    - **AuthDomain Fix**: Changed incorrect `gs://rpp-central-database.firebasestorage.app` to proper `rpp-central-database.firebaseapp.com`
-   - **StorageBucket Verification**: Confirmed all storageBucket configurations use correct `.appspot.com` domain
+   - **StorageBucket Verification**: Confirmed all storageBucket configurations use correct `.firebasestorage.app` domain
    - **Configuration Consistency**: Ensured client and server Firebase configurations match for proper authentication
    - **Upload Network Errors**: Fixed "ProgressEvent isTrusted: true" errors caused by invalid authDomain configuration
+- July 21, 2025. **ENHANCED FIREBASE UPLOAD WITH TIMEOUT HANDLING** - Fixed hanging uploads with comprehensive error handling:
+  - **Environment Variables**: Updated Firebase configuration to use proper environment variables with fallbacks
+  - **Authentication Check**: Added Firebase auth state logging for debugging upload permissions
+  - **Upload Timeout**: Implemented 30-second timeout to prevent hanging uploads with automatic task cancellation
+  - **Enhanced Error Logging**: Added error.code and error.message logging for better Firebase error debugging
+  - **Progress Monitoring**: Added detailed progress logging with percentage updates for each file upload
+  - **Retry Prevention**: Added timeout mechanism to cancel stuck uploads and display timeout error messages
+  - **Error Display**: Enhanced toast notifications to show specific file upload errors and timeout issues
+  - **Task Management**: Proper cleanup of timeout handlers when uploads complete successfully
 - July 21, 2025. **FIXED CORS AND STORAGE RULES FOR FIREBASE UPLOADS** - Set up CORS and updated Firebase Storage rules to resolve network errors:
    - **CORS Configuration**: Created cors.json file allowing PUT/GET/POST from all origins (temporary for development)
    - **Firebase Storage Rules**: Updated rules to allow write access for authenticated users in temp_uploads/{jobId}/{fileName} pattern
