@@ -522,8 +522,8 @@ function UploadToEditorContent() {
         setJobCards(jobsWithAddress);
 
         // Load editors
-        const usersResponse = await apiRequest('GET', '/api/users');
-        setEditors(usersResponse.filter((user: User) => user.role === 'editor'));
+        const editorsResponse = await apiRequest('GET', '/api/editors');
+        setEditors(editorsResponse);
       } catch (error) {
         console.error('Error loading data:', error);
       }
