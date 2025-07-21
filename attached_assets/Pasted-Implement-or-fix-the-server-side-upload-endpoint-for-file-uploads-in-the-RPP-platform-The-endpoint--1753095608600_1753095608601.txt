@@ -1,0 +1,38 @@
+Implement or fix the server-side upload endpoint for file uploads in the RPP platform. The endpoint is POST /api/jobs/:jobId/upload-file, which receives FormData with 'file' (the binary file), 'fileName', 'contentType', 'fileSize', 'category' ('photography'), and 'mediaType' ('raw'). It should upload the file to Firebase Storage in temp_uploads/{jobId}/{fileName} using firebase-admin, generate a signed download URL, and respond with { firebasePath, downloadUrl }.
+
+Steps to implement:
+1. If not present, create or update server/routes/jobs.js (or equivalent route file if different, e.g., server/api/jobs/upload.ts).
+2. Install Multer if missing: Run 'npm install multer' in the server directory.
+3. Require Express, Multer (with memoryStorage), and firebaseAdmin (assume utils/firebaseAdmin.js exists; if not, create it with admin.initializeApp using service account from env or JSON).
+4. In the route: Use multer.single('file') middleware. Extract params.jobId and req.body fields. Validate job exists (optional: query DB). Upload file.buffer to Firebase bucket. Generate signed URL with read action and long expiry.
+5. Handle errors: In catch, send res.status(500).json({ message: error.message }) for better debugging.
+6. Ensure the route is mounted in server/app.js or index.js (e.g., app.use('/api/jobs', require('./routes/jobs'))).
+
+Example code for the route:
+const express = require('express');
+const multer = require('multer');
+const admin = require('../utils/firebaseAdmin');
+const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage() });
+
+router.post('/:jobId/upload-file', upload.single('file'), async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const { fileName, contentType } = req.body;
+    const file = req.file;
+    if (!file) throw new Error('No file provided');
+    const bucket = admin.storage().bucket();
+    const firebaseFile = bucket.file(`temp_uploads/${jobId}/${fileName}`);
+    await firebaseFile.save(file.buffer, { metadata: { contentType: file.mimetype || contentType } });
+    const [downloadUrl] = await firebaseFile.getSignedUrl({ action: 'read', expires: '03-09-2491' });
+    // Optional: Update Job Card status in DB to 'In Progress'
+    res.json({ firebasePath: `temp_uploads/${jobId}/${fileName}`, downloadUrl });
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ message: error.message || 'Unknown error' });
+  }
+});
+
+module.exports = router;
+
+This fixes the 'Unknown error' by properly handling uploads. Aligns with RPP's temp storage and Job ID system. Commit with message: "Implement server-side file upload endpoint with Multer and Firebase for Upload to Editor module"

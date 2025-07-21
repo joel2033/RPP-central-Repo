@@ -94,122 +94,50 @@ const upload = multer({
 // POST /api/jobs/:id/upload-file - Direct file upload with FormData (must be before /upload route)
 router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
   try {
-    console.log("🔥 Upload route hit");
-    console.log("Request method:", req.method);
-    console.log("Request body keys:", Object.keys(req.body || {}));
-    console.log("Request body values:", req.body);
-    console.log("req.file:", req.file ? { 
-      originalname: req.file.originalname, 
-      mimetype: req.file.mimetype, 
-      size: req.file.size 
-    } : null);
-
-    const jobId = parseInt(req.params.id);
-    const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
-
-    if (!userId) {
-      console.log('❌ No user ID found');
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({
-        error: "Missing file",
-        fileReceived: !!req.file,
-        message: "No file received from client",
-        body: req.body
-      });
-    }
-
-    const { originalname: fileName, buffer, mimetype: contentType, size: fileSize } = req.file;
-    const { category = 'photography', mediaType = 'raw' } = req.body;
-
-    // Validate required fields
-    if (!req.body.mediaType) {
-      return res.status(400).json({
-        error: "Missing mediaType",
-        body: req.body
-      });
-    }
-
-    if (!req.body.category) {
-      return res.status(400).json({
-        error: "Missing category", 
-        body: req.body
-      });
-    }
-
-    console.log(`📤 Processing upload: ${fileName} (${fileSize} bytes) for job ${jobId}`);
-
-    // Check Firebase service
-    if (!firebaseStorageService) {
-      return res.status(500).json({ message: 'Failed to connect to Firebase' });
-    }
-
-    // Validate job exists
-    const job = await storage.getJobCard(jobId);
-    if (!job) {
-      return res.status(404).json({ message: 'Job not found' });
-    }
-
-    // Upload to Firebase Storage
-    console.log('🔥 Starting Firebase upload...');
-    const uploadResult = await firebaseStorageService.uploadFile(
-      jobId,
-      fileName,
-      buffer,
-      mediaType === 'finished' ? 'finished' : 'raw',
-      contentType
-    );
-
-    console.log('✅ Firebase upload complete:', uploadResult);
-
-    // Save metadata to database
-    const productionFile = await storage.createProductionFile({
-      jobCardId: jobId,
-      fileName,
-      fileSize,
-      firebasePath: uploadResult.firebasePath,
-      downloadUrl: uploadResult.downloadUrl,
-      mediaType: mediaType === 'finished' ? 'final' : 'raw',
-      uploadTimestamp: new Date(),
-      uploadedBy: userId,
-      contentType,
-      status: 'uploaded'
+    const { id: jobId } = req.params;
+    const { fileName, contentType } = req.body;
+    const file = req.file;
+    
+    if (!file) throw new Error('No file provided');
+    
+    // Import Firebase Admin
+    const { adminBucket } = await import('../utils/firebaseAdmin');
+    
+    // Use temp_uploads path as specified in requirements
+    const firebasePath = `temp_uploads/${jobId}/${fileName || file.originalname}`;
+    const firebaseFile = adminBucket.file(firebasePath);
+    
+    // Upload file to Firebase Storage
+    await firebaseFile.save(file.buffer, { 
+      metadata: { 
+        contentType: file.mimetype || contentType 
+      } 
     });
-
-    console.log(`✅ File uploaded successfully: ${fileName}`);
-
-    res.json({
-      success: true,
-      file: productionFile,
-      firebasePath: uploadResult.firebasePath,
-      downloadUrl: uploadResult.downloadUrl
+    
+    // Generate signed URL with long expiry
+    const [downloadUrl] = await firebaseFile.getSignedUrl({ 
+      action: 'read', 
+      expires: '03-09-2491' 
     });
-
+    
+    // Optional: Update Job Card status in DB to 'In Progress'
+    try {
+      const job = await storage.getJobCard(parseInt(jobId));
+      if (job && job.status === 'unassigned') {
+        await storage.updateJobCardStatus(parseInt(jobId), 'in_progress');
+      }
+    } catch (dbError) {
+      console.warn('Failed to update job status:', dbError);
+    }
+    
+    res.json({ 
+      firebasePath: firebasePath, 
+      downloadUrl 
+    });
   } catch (error) {
-    console.error("❌ Firebase upload failed:", error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    
-    // Check for specific Firebase errors
-    if (errorMessage.includes('Firebase')) {
-      return res.status(500).json({ 
-        error: "Firebase upload failure",
-        details: errorMessage 
-      });
-    }
-    
-    if (errorMessage.includes('Unsupported file type')) {
-      return res.status(400).json({ 
-        error: "Unsupported file type",
-        details: errorMessage 
-      });
-    }
-
-    return res.status(500).json({
-      error: "Upload failed",
-      message: errorMessage,
-      details: error instanceof Error ? error.stack : error
+    console.error('Upload error:', error);
+    res.status(500).json({ 
+      message: error instanceof Error ? error.message : 'Unknown error' 
     });
   }
 });
