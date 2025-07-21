@@ -1,0 +1,26 @@
+Create or fix Firebase client-side initialization for the RPP platform to resolve the generic upload error in client/src/pages/upload-to-editor.tsx. Add client/src/lib/firebase.ts with initializeApp using placeholder config (remind to fill from Firebase Console). Export storage = getStorage(app). In handleUpload, add console.error('Firebase upload error:', error.message) for better debugging. Ensure uploads use uploadBytesResumable with progress, and integrate auth if rules require it (use getAuth for signed-in user).
+
+Steps to implement:
+1. Create client/src/lib/firebase.ts:
+import { initializeApp } from 'firebase/app';
+import { getStorage } from 'firebase/storage';
+import { getAuth } from 'firebase/auth'; // For auth if needed
+const firebaseConfig = { apiKey: "YOUR_API_KEY", authDomain: "YOUR_PROJECT.firebaseapp.com", projectId: "YOUR_PROJECT_ID", storageBucket: "YOUR_PROJECT.appspot.com", messagingSenderId: "YOUR_SENDER_ID", appId: "YOUR_APP_ID" }; // Fill from Firebase Console
+const app = initializeApp(firebaseConfig);
+export const storage = getStorage(app);
+export const auth = getAuth(app);
+2. In upload-to-editor.tsx, import { storage } from '@/lib/firebase'; at top.
+3. Update handleUpload to client-side (remove server code if still there):
+console.log('Using client-side Firebase upload...');
+const uploadTasks = files.map(file => {
+  const path = `temp_uploads/${jobCardId}/${file.name}`;
+  const storageRef = ref(storage, path);
+  const uploadTask = uploadBytesResumable(storageRef, file);
+  uploadTask.on('state_changed', snapshot => setUploadingFiles(prev => new Map(prev).set(file.name, (snapshot.bytesTransferred / snapshot.totalBytes) * 100)), err => { console.error('Firebase upload error:', err.message); setUploadErrors(prev => new Map(prev).set(file.name, err.message)); }, async () => { const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref); uploadResults.push({ fileName: file.name, firebasePath: path, downloadUrl }); });
+  return uploadTask;
+});
+await Promise.all(uploadTasks.map(task => new Promise((res, rej) => task.on('state_changed', null, rej, res))));
+4. If auth required, add before upload: if (!auth.currentUser) throw new Error('User not authenticated');
+5. Update Storage rules in Firebase Console (manual): allow write: if request.auth != null && request.auth.token.role == 'photographer';
+
+This sets up Firebase for temp uploads. Commit with message: "Add Firebase client init and fix upload error logging for Upload to Editor module"

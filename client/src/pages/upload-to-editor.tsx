@@ -16,6 +16,8 @@ import TopBar from "@/components/layout/topbar";
 import type { JobCard, Client, User, EditorServiceCategory, EditorServiceOption } from "@shared/schema";
 import { editorServiceApi } from "@/lib/api/editorServiceApi";
 import { uploadFileToFirebase, uploadMultipleFilesToFirebase } from "@/lib/firebaseUpload";
+import { storage } from '@/lib/firebase';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 interface JobCardWithDetails extends JobCard {
   client: Client;
@@ -116,17 +118,50 @@ function FileUploadModal({
     console.log(`Starting upload of ${files.length} files`);
     
     try {
-      // Use client-side Firebase upload with uploadMultipleFilesToFirebase
+      // Use client-side Firebase upload
       console.log('🔥 Using client-side Firebase upload...');
       
-      const uploadResults = await uploadMultipleFilesToFirebase(
-        files,
-        jobCardId,
-        'raw',
-        (fileName, progress) => {
-          console.log(`📤 ${fileName}: ${progress.progress}%`);
-          setUploadingFiles(prev => new Map(prev).set(fileName, progress.progress));
-        }
+      const uploadResults: any[] = [];
+      const uploadTasks = files.map(file => {
+        const path = `temp_uploads/${jobCardId}/${file.name}`;
+        const storageRef = ref(storage, path);
+        const uploadTask = uploadBytesResumable(storageRef, file);
+        
+        uploadTask.on('state_changed', 
+          (snapshot) => {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            setUploadingFiles(prev => new Map(prev).set(file.name, progress));
+          }, 
+          (error) => {
+            console.error('Firebase upload error:', error.message || error);
+            setUploadErrors(prev => new Map(prev).set(file.name, error.message || 'Upload failed'));
+          }, 
+          async () => {
+            try {
+              const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+              uploadResults.push({ 
+                fileName: file.name, 
+                firebasePath: path, 
+                downloadUrl 
+              });
+              console.log(`✅ ${file.name} uploaded successfully`);
+            } catch (error) {
+              console.error('Error getting download URL:', error);
+              setUploadErrors(prev => new Map(prev).set(file.name, 'Failed to get download URL'));
+            }
+          }
+        );
+        
+        return uploadTask;
+      });
+      
+      // Wait for all uploads to complete
+      await Promise.all(
+        uploadTasks.map(task => 
+          new Promise((resolve, reject) => {
+            task.on('state_changed', null, reject, resolve);
+          })
+        )
       );
       
       console.log('All files uploaded successfully:', uploadResults);
@@ -149,7 +184,7 @@ function FileUploadModal({
       // Close modal after successful upload
       setTimeout(() => onClose(), 1000);
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error('Firebase upload error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
       // Show error toast
