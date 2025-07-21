@@ -116,58 +116,18 @@ function FileUploadModal({
     console.log(`Starting upload of ${files.length} files`);
     
     try {
-      // Upload all files to Firebase
-      console.log('Using server-side upload due to Firebase client issues');
+      // Use client-side Firebase upload with uploadMultipleFilesToFirebase
+      console.log('🔥 Using client-side Firebase upload...');
       
-      // Upload files using server-side endpoint as fallback
-      const uploadResults = [];
-      
-      for (const file of files) {
-        try {
-          // Create form data for server upload
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('fileName', String(file.name));
-          formData.append('contentType', String(file.type || 'application/octet-stream'));
-          formData.append('fileSize', String(file.size));
-          formData.append('category', String('photography'));
-          formData.append('mediaType', String('raw'));
-          
-          console.log(`📤 Uploading ${file.name} via server...`);
-          console.log('FormData contents:', {
-            fileName: file.name,
-            contentType: file.type,
-            fileSize: file.size,
-            category: 'photography',
-            mediaType: 'raw'
-          });
-          
-          const response = await fetch(`/api/jobs/${jobCardId}/upload-file`, {
-            method: 'POST',
-            body: formData,
-            credentials: 'include'
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
-            console.error('Server upload error response:', errorData);
-            throw new Error(`Server upload failed: ${errorData.message || errorData.error || response.status}`);
-          }
-          
-          const result = await response.json();
-          console.log(`✅ Server upload successful:`, result);
-          
-          uploadResults.push({
-            fileName: file.name,
-            firebasePath: result.firebasePath,
-            downloadUrl: result.downloadUrl
-          });
-          
-        } catch (error) {
-          console.error('Server upload error for', file.name + ':', error);
-          throw error;
+      const uploadResults = await uploadMultipleFilesToFirebase(
+        files,
+        jobCardId,
+        'raw',
+        (fileName, progress) => {
+          console.log(`📤 ${fileName}: ${progress.progress}%`);
+          setUploadingFiles(prev => new Map(prev).set(fileName, progress.progress));
         }
-      }
+      );
       
       console.log('All files uploaded successfully:', uploadResults);
       
