@@ -42,6 +42,15 @@ const processFileSchema = z.object({
   mediaType: z.enum(['raw', 'finished']).default('finished'),
 });
 
+// Debug middleware to log all requests
+router.use((req, res, next) => {
+  if (req.method === 'POST' && req.path.includes('upload')) {
+    console.log('🔍 DEBUG - Route request:', req.method, req.originalUrl, req.path);
+    console.log('🔍 DEBUG - Content-Type:', req.headers['content-type']);
+  }
+  next();
+});
+
 // All routes require authentication
 router.use(isAuthenticated);
 
@@ -178,11 +187,13 @@ router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
   }
 });
 
-// POST /api/jobs/:id/upload - Prepare Firebase upload (JSON endpoint)
-router.post('/:id/upload', validateParams(idParamSchema), (req, res, next) => {
-  console.log('🚫 WRONG ENDPOINT - this should NOT be called for FormData uploads!');
-  next();
-}, uploadJobFile);
+// POST /api/jobs/:id/upload - Prepare Firebase upload (JSON endpoint) 
+// NOTE: This route is disabled to avoid conflicts with /upload-file
+// router.post('/:id/upload', validateParams(idParamSchema), (req, res, next) => {
+//   console.log('🚫 WRONG ENDPOINT - upload called instead of upload-file! URL:', req.originalUrl);
+//   console.log('🚫 Content-Type:', req.headers['content-type']);
+//   next();
+// }, uploadJobFile);
 
 // POST /api/jobs/:id/process-file - Process uploaded Firebase file
 router.post('/:id/process-file', validateParams(idParamSchema), validateBody(processFileSchema), processUploadedFile);

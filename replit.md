@@ -618,6 +618,11 @@ Changelog:
   - **Upload Path Structure**: Files upload directly to temp_uploads/{jobCardId}/{fileName} pattern bypassing server validation
   - **Promise-based Completion**: Used Promise.all to wait for all upload tasks with proper error handling and download URL retrieval
   - **Removed Server Dependency**: Eliminated server-side FormData validation by uploading directly to Firebase Storage client-side
+- July 21, 2025. **FIXED UPLOAD ROUTE CONFLICTS** - Resolved Express routing issues preventing FormData uploads from reaching correct endpoint:
+   - **Route Conflict Resolution**: Disabled `/upload` route that was incorrectly matching `/upload-file` requests due to Express prefix matching
+   - **Enhanced Route Debugging**: Added middleware to trace route matching and identify why validation was happening in wrong controller
+   - **Server-side Upload Fix**: Ensured FormData uploads hit `/upload-file` endpoint with direct Firebase Admin uploads instead of validation-heavy JSON endpoint
+   - **Upload Path Verification**: Confirmed client calls correct `/api/jobs/${jobId}/upload-file` endpoint with proper server-side processing
 - July 21, 2025. **ENHANCED FIREBASE UPLOAD WITH TIMEOUT HANDLING** - Fixed hanging uploads with comprehensive error handling:
   - **Environment Variables**: Updated Firebase configuration to use proper environment variables with fallbacks
   - **Authentication Check**: Added Firebase auth state logging for debugging upload permissions
