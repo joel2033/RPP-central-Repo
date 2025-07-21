@@ -95,7 +95,7 @@ const upload = multer({
 const uploadFormDataSchema = z.object({
   fileName: z.string(),
   contentType: z.string(),
-  fileSize: z.string(), // String from FormData
+  fileSize: z.number(), // Number as specified in requirements
   category: z.string(),
   mediaType: z.string()
 });
@@ -104,7 +104,9 @@ const uploadFormDataSchema = z.object({
 router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
   console.log('📥 /upload-file route hit');
   console.log('Request body:', req.body);
-  console.log('File:', req.file ? { name: req.file.originalname, size: req.file.size } : 'No file');
+  console.log('Req body keys:', Object.keys(req.body));
+  console.log('Req body types:', Object.entries(req.body).map(([key, val]) => ({key, type: typeof val, value: val})));
+  console.log('File:', req.file ? { name: req.file.originalname, size: req.file.size, mimetype: req.file.mimetype } : 'No file');
   
   try {
     const { id: jobId } = req.params;
@@ -112,25 +114,37 @@ router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
     
     if (!file) throw new Error('No file provided');
     
+    // Extract values from FormData (all come as strings)
+    const fileName = req.body.fileName || file.originalname;
+    const contentType = req.body.contentType || file.mimetype;
+    const fileSize = req.body.fileSize ? parseInt(req.body.fileSize) : file.size;
+    const category = req.body.category || 'photography';
+    const mediaType = req.body.mediaType || 'raw';
+    
+    console.log('Extracted values:', { fileName, contentType, fileSize, category, mediaType });
+    
+    // Create request body for validation
+    const requestBody = { fileName, contentType, fileSize, category, mediaType };
+    
     // Validate request body with Zod
-    const parsedBody = uploadFormDataSchema.parse(req.body);
-    const { fileName, contentType, fileSize, category, mediaType } = parsedBody;
+    const parsedBody = uploadFormDataSchema.parse(requestBody);
+    console.log('✅ Validation passed:', parsedBody);
     
     // Import Firebase Admin
     const { adminBucket } = await import('../utils/firebaseAdmin');
     
     // Use temp_uploads path as specified in requirements
-    const firebasePath = `temp_uploads/${jobId}/${fileName}`;
+    const firebasePath = `temp_uploads/${jobId}/${parsedBody.fileName}`;
     const firebaseFile = adminBucket.file(firebasePath);
     
     // Upload file to Firebase Storage
     await firebaseFile.save(file.buffer, { 
       metadata: { 
-        contentType: file.mimetype || contentType,
+        contentType: file.mimetype || parsedBody.contentType,
         metadata: {
           jobId: jobId,
-          category: category,
-          mediaType: mediaType
+          category: parsedBody.category,
+          mediaType: parsedBody.mediaType
         }
       } 
     });

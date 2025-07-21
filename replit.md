@@ -600,6 +600,15 @@ Changelog:
   - **Upload Route Addition**: Added missing POST /api/jobs/:id/upload endpoint to jobRoutes for Firebase upload preparation
   - **Error Handling Enhancement**: Improved Firebase upload error reporting with detailed error information logging
   - **Complete Workflow**: Upload to editor page now fully functional from job selection through file uploads
+- July 21, 2025. **FIXED SERVER-SIDE UPLOAD VALIDATION** - Resolved critical Zod validation failure in FormData upload endpoint:
+  - **Firebase Admin SDK Configuration**: Enhanced server/utils/firebaseAdmin.ts with proper error handling and fallback to default credentials
+  - **FormData Validation Fix**: Fixed POST /api/jobs/:id/upload-file endpoint to properly parse FormData fields from Multer middleware
+  - **Type Conversion Logic**: Added manual field extraction with fileSize conversion from string to number for Zod validation
+  - **Enhanced Error Handling**: Comprehensive Zod error handling with detailed validation failure reporting
+  - **Firebase Storage Integration**: Proper file upload to temp_uploads/{jobId}/{fileName} path structure as required
+  - **Comprehensive Logging**: Added detailed request body logging and type checking for debugging FormData parsing issues
+  - **Schema Validation**: Updated uploadFormDataSchema to use z.number() for fileSize matching user specifications
+  - **Complete Upload Flow**: Server-side fallback upload now properly validates and processes FormData with Firebase Admin SDK
 ```
 
 ## User Preferences
