@@ -192,4 +192,34 @@ router.post('/:id/upload', validateParams(idParamSchema), uploadJobFile);
 // POST /api/jobs/:id/process-file - Process uploaded Firebase file
 router.post('/:id/process-file', validateParams(idParamSchema), validateBody(processFileSchema), processUploadedFile);
 
+// POST /api/jobs/:id/generate-signed-url - Generate signed URL for direct upload
+const signedUrlSchema = z.object({
+  fileName: z.string().min(1, 'File name is required'),
+});
+
+router.post('/:id/generate-signed-url', validateParams(idParamSchema), validateBody(signedUrlSchema), async (req, res) => {
+  try {
+    const { id: jobId } = req.params;
+    const { fileName } = req.body;
+    
+    console.log(`🔑 Generating signed URL for ${fileName} in job ${jobId}`);
+    
+    const admin = require('../utils/firebaseAdmin');
+    const bucket = admin.storage().bucket();
+    const filePath = `temp_uploads/${jobId}/${fileName}`;
+    
+    const [signedUrl] = await bucket.file(filePath).getSignedUrl({
+      action: 'write',
+      expires: Date.now() + 60 * 60 * 1000, // 1 hour
+      contentType: 'application/octet-stream',
+    });
+    
+    console.log(`✅ Generated signed URL for ${fileName}`);
+    res.json({ signedUrl, filePath });
+  } catch (error) {
+    console.error('❌ Failed to generate signed URL:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

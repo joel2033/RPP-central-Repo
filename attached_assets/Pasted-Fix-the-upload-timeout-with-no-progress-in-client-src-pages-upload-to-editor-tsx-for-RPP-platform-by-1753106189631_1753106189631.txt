@@ -1,0 +1,42 @@
+Fix the upload timeout with no progress in client/src/pages/upload-to-editor.tsx for RPP platform by switching to signed URLs for direct client-side uploads to Firebase Storage. The server generates a signed write URL for each file, client uploads directly with fetch and progress tracking, then gets download URL.
+
+Steps to implement:
+1. In server/routes/jobs.js (or equivalent), add POST /:jobId/generate-signed-url:
+const express = require('express');
+const admin = require('../utils/firebaseAdmin');
+const router = express.Router();
+
+router.post('/:jobId/generate-signed-url', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const { fileName } = req.body;
+    const bucket = admin.storage().bucket();
+    const [signedUrl] = await bucket.file(`temp_uploads/${jobId}/${fileName}`).getSignedUrl({
+      action: 'write',
+      expires: Date.now() + 60 * 60 * 1000, // 1 hour
+      contentType: 'application/octet-stream',
+    });
+    res.json({ signedUrl });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+module.exports = router;
+- Ensure firebaseAdmin is initialized.
+2. In upload-to-editor.tsx handleUpload:
+- Remove server FormData loop.
+- For each file, fetch signed URL from `/api/jobs/${jobCardId}/generate-signed-url` with POST { fileName: file.name }.
+- Then, use fetch to PUT the file to signedUrl, with onprogress for updating uploadingFiles (use XMLHttpRequest for better progress if fetch doesn't support).
+- Example with XMLHttpRequest for progress:
+const xhr = new XMLHttpRequest();
+xhr.upload.onprogress = (e) => { if (e.lengthComputable) setUploadingFiles(prev => new Map(prev).set(file.name, (e.loaded / e.total) * 100)); };
+xhr.open('PUT', signedUrl);
+xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+xhr.send(file);
+xhr.onload = () => { if (xhr.status === 200) { getDownloadURL(ref(storage, `temp_uploads/${jobCardId}/${file.name}`)).then(downloadUrl => uploadResults.push({ fileName, firebasePath, downloadUrl })); } };
+- Await all xhr promises.
+- Remove timeout cancel; handle errors with 'Upload failed - network issue'.
+3. Update toast for 'Upload interrupted - check network'.
+4. Manual: Ensure Storage rules allow signed URL writes: allow write: if request.time < date('2025-12-31');
+
+This enables direct uploads with progress. Commit with message: "Switch to signed URLs for direct Firebase uploads to fix timeout in Upload to Editor"

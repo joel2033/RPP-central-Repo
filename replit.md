@@ -663,6 +663,15 @@ Changelog:
   - **Enhanced Progress Logging**: Updated progress logging format for better upload monitoring
   - **Conditional Close Logic**: X button and onClose only work when no uploads are active
   - **Upload State Management**: setCanClose(false) during upload, setCanClose(true) on completion/error
+- July 21, 2025. **SWITCHED TO SIGNED URL UPLOADS** - Replaced Firebase SDK uploads with direct HTTP uploads using signed URLs:
+  - **Server Signed URL Generation**: Added POST /api/jobs/:id/generate-signed-url endpoint with 1-hour expiration
+  - **Direct HTTP Upload**: Replaced uploadBytesResumable with XMLHttpRequest PUT requests to signed URLs
+  - **Real-time Progress Tracking**: Maintained progress indicators using xhr.upload.onprogress events
+  - **Network Error Handling**: Enhanced error detection with specific messages for network issues and timeouts
+  - **Firebase Admin Integration**: Server-side signed URL generation using Firebase Admin SDK
+  - **Eliminated SDK Timeouts**: Bypassed Firebase SDK retry-limit-exceeded errors with direct HTTP uploads
+  - **Preserved File Structure**: Maintained temp_uploads/{jobId}/{filename} path structure
+  - **Download URL Retrieval**: Server generates signed URLs, client uploads directly, then gets download URL via SDK
 ```
 
 ## User Preferences

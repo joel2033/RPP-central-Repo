@@ -129,87 +129,106 @@ function FileUploadModal({
     console.log(`Starting upload of ${files.length} files`);
     
     try {
-      // Use client-side Firebase upload
-      console.log('🔥 Using client-side Firebase upload...');
-      
-      // Skip Firebase auth check to prevent network requests
-      // Upload will work with proper Firebase Storage rules
-      console.log('Auth state:', { isAuthenticated: !!useAuth });
-      console.warn('Firebase auth disabled to prevent network request errors');
+      console.log('🔑 Using signed URL direct uploads...');
       
       const uploadResults: any[] = [];
-      const uploadTasks = files.map(file => {
-        try {
-          const path = `temp_uploads/${jobCardId}/${file.name}`;
-          const storageRef = ref(storage, path);
-          console.log('Starting upload task for', file.name);
-          const uploadTask = uploadBytesResumable(storageRef, file);
-          
-          uploadTask.on('state_changed', 
-            (snapshot) => {
-              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-              setUploadingFiles(prev => new Map(prev).set(file.name, progress));
-              console.log('Upload progress for', file.name, progress.toFixed(1) + '%');
-            }, 
-            (error) => {
-              console.error('Firebase upload error:', error.code, error.message);
-              if (error.code === 'storage/canceled') {
-                setUploadErrors(prev => new Map(prev).set(file.name, 'Upload canceled - check network or try again'));
-              } else if (error.code === 'storage/unauthorized') {
-                setUploadErrors(prev => new Map(prev).set(file.name, 'Upload unauthorized - check Firebase rules'));
-              } else {
-                setUploadErrors(prev => new Map(prev).set(file.name, error.message || 'Upload failed'));
+      
+      // Upload each file using signed URLs
+      const uploadPromises = files.map((file) => {
+        return new Promise<void>((resolve, reject) => {
+          const uploadFile = async () => {
+            try {
+              // Step 1: Get signed URL from server
+              console.log(`🔑 Getting signed URL for ${file.name}`);
+              const signedUrlResponse = await fetch(`/api/jobs/${jobCardId}/generate-signed-url`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ fileName: file.name }),
+              });
+              
+              if (!signedUrlResponse.ok) {
+                throw new Error(`Failed to get signed URL: ${signedUrlResponse.status}`);
               }
-            }, 
-            async () => {
-              try {
-                const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-                uploadResults.push({ 
-                  fileName: file.name, 
-                  firebasePath: path, 
-                  downloadUrl 
-                });
-                console.log(`✅ ${file.name} uploaded successfully`);
-              } catch (error) {
-                console.error('Error getting download URL:', error);
-                setUploadErrors(prev => new Map(prev).set(file.name, 'Failed to get download URL'));
-              }
+              
+              const { signedUrl, filePath } = await signedUrlResponse.json();
+              console.log(`✅ Got signed URL for ${file.name}`);
+              
+              // Step 2: Upload directly to Firebase using XMLHttpRequest for progress
+              const xhr = new XMLHttpRequest();
+              
+              xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                  const progress = (e.loaded / e.total) * 100;
+                  console.log(`Upload progress for ${file.name}: ${progress.toFixed(1)}%`);
+                  setUploadingFiles(prev => new Map(prev).set(file.name, progress));
+                }
+              };
+              
+              xhr.onload = async () => {
+                if (xhr.status === 200) {
+                  try {
+                    // Step 3: Get download URL
+                    const fileRef = ref(storage, filePath);
+                    const downloadUrl = await getDownloadURL(fileRef);
+                    
+                    uploadResults.push({
+                      fileName: file.name,
+                      firebasePath: filePath,
+                      downloadUrl,
+                      contentType: file.type || 'application/octet-stream',
+                      fileSize: file.size,
+                      category: 'photography'
+                    });
+                    
+                    console.log(`✅ Upload complete for ${file.name}`);
+                    resolve();
+                  } catch (error) {
+                    console.error(`Failed to get download URL for ${file.name}:`, error);
+                    setUploadErrors(prev => new Map(prev).set(file.name, 'Failed to get download URL'));
+                    reject(error);
+                  }
+                } else {
+                  const errorMsg = `Upload failed with status ${xhr.status}`;
+                  console.error(`❌ ${errorMsg} for ${file.name}`);
+                  setUploadErrors(prev => new Map(prev).set(file.name, errorMsg));
+                  reject(new Error(errorMsg));
+                }
+              };
+              
+              xhr.onerror = () => {
+                const errorMsg = 'Upload failed - network issue';
+                console.error(`❌ Network error for ${file.name}`);
+                setUploadErrors(prev => new Map(prev).set(file.name, errorMsg));
+                reject(new Error(errorMsg));
+              };
+              
+              xhr.ontimeout = () => {
+                const errorMsg = 'Upload interrupted - check network';
+                console.error(`❌ Timeout for ${file.name}`);
+                setUploadErrors(prev => new Map(prev).set(file.name, errorMsg));
+                reject(new Error(errorMsg));
+              };
+              
+              // Configure and start upload
+              xhr.open('PUT', signedUrl);
+              xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+              xhr.timeout = 60000; // 60 second timeout
+              xhr.send(file);
+              
+            } catch (error) {
+              console.error(`Failed to upload ${file.name}:`, error);
+              setUploadErrors(prev => new Map(prev).set(file.name, error.message || 'Upload failed'));
+              reject(error);
             }
-          );
+          };
           
-          // Add timeout to prevent hanging uploads (60 seconds for large files)
-          const timeoutId = setTimeout(() => {
-            const currentProgress = uploadingFiles.get(file.name) || 0;
-            if (!uploadingFiles.has(file.name) || currentProgress === 0) {
-              console.error(`Upload timeout for ${file.name} - no progress after 60s`);
-              setUploadErrors(prev => new Map(prev).set(file.name, 'Upload timed out - no progress'));
-              // Removed uploadTask.cancel() to prevent storage/canceled error
-            }
-          }, 60000);
-          
-          // Clear timeout when upload completes and handle unhandled rejections
-          uploadTask.then(() => clearTimeout(timeoutId)).catch((error) => {
-            console.error(`Upload task error for ${file.name}:`, error);
-            clearTimeout(timeoutId);
-            setUploadErrors(prev => new Map(prev).set(file.name, error.message || 'Upload task failed'));
-          });
-          
-          return uploadTask;
-        } catch (syncError) {
-          console.error('Sync upload error:', syncError);
-          setUploadErrors(prev => new Map(prev).set(file.name, syncError.message || 'Upload initialization failed'));
-          throw syncError;
-        }
+          uploadFile();
+        });
       });
       
-      // Wait for all uploads to complete
-      await Promise.all(
-        uploadTasks.map(task => 
-          new Promise((resolve, reject) => {
-            task.on('state_changed', null, reject, resolve);
-          })
-        )
-      );
+      await Promise.all(uploadPromises);
       
       console.log('All files uploaded successfully:', uploadResults);
       
@@ -225,7 +244,7 @@ function FileUploadModal({
       // Show success toast
       toast({
         title: "Upload Successful",
-        description: `Successfully uploaded ${uploadResults.length} file(s) to Firebase`,
+        description: `Successfully uploaded ${uploadResults.length} file(s) via signed URLs`,
       });
       
       setCanClose(true); // Re-enable modal close
