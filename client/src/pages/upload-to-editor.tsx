@@ -75,6 +75,15 @@ function FileUploadModal({
   const [uploadErrors, setUploadErrors] = useState<Map<string, string>>(new Map());
   const [dragActive, setDragActive] = useState(false);
   const [urlLink, setUrlLink] = useState("");
+  const [canClose, setCanClose] = useState(true);
+
+  // Allow tasks to persist on unmount without canceling them
+  useEffect(() => {
+    return () => {
+      // No cancel; let background tasks continue
+      console.log('FileUploadModal unmounting - tasks will continue in background');
+    };
+  }, []);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -115,6 +124,7 @@ function FileUploadModal({
     if (files.length === 0) return;
     
     setIsUploading(true);
+    setCanClose(false); // Prevent modal close during upload
     setUploadErrors(new Map());
     console.log(`Starting upload of ${files.length} files`);
     
@@ -139,7 +149,7 @@ function FileUploadModal({
             (snapshot) => {
               const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
               setUploadingFiles(prev => new Map(prev).set(file.name, progress));
-              console.log(`📤 ${file.name}: ${progress.toFixed(1)}%`);
+              console.log('Upload progress for', file.name, progress.toFixed(1) + '%');
             }, 
             (error) => {
               console.error('Firebase upload error:', error.code, error.message);
@@ -173,7 +183,7 @@ function FileUploadModal({
             if (!uploadingFiles.has(file.name) || currentProgress === 0) {
               console.error(`Upload timeout for ${file.name} - no progress after 60s`);
               setUploadErrors(prev => new Map(prev).set(file.name, 'Upload timed out - no progress'));
-              uploadTask.cancel();
+              // Removed uploadTask.cancel() to prevent storage/canceled error
             }
           }, 60000);
           
@@ -218,6 +228,7 @@ function FileUploadModal({
         description: `Successfully uploaded ${uploadResults.length} file(s) to Firebase`,
       });
       
+      setCanClose(true); // Re-enable modal close
       // Close modal after successful upload
       setTimeout(() => onClose(), 1000);
     } catch (error) {
@@ -247,6 +258,7 @@ function FileUploadModal({
       setUploadingFiles(new Map());
     } finally {
       setIsUploading(false);
+      setCanClose(true); // Re-enable modal close on error too
     }
   };
 
@@ -263,7 +275,7 @@ function FileUploadModal({
             )}
           </div>
           <div className="flex items-center gap-2">
-            {!isUploading && (
+            {!isUploading && canClose && (
               <Button
                 variant="outline"
                 size="sm"
@@ -275,8 +287,11 @@ function FileUploadModal({
             <Button
               variant="ghost"
               size="sm"
-              onClick={onClose}
-              disabled={isUploading}
+              onClick={() => {
+                if (isUploading || uploadingFiles.size > 0) return;
+                onClose();
+              }}
+              disabled={isUploading || !canClose}
             >
               <X className="h-4 w-4" />
             </Button>

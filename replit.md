@@ -656,6 +656,13 @@ Changelog:
   - **Network Issue Resolution**: Emulators bypass external network requests that cause runtime errors in Replit
   - **Unhandled Rejection Fix**: Added proper error handling in uploadTask Promise chain to prevent unhandled rejections
   - **Production Fallback**: Graceful fallback to production Firebase when emulators unavailable
+- July 21, 2025. **FIXED STORAGE/CANCELED ERROR** - Prevented unwanted task cancellations and modal closure during uploads:
+  - **Removed Task Cancellation**: Removed uploadTask.cancel() from timeout to prevent storage/canceled errors
+  - **Modal Close Prevention**: Added canClose state to prevent modal closure during active uploads  
+  - **Persistent Background Tasks**: Added useEffect cleanup without cancel to allow tasks to continue on unmount
+  - **Enhanced Progress Logging**: Updated progress logging format for better upload monitoring
+  - **Conditional Close Logic**: X button and onClose only work when no uploads are active
+  - **Upload State Management**: setCanClose(false) during upload, setCanClose(true) on completion/error
 ```
 
 ## User Preferences
