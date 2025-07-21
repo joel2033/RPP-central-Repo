@@ -177,8 +177,12 @@ function FileUploadModal({
             }
           }, 60000);
           
-          // Clear timeout when upload completes
-          uploadTask.then(() => clearTimeout(timeoutId));
+          // Clear timeout when upload completes and handle unhandled rejections
+          uploadTask.then(() => clearTimeout(timeoutId)).catch((error) => {
+            console.error(`Upload task error for ${file.name}:`, error);
+            clearTimeout(timeoutId);
+            setUploadErrors(prev => new Map(prev).set(file.name, error.message || 'Upload task failed'));
+          });
           
           return uploadTask;
         } catch (syncError) {

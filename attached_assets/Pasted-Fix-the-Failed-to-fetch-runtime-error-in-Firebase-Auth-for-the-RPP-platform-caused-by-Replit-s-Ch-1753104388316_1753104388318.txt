@@ -1,0 +1,46 @@
+Fix the "Failed to fetch" runtime error in Firebase Auth for the RPP platform, caused by Replit's Chrome extension interfering with fetches in dev mode. Disable Vite HMR overlay, set up Firebase Auth emulator, and use signInWithCustomToken with token from useAuth instead of anonymous sign-in to bypass fetch issues.
+
+Steps to implement:
+1. In client/vite.config.ts (or create if missing):
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    hmr: {
+      overlay: false,  // Disable error overlay popup
+    },
+  },
+});
+2. Install Firebase CLI in Replit shell: Run 'npm install -g firebase-tools'.
+3. In Replit shell, start emulator: 'firebase emulators:start --only auth'.
+4. In client/src/lib/firebase.ts, add emulator:
+import { connectAuthEmulator } from 'firebase/auth';
+// After getAuth
+if (process.env.NODE_ENV === 'development') {
+  connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+}
+5. In client/src/pages/upload-to-editor.tsx, update auth sync in UploadToEditorContent useEffect:
+useEffect(() => {
+  const syncAuth = async () => {
+    if (isAuthenticated && !auth.currentUser) {
+      try {
+        const token = localStorage.getItem('authToken') || '';  // Get token from useAuth or API login response
+        if (token) {
+          const credential = await auth.signInWithCustomToken(token);
+          console.log('Firebase auth synced with custom token:', credential.user?.uid);
+        } else {
+          console.warn('No auth token found - uploads may fail');
+        }
+      } catch (err) {
+        console.error('Auth sync error:', err.code, err.message);
+      }
+    }
+  };
+  syncAuth();
+}, [isAuthenticated]);
+- Remove any signInAnonymously calls.
+6. In handleUpload, add CSP check log: console.log('CSP headers for Firebase:', document.head.querySelector('meta[http-equiv="Content-Security-Policy"]')?.content || 'No CSP');
+7. Manual: In Firebase Console > Authentication > Settings, add 'chrome-extension://eppiocemhmnlbhjplcgkofciiegomcon' to Authorized Domains if needed for dev.
+
+This resolves extension fetch blocks and aligns with RPP auth for roles. Commit with message: "Fix Failed to fetch in Firebase Auth by disabling HMR overlay and using emulator in Upload to Editor"

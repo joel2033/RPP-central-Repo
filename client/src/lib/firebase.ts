@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getStorage } from 'firebase/storage';
-import { getAuth } from 'firebase/auth';
+import { getStorage, connectStorageEmulator } from 'firebase/storage';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
 
 // Firebase configuration using environment variables
 // Set these in Replit secrets/environment variables from Firebase Console
@@ -20,4 +20,24 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 // Export Firebase Storage and Auth instances
 export const storage = getStorage(app);
 export const auth = getAuth(app);
+
+// Connect to emulators in development to avoid network issues
+if (import.meta.env.DEV) {
+  try {
+    // Connect to Firebase Auth emulator
+    connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+    console.log('Connected to Firebase Auth emulator');
+  } catch (error) {
+    console.log('Firebase Auth emulator not available, using production');
+  }
+  
+  try {
+    // Connect to Firebase Storage emulator  
+    connectStorageEmulator(storage, 'localhost', 9199);
+    console.log('Connected to Firebase Storage emulator');
+  } catch (error) {
+    console.log('Firebase Storage emulator not available, using production');
+  }
+}
+
 export default app;
