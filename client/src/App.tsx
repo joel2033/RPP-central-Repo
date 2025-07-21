@@ -3,7 +3,7 @@ import { Route, Switch } from 'wouter';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import LoadingSpinner from '@/components/shared/loading-spinner';
 import { queryClient } from '@/lib/queryClient';
 
 // Lazy load pages for better performance

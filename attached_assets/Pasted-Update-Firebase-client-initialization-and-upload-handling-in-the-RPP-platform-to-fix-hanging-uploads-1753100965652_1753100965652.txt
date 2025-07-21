@@ -1,0 +1,45 @@
+Update Firebase client initialization and upload handling in the RPP platform to fix hanging uploads in client/src/pages/upload-to-editor.tsx. Use env vars for config in firebase.ts to avoid placeholders. Add try-catch around uploads, log err.code and message, and check auth before upload. If no progress after 30s, timeout with error.
+
+Steps to implement:
+1. Update client/src/lib/firebase.ts to use process.env:
+import { initializeApp } from 'firebase/app';
+import { getStorage } from 'firebase/storage';
+import { getAuth } from 'firebase/auth';
+const firebaseConfig = {
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID
+};
+const app = initializeApp(firebaseConfig);
+export const storage = getStorage(app);
+export const auth = getAuth(app);
+// Comment: Set these in Replit secrets/environment variables from Firebase Console.
+2. In upload-to-editor.tsx FileUploadModal, import { storage, auth } from '@/lib/firebase';
+3. In handleUpload, add auth check and better error handling:
+if (!auth.currentUser) throw new Error('Authentication required for uploads');
+const uploadResults = [];
+const uploadTasks = files.map(file => {
+  try {
+    const path = `temp_uploads/${jobCardId}/${file.name}`;
+    const storageRef = ref(storage, path);
+    const uploadTask = uploadBytesResumable(storageRef, file);
+    uploadTask.on('state_changed', 
+      snapshot => setUploadingFiles(prev => new Map(prev).set(file.name, (snapshot.bytesTransferred / snapshot.totalBytes) * 100)),
+      err => { console.error('Firebase upload error:', err.code, err.message); setUploadErrors(prev => new Map(prev).set(file.name, err.message)); },
+      async () => { const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref); uploadResults.push({ fileName: file.name, firebasePath: path, downloadUrl }); }
+    );
+    // Timeout if no progress
+    setTimeout(() => { if (!uploadingFiles.has(file.name)) setUploadErrors(prev => new Map(prev).set(file.name, 'Upload timed out')); }, 30000);
+    return uploadTask;
+  } catch (syncErr) { console.error('Sync upload error:', syncErr.message); throw syncErr; }
+});
+await Promise.all(uploadTasks.map(task => new Promise((resolve, reject) => {
+  task.on('state_changed', null, reject, resolve);
+})));
+4. Update toast to show specific errors if any.
+5. Manual: In Firebase Console, ensure Storage rules allow authenticated writes: allow write: if request.auth != null;
+
+This prevents hanging by adding timeouts and logging. Commit with message: "Enhance Firebase upload with env config, auth check, and error handling for hanging issues in Upload to Editor"

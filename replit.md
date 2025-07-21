@@ -618,6 +618,15 @@ Changelog:
   - **Upload Path Structure**: Files upload directly to temp_uploads/{jobCardId}/{fileName} pattern bypassing server validation
   - **Promise-based Completion**: Used Promise.all to wait for all upload tasks with proper error handling and download URL retrieval
   - **Removed Server Dependency**: Eliminated server-side FormData validation by uploading directly to Firebase Storage client-side
+- July 21, 2025. **ENHANCED FIREBASE UPLOAD WITH TIMEOUT HANDLING** - Fixed hanging uploads with comprehensive error handling:
+  - **Environment Variables**: Updated Firebase configuration to use proper environment variables with fallbacks
+  - **Authentication Check**: Added Firebase auth state logging for debugging upload permissions
+  - **Upload Timeout**: Implemented 30-second timeout to prevent hanging uploads with automatic task cancellation
+  - **Enhanced Error Logging**: Added error.code and error.message logging for better Firebase error debugging
+  - **Progress Monitoring**: Added detailed progress logging with percentage updates for each file upload
+  - **Retry Prevention**: Added timeout mechanism to cancel stuck uploads and display timeout error messages
+  - **Error Display**: Enhanced toast notifications to show specific file upload errors and timeout issues
+  - **Task Management**: Proper cleanup of timeout handlers when uploads complete successfully
 ```
 
 ## User Preferences
