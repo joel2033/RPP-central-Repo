@@ -2,6 +2,9 @@ import { Router } from 'express';
 import { validateBody, validateParams, validateQuery } from '../utils/validation';
 import { isAuthenticated } from '../replitAuth';
 import { z } from 'zod';
+import multer from 'multer';
+import { firebaseStorageService } from '../services/firebaseService';
+import { storage } from '../storage';
 import {
   getJobs,
   getJob,
@@ -62,5 +65,149 @@ router.post('/:id/upload', validateParams(idParamSchema), uploadJobFile);
 
 // POST /api/jobs/:id/process-file - Process uploaded Firebase file
 router.post('/:id/process-file', validateParams(idParamSchema), validateBody(processFileSchema), processUploadedFile);
+
+// Configure multer for multipart uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 2 * 1024 * 1024 * 1024, // 2GB
+    fieldSize: 50 * 1024 * 1024, // 50MB for fields
+  },
+  fileFilter: (req, file, cb) => {
+    console.log('📁 File upload filter:', {
+      fieldname: file.fieldname,
+      originalname: file.originalname,
+      mimetype: file.mimetype
+    });
+    
+    const allowedTypes = [
+      'image/jpeg', 'image/jpg', 'image/png', 'image/tiff',
+      'image/x-adobe-dng', 'image/x-canon-cr2', 'image/x-nikon-nef',
+      'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/avi',
+      'application/zip', 'application/octet-stream'
+    ];
+    
+    // Accept DNG files even if they come as octet-stream
+    if (file.originalname.toLowerCase().endsWith('.dng') || allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      console.log('❌ File type rejected:', file.mimetype);
+      cb(new Error(`Unsupported file type: ${file.mimetype}`));
+    }
+  }
+});
+
+// POST /api/jobs/:id/upload-file - Direct file upload with FormData
+router.post('/:id/upload-file', validateParams(idParamSchema), upload.single('file'), async (req, res) => {
+  try {
+    console.log('🔍 === UPLOAD REQUEST DEBUG START ===');
+    console.log('🔍 Method:', req.method);
+    console.log('🔍 Headers:', {
+      'content-type': req.headers['content-type'],
+      'content-length': req.headers['content-length']
+    });
+    console.log('🔍 Body:', req.body);
+    console.log('🔍 File:', req.file ? {
+      fieldname: req.file.fieldname,
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size
+    } : 'No file');
+
+    const jobId = parseInt(req.params.id);
+    const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
+
+    if (!userId) {
+      console.log('❌ No user ID found');
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    if (!req.file) {
+      console.log('❌ Missing file in request');
+      return res.status(400).json({ 
+        message: 'Missing file in request', 
+        body: req.body 
+      });
+    }
+
+    const { originalname: fileName, buffer, mimetype: contentType, size: fileSize } = req.file;
+    const { category = 'photography', mediaType = 'raw' } = req.body;
+
+    // Validate required fields
+    if (!mediaType) {
+      return res.status(400).json({ message: 'Missing mediaType' });
+    }
+
+    if (!category) {
+      return res.status(400).json({ message: 'Missing category' });
+    }
+
+    console.log(`📤 Processing upload: ${fileName} (${fileSize} bytes) for job ${jobId}`);
+
+    // Check Firebase service
+    if (!firebaseStorageService) {
+      return res.status(500).json({ message: 'Failed to connect to Firebase' });
+    }
+
+    // Validate job exists
+    const job = await storage.getJobCard(jobId);
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+
+    // Upload to Firebase Storage
+    console.log('🔥 Starting Firebase upload...');
+    const uploadResult = await firebaseStorageService.uploadFile(
+      jobId,
+      fileName,
+      buffer,
+      mediaType === 'finished' ? 'finished' : 'raw',
+      contentType
+    );
+
+    console.log('✅ Firebase upload complete:', uploadResult);
+
+    // Save metadata to database
+    const productionFile = await storage.createProductionFile({
+      jobCardId: jobId,
+      fileName,
+      fileSize,
+      firebasePath: uploadResult.firebasePath,
+      downloadUrl: uploadResult.downloadUrl,
+      mediaType: mediaType === 'finished' ? 'final' : 'raw',
+      uploadTimestamp: new Date(),
+      uploadedBy: userId,
+      contentType,
+      status: 'uploaded'
+    });
+
+    console.log(`✅ File uploaded successfully: ${fileName}`);
+
+    res.json({
+      success: true,
+      file: productionFile,
+      firebasePath: uploadResult.firebasePath,
+      downloadUrl: uploadResult.downloadUrl
+    });
+
+  } catch (error) {
+    console.error('❌ Upload error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Check for specific Firebase errors
+    if (errorMessage.includes('Firebase')) {
+      return res.status(500).json({ message: 'Failed to connect to Firebase', error: errorMessage });
+    }
+    
+    if (errorMessage.includes('Unsupported file type')) {
+      return res.status(400).json({ message: 'Unsupported file type', error: errorMessage });
+    }
+
+    res.status(500).json({
+      message: 'Upload failed',
+      error: errorMessage
+    });
+  }
+});
 
 export default router;

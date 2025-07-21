@@ -14,9 +14,9 @@ router.get('/health', (req, res) => {
 router.use('/clients', clientRoutes);
 router.use('/jobs', jobRoutes);
 
-// Import upload routes
-import uploadRoutes from './uploadRoutes';
-router.use('/', uploadRoutes);
+// Remove duplicate upload routes - now handled in jobRoutes
+// import uploadRoutes from './uploadRoutes';
+// router.use('/', uploadRoutes);
 
 // 404 handler for API routes
 router.use('*', notFoundHandler);
