@@ -260,6 +260,9 @@ Changelog:
   - **Removed S3 Dependencies**: Eliminated all upload-url, upload-proxy endpoints and S3 presigned URL generation from production workflow
   - **Firebase Path Structure**: Files now upload to Firebase under job-{jobId}/raw/{filename} pattern as requested
   - **Progress Tracking**: Maintained real-time upload progress using Firebase's uploadBytesResumable with state_changed callbacks
+  - **Upload to Editor Migration**: Completely rewrote upload-to-editor.tsx removing all broken S3 code and implementing clean Firebase upload workflow
+  - **Reusable Firebase Module**: Created lib/firebaseUpload.ts with uploadFileToFirebase and uploadMultipleFilesToFirebase functions for standardized uploads
+  - **Clean Architecture**: Removed all deprecated S3 upload logic, XMLHttpRequest calls, and broken code fragments from upload workflow
 - July 08, 2025. Enhanced date and time picker components with modern UI and functionality:
   - **Modern Date Picker**: Implemented react-day-picker with calendar UI, month/year navigation, and proper date formatting
   - **Advanced Time Picker**: Created dropdown with 15-minute intervals, proper AM/PM formatting, and smooth scrolling
