@@ -127,10 +127,20 @@ function FileUploadModal({
           // Create form data for server upload
           const formData = new FormData();
           formData.append('file', file);
+          formData.append('fileName', file.name);
+          formData.append('contentType', file.type || 'application/octet-stream');
+          formData.append('fileSize', file.size.toString());
           formData.append('category', 'photography');
           formData.append('mediaType', 'raw');
           
           console.log(`📤 Uploading ${file.name} via server...`);
+          console.log('FormData contents:', {
+            fileName: file.name,
+            contentType: file.type,
+            fileSize: file.size,
+            category: 'photography',
+            mediaType: 'raw'
+          });
           
           const response = await fetch(`/api/jobs/${jobCardId}/upload-file`, {
             method: 'POST',
