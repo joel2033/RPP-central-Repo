@@ -618,6 +618,11 @@ Changelog:
   - **Upload Path Structure**: Files upload directly to temp_uploads/{jobCardId}/{fileName} pattern bypassing server validation
   - **Promise-based Completion**: Used Promise.all to wait for all upload tasks with proper error handling and download URL retrieval
   - **Removed Server Dependency**: Eliminated server-side FormData validation by uploading directly to Firebase Storage client-side
+- July 21, 2025. **FIXED FIREBASE CLIENT CONFIGURATION** - Corrected Firebase client-side configuration causing network upload errors:
+   - **AuthDomain Fix**: Changed incorrect `gs://rpp-central-database.firebasestorage.app` to proper `rpp-central-database.firebaseapp.com`
+   - **StorageBucket Verification**: Confirmed all storageBucket configurations use correct `.appspot.com` domain
+   - **Configuration Consistency**: Ensured client and server Firebase configurations match for proper authentication
+   - **Upload Network Errors**: Fixed "ProgressEvent isTrusted: true" errors caused by invalid authDomain configuration
 - July 21, 2025. **FIXED CORS AND STORAGE RULES FOR FIREBASE UPLOADS** - Set up CORS and updated Firebase Storage rules to resolve network errors:
    - **CORS Configuration**: Created cors.json file allowing PUT/GET/POST from all origins (temporary for development)
    - **Firebase Storage Rules**: Updated rules to allow write access for authenticated users in temp_uploads/{jobId}/{fileName} pattern
