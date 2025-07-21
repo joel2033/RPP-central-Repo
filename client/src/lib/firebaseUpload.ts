@@ -55,6 +55,7 @@ export const uploadFileToFirebase = async (
       fileName: file.name,
       contentType: file.type,
       fileSize: file.size,
+      category: 'photography', // Default category for preparation
       mediaType: mediaType
     });
 
@@ -87,7 +88,13 @@ export const uploadFileToFirebase = async (
         },
         (error) => {
           console.error('Firebase upload error:', error);
-          reject(new Error(`Upload failed: ${error.message}`));
+          console.error('Error details:', {
+            code: error.code,
+            message: error.message,
+            name: error.name,
+            customData: error.customData
+          });
+          reject(new Error(`Upload failed: ${error.message || error.code || 'Unknown Firebase error'}`));
         },
         async () => {
           try {
@@ -96,12 +103,13 @@ export const uploadFileToFirebase = async (
             console.log(`✅ File uploaded successfully: ${downloadUrl}`);
 
             // Step 3: Notify backend of successful upload
-            const completeResponse = await apiRequest('POST', `/api/jobs/${jobId}/upload-complete`, {
+            const completeResponse = await apiRequest('POST', `/api/jobs/${jobId}/process-file`, {
               firebasePath,
               downloadUrl,
               fileName: file.name,
               contentType: file.type,
               fileSize: file.size,
+              category: 'photography', // Default category
               mediaType: mediaType
             });
 

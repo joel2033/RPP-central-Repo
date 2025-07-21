@@ -587,15 +587,19 @@ Changelog:
   - **Storage Methods**: Added getMediaFileById and getMediaFilesByJobId methods for enhanced file retrieval
   - **Documentation**: Created comprehensive S3 lifecycle setup guide with AWS CLI, Console, and Terraform options
   - **Workflow Integration**: Seamlessly integrated with existing upload system while maintaining backward compatibility
-- July 21, 2025. **FIXED JOB DROPDOWN PERSISTENCE AND DISPLAY** - Resolved multiple upload page issues:
+- July 21, 2025. **FIXED UPLOAD TO EDITOR FUNCTIONALITY** - Resolved multiple critical upload page issues:
   - **Job Status Filter Enhancement**: Extended job filtering to include 'unassigned', 'pending', 'in_progress', and 'editing' statuses
   - **Form Reset Logic Update**: Modified upload form to keep selected job after successful submission for multiple uploads to same job
   - **Job Display Improvement**: Enhanced job dropdown to show "Job ID - Client Name - Property Address" format for better identification
   - **Booking Data Integration**: Added property address fetching from booking data for complete job information display
   - **Menu Fix**: Restored sidebar and topbar navigation on upload-to-editor page with proper layout structure
-  - **Job List Refresh**: Added automatic job list refresh after each submission to reflect status changes
-  - **User Experience**: Users can now upload files to the same job multiple times without losing job selection
-  - **Status Persistence**: Jobs remain visible in dropdown even after status changes from submission workflow
+  - **Editor Dropdown Fix**: Changed API endpoint from /api/users to /api/editors and fixed licensee ID mismatch preventing editor loading
+  - **Service Categories Loading**: Fixed editor service categories loading after editor selection with proper debug logging
+  - **JSON Parsing Errors**: Enhanced API response handling in queryClient.ts with proper error detection for malformed responses
+  - **Firebase Upload Endpoints**: Fixed upload workflow to use correct /api/jobs/:id/process-file endpoint instead of non-existent upload-complete
+  - **Upload Route Addition**: Added missing POST /api/jobs/:id/upload endpoint to jobRoutes for Firebase upload preparation
+  - **Error Handling Enhancement**: Improved Firebase upload error reporting with detailed error information logging
+  - **Complete Workflow**: Upload to editor page now fully functional from job selection through file uploads
 ```
 
 ## User Preferences
