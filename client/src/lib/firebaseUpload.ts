@@ -106,14 +106,24 @@ export const uploadFileToFirebase = async (
           console.log(`Upload progress: ${Math.round(progress)}%`);
         },
         (error) => {
-          console.error('Firebase upload error:', error);
-          console.error('Error details:', {
-            code: error.code,
-            message: error.message,
-            name: error.name,
-            customData: error.customData
+          console.error('🚨 Firebase upload error occurred:', error);
+          console.error('🚨 Error type:', typeof error);
+          console.error('🚨 Error constructor:', error?.constructor?.name);
+          console.error('🚨 Error details:', {
+            code: error?.code || 'no code',
+            message: error?.message || 'no message',
+            name: error?.name || 'no name',
+            customData: error?.customData || 'no customData',
+            fullError: JSON.stringify(error, null, 2)
           });
-          reject(new Error(`Upload failed: ${error.message || error.code || 'Unknown Firebase error'}`));
+          
+          // Check if error is completely empty
+          if (!error || (typeof error === 'object' && Object.keys(error).length === 0)) {
+            console.error('🚨 Empty error object detected - this suggests a network or CORS issue');
+            reject(new Error('Upload failed: Empty error (likely network/CORS issue)'));
+          } else {
+            reject(new Error(`Upload failed: ${error.message || error.code || 'Unknown Firebase error'}`));
+          }
         },
         async () => {
           try {
