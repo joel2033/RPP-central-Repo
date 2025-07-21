@@ -170,6 +170,10 @@ function FileUploadModal({
               };
               
               xhr.onload = async () => {
+                console.log(`🔍 Upload response for ${file.name}: Status ${xhr.status}, StatusText: '${xhr.statusText}'`);
+                console.log(`🔍 Response headers: ${xhr.getAllResponseHeaders()}`);
+                console.log(`🔍 Response body: ${xhr.responseText}`);
+                
                 if (xhr.status === 200) {
                   try {
                     // Step 3: Get download URL
@@ -193,16 +197,19 @@ function FileUploadModal({
                     reject(error);
                   }
                 } else {
-                  const errorMsg = `Upload failed with status ${xhr.status}`;
+                  const errorMsg = `Upload failed with status ${xhr.status}: ${xhr.statusText}`;
                   console.error(`❌ ${errorMsg} for ${file.name}`);
+                  console.error(`❌ Response body: ${xhr.responseText}`);
                   setUploadErrors(prev => new Map(prev).set(file.name, errorMsg));
                   reject(new Error(errorMsg));
                 }
               };
               
-              xhr.onerror = () => {
-                const errorMsg = 'Upload failed - network issue';
-                console.error(`❌ Network error for ${file.name}`);
+              xhr.onerror = (event) => {
+                console.error(`❌ Network error for ${file.name}:`, event);
+                console.error(`❌ XHR details: readyState=${xhr.readyState}, status=${xhr.status}, statusText='${xhr.statusText}'`);
+                console.error(`❌ Response: ${xhr.responseText}`);
+                const errorMsg = `Upload failed - network issue (status: ${xhr.status})`;
                 setUploadErrors(prev => new Map(prev).set(file.name, errorMsg));
                 reject(new Error(errorMsg));
               };
@@ -215,6 +222,10 @@ function FileUploadModal({
               };
               
               // Configure and start upload
+              console.log(`🚀 Starting upload for ${file.name}`);
+              console.log(`🔗 Signed URL (first 100 chars): ${signedUrl.substring(0, 100)}...`);
+              console.log(`📄 File details: type=${file.type}, size=${file.size}`);
+              
               xhr.open('PUT', signedUrl);
               xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
               xhr.timeout = 60000; // 60 second timeout
