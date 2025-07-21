@@ -2628,7 +2628,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/jobs/:id/activity', isAuthenticated, jobController.getJobActivity);
   
   // S3 file upload workflow
-  app.post('/api/jobs/:id/upload-file', isAuthenticated, jobController.uploadJobFile);
+  // app.post('/api/jobs/:id/upload-file', isAuthenticated, jobController.uploadJobFile); // Disabled - using jobRoutes.ts version instead
   app.post('/api/jobs/:id/process-file', isAuthenticated, jobController.processUploadedFile);
   
   // Enhanced RAW image upload tracking

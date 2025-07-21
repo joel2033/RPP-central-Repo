@@ -113,8 +113,9 @@ const uploadFormDataSchema = z.object({
 router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
   console.log('🎯 ENTERING /upload-file endpoint - this is the correct path!');
   console.log('📥 Server upload request received');
-  console.log('Request body:', req.body);
-  console.log('File:', req.file ? { name: req.file.originalname, size: req.file.size, mimetype: req.file.mimetype } : 'No file');
+  console.log('Received req.body:', req.body);
+  console.log('Received file:', req.file ? 'Yes' : 'No');
+  console.log('File details:', req.file ? { name: req.file.originalname, size: req.file.size, mimetype: req.file.mimetype } : 'No file');
   
   try {
     const { id: jobId } = req.params;
@@ -122,18 +123,18 @@ router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
     
     if (!file) throw new Error('No file provided');
     
-    // Use file properties directly since FormData fields aren't being transmitted
-    const fileName = file.originalname;
-    const contentType = file.mimetype || 'application/octet-stream';
-    const fileSize = file.size;
-    const category = 'photography';  // Default for upload-to-editor workflow
-    const mediaType = 'raw';         // Default for upload-to-editor workflow
+    // Use fallback pattern as requested - req.body with file fallbacks
+    const fileName = req.body.fileName || file.originalname;
+    const contentType = req.body.contentType || file.mimetype || 'application/octet-stream';
+    const fileSize = parseInt(req.body.fileSize) || file.size;
+    const category = req.body.category || 'photography';  // Default for upload-to-editor workflow
+    const mediaType = req.body.mediaType || 'raw';         // Default for upload-to-editor workflow
     
-    console.log('Using file properties directly:', { fileName, contentType, fileSize, category, mediaType });
+    console.log('Using fallback values:', { fileName, contentType, fileSize, category, mediaType });
     
-    // Create request body for validation (skip Zod validation since we're using defaults)
+    // Skip Zod validation entirely and use values directly
     const parsedBody = { fileName, contentType, fileSize, category, mediaType };
-    console.log('✅ Validation passed:', parsedBody);
+    console.log('✅ Skipping validation, using direct values:', parsedBody);
     
     // Import Firebase Admin
     const { adminBucket } = await import('../utils/firebaseAdmin');

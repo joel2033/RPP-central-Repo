@@ -148,6 +148,8 @@ function FileUploadModal({
               formData.append('fileSize', file.size.toString());
               formData.append('category', 'photography');
               
+              console.log('Sending FormData for', file.name);
+              
               // Upload via server-side proxy
               const xhr = new XMLHttpRequest();
               
