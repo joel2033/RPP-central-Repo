@@ -9,7 +9,7 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface FirebaseFileUploadProps {
   jobCardId: number;
-  onUploadSuccess: () => void;
+  onUploadSuccess: (fileData?: any) => void;
   mediaType?: 'raw' | 'finished';
   serviceCategory?: string;
   disabled?: boolean;
@@ -150,7 +150,10 @@ export const FirebaseFileUpload: React.FC<FirebaseFileUploadProps> = ({
         description: `${validFiles.length} file(s) uploaded successfully.`,
       });
 
-      onUploadSuccess();
+      onUploadSuccess({ 
+        uploadedFiles: validFiles.length,
+        lastUploadedFile: validFiles[validFiles.length - 1]?.name 
+      });
     } catch (error) {
       console.error('Upload error:', error);
       toast({
@@ -216,8 +219,19 @@ export const FirebaseFileUpload: React.FC<FirebaseFileUploadProps> = ({
         )
       );
 
-      // Process the uploaded file on the server
-      await apiRequest('POST', `/api/jobs/${jobCardId}/process-file`, {
+      // Save file to mediaFiles table (new Firebase approach)
+      const mediaFileData = {
+        jobId: jobCardId,
+        fileName: file.name,
+        mediaType,
+        firebasePath,
+        downloadUrl,
+        fileSize: file.size,
+        contentType: file.type
+      };
+
+      // Process the uploaded file on the server - save to mediaFiles table
+      const result = await apiRequest('POST', `/api/jobs/${jobCardId}/process-file`, {
         firebasePath,
         downloadUrl,
         fileName: file.name,
