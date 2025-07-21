@@ -381,12 +381,14 @@ function ServiceBlockComponent({
   block, 
   editorOptions,
   onUpdate, 
-  onRemove 
+  onRemove,
+  jobCardId 
 }: { 
   block: ServiceBlock;
   editorOptions: EditorServiceOption[];
   onUpdate: (block: ServiceBlock) => void;
   onRemove: () => void;
+  jobCardId: number;
 }) {
   const [showUploadModal, setShowUploadModal] = useState(false);
 
@@ -510,7 +512,7 @@ function ServiceBlockComponent({
           uploadedFiles={block.files}
           onFilesUpload={updateFiles}
           onClose={() => setShowUploadModal(false)}
-          jobCardId={1} // This should be passed from parent
+          jobCardId={jobCardId}
         />
       )}
     </Card>
@@ -827,6 +829,7 @@ function UploadToEditorContent() {
                   editorOptions={options}
                   onUpdate={(updatedBlock) => updateServiceBlock(block.id, updatedBlock)}
                   onRemove={() => removeServiceBlock(block.id, block.categoryId)}
+                  jobCardId={selectedJob?.id || 0}
                 />
               );
             })}
