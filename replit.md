@@ -587,6 +587,12 @@ Changelog:
   - **Storage Methods**: Added getMediaFileById and getMediaFilesByJobId methods for enhanced file retrieval
   - **Documentation**: Created comprehensive S3 lifecycle setup guide with AWS CLI, Console, and Terraform options
   - **Workflow Integration**: Seamlessly integrated with existing upload system while maintaining backward compatibility
+- July 21, 2025. **FIXED JOB DROPDOWN PERSISTENCE** - Resolved jobs disappearing from upload page dropdown after first use:
+  - **Job Status Filter Enhancement**: Extended job filtering to include 'unassigned', 'in_progress', 'assigned', and 'editing' statuses
+  - **Form Reset Logic Update**: Modified upload form to keep selected job after successful submission for multiple uploads to same job
+  - **Job List Refresh**: Added automatic job list refresh after each submission to reflect status changes
+  - **User Experience**: Users can now upload files to the same job multiple times without losing job selection
+  - **Status Persistence**: Jobs remain visible in dropdown even after status changes from submission workflow
 ```
 
 ## User Preferences

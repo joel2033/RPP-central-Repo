@@ -493,10 +493,13 @@ function UploadToEditorContent() {
   React.useEffect(() => {
     const loadData = async () => {
       try {
-        // Load job cards
+        // Load job cards - include more statuses so jobs don't disappear after upload
         const jobsResponse = await apiRequest('GET', '/api/job-cards');
         setJobCards(jobsResponse.filter((job: JobCardWithDetails) => 
-          job.status === 'unassigned' || job.status === 'in_progress'
+          job.status === 'unassigned' || 
+          job.status === 'pending' ||
+          job.status === 'in_progress' || 
+          job.status === 'editing'
         ));
 
         // Load editors
@@ -597,8 +600,17 @@ function UploadToEditorContent() {
         description: "Job has been submitted to the editor",
       });
 
-      // Reset form
-      setSelectedJob(null);
+      // Refresh job list to reflect any status changes
+      const jobsResponse = await apiRequest('GET', '/api/job-cards');
+      setJobCards(jobsResponse.filter((job: JobCardWithDetails) => 
+        job.status === 'unassigned' || 
+        job.status === 'pending' ||
+        job.status === 'in_progress' || 
+        job.status === 'editing'
+      ));
+
+      // Reset form but keep job selected to allow multiple uploads to same job
+      // setSelectedJob(null); // Don't reset job selection
       setSelectedEditor(null);
       setServiceBlocks([]);
       setInstructions("");
