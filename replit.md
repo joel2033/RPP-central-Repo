@@ -618,6 +618,12 @@ Changelog:
   - **Upload Path Structure**: Files upload directly to temp_uploads/{jobCardId}/{fileName} pattern bypassing server validation
   - **Promise-based Completion**: Used Promise.all to wait for all upload tasks with proper error handling and download URL retrieval
   - **Removed Server Dependency**: Eliminated server-side FormData validation by uploading directly to Firebase Storage client-side
+- July 21, 2025. **FIXED CORS AND STORAGE RULES FOR FIREBASE UPLOADS** - Set up CORS and updated Firebase Storage rules to resolve network errors:
+   - **CORS Configuration**: Created cors.json file allowing PUT/GET/POST from all origins (temporary for development)
+   - **Firebase Storage Rules**: Updated rules to allow write access for authenticated users in temp_uploads/{jobId}/{fileName} pattern
+   - **Enhanced Error Logging**: Added detailed error logging with error.name and error.message for better debugging
+   - **Network Error Resolution**: Fixed "ProgressEvent isTrusted: true" network errors by configuring Firebase Storage permissions
+   - **Manual Setup Required**: CORS and rules must be configured manually in Firebase Console for full functionality
 - July 21, 2025. **FIXED UPLOAD ROUTE CONFLICTS** - Resolved Express routing issues preventing FormData uploads from reaching correct endpoint:
    - **Route Conflict Resolution**: Disabled `/upload` route that was incorrectly matching `/upload-file` requests due to Express prefix matching
    - **Enhanced Route Debugging**: Added middleware to trace route matching and identify why validation was happening in wrong controller

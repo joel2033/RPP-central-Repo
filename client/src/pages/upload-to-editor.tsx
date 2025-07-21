@@ -196,6 +196,7 @@ function FileUploadModal({
               
               xhr.onerror = (event) => {
                 console.error(`❌ Server upload network error for ${file.name}:`, event);
+                console.error('Error name:', event.type, 'Event details:', event);
                 const errorMsg = 'Server upload failed - network issue';
                 setUploadErrors(prev => new Map(prev).set(file.name, errorMsg));
                 reject(new Error(errorMsg));
@@ -215,6 +216,7 @@ function FileUploadModal({
               
             } catch (error) {
               console.error(`Failed to upload ${file.name}:`, error);
+              console.error('Error name:', error.name, 'Error message:', error.message);
               setUploadErrors(prev => new Map(prev).set(file.name, error.message || 'Upload failed'));
               reject(error);
             }
