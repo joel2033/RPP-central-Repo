@@ -127,11 +127,11 @@ function FileUploadModal({
           // Create form data for server upload
           const formData = new FormData();
           formData.append('file', file);
-          formData.append('fileName', file.name);
-          formData.append('contentType', file.type || 'application/octet-stream');
-          formData.append('fileSize', file.size.toString());
-          formData.append('category', 'photography');
-          formData.append('mediaType', 'raw');
+          formData.append('fileName', String(file.name));
+          formData.append('contentType', String(file.type || 'application/octet-stream'));
+          formData.append('fileSize', String(file.size));
+          formData.append('category', String('photography'));
+          formData.append('mediaType', String('raw'));
           
           console.log(`📤 Uploading ${file.name} via server...`);
           console.log('FormData contents:', {

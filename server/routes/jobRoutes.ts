@@ -96,10 +96,13 @@ router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
   try {
     console.log("🔥 Upload route hit");
     console.log("Request method:", req.method);
-    console.log("Request headers:", req.headers);
     console.log("Request body keys:", Object.keys(req.body || {}));
-    console.log("req.file:", req.file);
-    console.log("req.files:", (req as any).files);
+    console.log("Request body values:", req.body);
+    console.log("req.file:", req.file ? { 
+      originalname: req.file.originalname, 
+      mimetype: req.file.mimetype, 
+      size: req.file.size 
+    } : null);
 
     const jobId = parseInt(req.params.id);
     const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
