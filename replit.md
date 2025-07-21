@@ -643,6 +643,8 @@ Changelog:
   - **Error Handling**: Clear error messages when no authenticated user exists for uploads
   - **useEffect Integration**: Automatic Firebase sign-in when user is authenticated through existing useAuth system
   - **Anonymous Sign-In**: Using Firebase anonymous auth as bridge between existing auth and Firebase Storage requirements
+  - **Runtime Error Fix**: Resolved unhandled promise rejection by properly catching Firebase auth network errors
+  - **Non-blocking Auth**: Made Firebase auth optional to allow uploads when Firebase rules permit anonymous access
 ```
 
 ## User Preferences

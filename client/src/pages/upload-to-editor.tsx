@@ -127,7 +127,8 @@ function FileUploadModal({
       console.log('Auth state:', { userId: user?.uid, isAuthenticated: !!user });
       
       if (!user) {
-        throw new Error('No authenticated user - login required for uploads');
+        console.warn('No Firebase user - uploads may require authentication');
+        // Continue without throwing error to test if Firebase rules allow anonymous uploads
       }
       
       const uploadResults: any[] = [];
@@ -148,6 +149,8 @@ function FileUploadModal({
               console.error('Firebase upload error:', error.code, error.message);
               if (error.code === 'storage/canceled') {
                 setUploadErrors(prev => new Map(prev).set(file.name, 'Upload canceled - check network or try again'));
+              } else if (error.code === 'storage/unauthorized') {
+                setUploadErrors(prev => new Map(prev).set(file.name, 'Upload unauthorized - check Firebase rules'));
               } else {
                 setUploadErrors(prev => new Map(prev).set(file.name, error.message || 'Upload failed'));
               }
@@ -925,17 +928,21 @@ export default function UploadToEditor() {
 
   // Integrate Firebase Auth with existing useAuth
   useEffect(() => {
-    if (isAuthenticated && !auth.currentUser) {
-      // For now, sign in anonymously to enable uploads
-      // TODO: Replace with custom token from backend auth system
-      signInAnonymously(auth)
-        .then((result) => {
+    const handleFirebaseAuth = async () => {
+      if (isAuthenticated && !auth.currentUser) {
+        try {
+          // For now, sign in anonymously to enable uploads
+          // TODO: Replace with custom token from backend auth system
+          const result = await signInAnonymously(auth);
           console.log('Firebase anonymous sign-in successful:', result.user.uid);
-        })
-        .catch((err) => {
+        } catch (err) {
           console.error('Firebase auth failed:', err);
-        });
-    }
+          // Silently fail - uploads can be tested without auth if Firebase rules allow
+        }
+      }
+    };
+
+    handleFirebaseAuth();
   }, [isAuthenticated]);
 
   if (isLoading) {
