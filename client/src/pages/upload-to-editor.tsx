@@ -123,12 +123,16 @@ function FileUploadModal({
       
       // Check authentication before upload (optional - Firebase Storage rules will handle this)
       console.log('Firebase auth state:', auth.currentUser ? 'authenticated' : 'anonymous');
+      if (!auth.currentUser) {
+        console.warn('No Firebase user; uploads may fail if rules require auth');
+      }
       
       const uploadResults: any[] = [];
       const uploadTasks = files.map(file => {
         try {
           const path = `temp_uploads/${jobCardId}/${file.name}`;
           const storageRef = ref(storage, path);
+          console.log('Starting upload task for', file.name);
           const uploadTask = uploadBytesResumable(storageRef, file);
           
           uploadTask.on('state_changed', 
@@ -139,7 +143,11 @@ function FileUploadModal({
             }, 
             (error) => {
               console.error('Firebase upload error:', error.code, error.message);
-              setUploadErrors(prev => new Map(prev).set(file.name, error.message || 'Upload failed'));
+              if (error.code === 'storage/canceled') {
+                setUploadErrors(prev => new Map(prev).set(file.name, 'Upload canceled - check network or try again'));
+              } else {
+                setUploadErrors(prev => new Map(prev).set(file.name, error.message || 'Upload failed'));
+              }
             }, 
             async () => {
               try {
@@ -157,15 +165,15 @@ function FileUploadModal({
             }
           );
           
-          // Add timeout to prevent hanging uploads
+          // Add timeout to prevent hanging uploads (60 seconds for large files)
           const timeoutId = setTimeout(() => {
             const currentProgress = uploadingFiles.get(file.name) || 0;
-            if (currentProgress < 100) {
-              console.error(`Upload timeout for ${file.name} - no progress after 30s`);
-              setUploadErrors(prev => new Map(prev).set(file.name, 'Upload timed out after 30 seconds'));
+            if (!uploadingFiles.has(file.name) || currentProgress === 0) {
+              console.error(`Upload timeout for ${file.name} - no progress after 60s`);
+              setUploadErrors(prev => new Map(prev).set(file.name, 'Upload timed out - no progress'));
               uploadTask.cancel();
             }
-          }, 30000);
+          }, 60000);
           
           // Clear timeout when upload completes
           uploadTask.then(() => clearTimeout(timeoutId));
@@ -217,9 +225,15 @@ function FileUploadModal({
         : errorMessage;
       
       // Show error toast with specific details
+      const hasCanceledOrTimeout = uploadErrorsList.some(([, err]) => 
+        err.includes('canceled') || err.includes('timed out')
+      );
+      
       toast({
         title: "Upload Failed",
-        description: `Failed to upload files: ${errorDetails}`,
+        description: hasCanceledOrTimeout 
+          ? "Upload interrupted - retry or check connection"
+          : `Failed to upload files: ${errorDetails}`,
         variant: "destructive"
       });
       

@@ -627,6 +627,15 @@ Changelog:
   - **Retry Prevention**: Added timeout mechanism to cancel stuck uploads and display timeout error messages
   - **Error Display**: Enhanced toast notifications to show specific file upload errors and timeout issues
   - **Task Management**: Proper cleanup of timeout handlers when uploads complete successfully
+- July 21, 2025. **FIXED FIREBASE UPLOAD CANCELLATION AND EXTENDED TIMEOUT** - Resolved upload interruption handling:
+  - **Cancellation Error Handling**: Added specific handling for 'storage/canceled' errors with user-friendly messages
+  - **Extended Timeout**: Increased upload timeout from 30 to 60 seconds for large DNG/RAW files
+  - **Optional Authentication**: Made Firebase auth check optional with warning log instead of throwing error
+  - **Enhanced Progress Detection**: Improved timeout logic to check for zero progress or missing upload state
+  - **User-Friendly Messages**: Added "Upload canceled - check network or try again" for canceled uploads
+  - **Toast Enhancement**: Special toast message "Upload interrupted - retry or check connection" for canceled/timeout errors
+  - **Upload Task Logging**: Added console logging before each upload task initialization for debugging
+  - **Network Issue Handling**: Better handling of network interruptions and connection issues during large file uploads
 ```
 
 ## User Preferences
