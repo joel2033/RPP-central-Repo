@@ -129,36 +129,26 @@ function FileUploadModal({
     console.log(`Starting upload of ${files.length} files`);
     
     try {
-      console.log('🔑 Using signed URL direct uploads...');
+      console.log('🔧 Using server-side upload due to Replit network restrictions...');
       
       const uploadResults: any[] = [];
       
-      // Upload each file using signed URLs
+      // Upload each file via server-side proxy to Firebase
       const uploadPromises = files.map((file) => {
         return new Promise<void>((resolve, reject) => {
           const uploadFile = async () => {
             try {
-              // Step 1: Get signed URL from server
-              console.log(`🔑 Getting signed URL for ${file.name}`);
-              const signedUrlResponse = await fetch(`/api/jobs/${jobCardId}/generate-signed-url`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ fileName: file.name }),
-              });
+              console.log(`⬆️ Uploading ${file.name} via server...`);
               
-              if (!signedUrlResponse.ok) {
-                const errorText = await signedUrlResponse.text();
-                console.error(`Signed URL fetch failed: ${signedUrlResponse.status} - ${errorText}`);
-                throw new Error(`Signed URL fetch failed: ${errorText}`);
-              }
+              // Create FormData for multipart upload
+              const formData = new FormData();
+              formData.append('file', file);
+              formData.append('fileName', file.name);
+              formData.append('contentType', file.type || 'application/octet-stream');
+              formData.append('fileSize', file.size.toString());
+              formData.append('category', 'photography');
               
-              const responseData = await signedUrlResponse.json();
-              const { signedUrl, filePath } = responseData;
-              console.log(`✅ Got signed URL for ${file.name}`);
-              
-              // Step 2: Upload directly to Firebase using XMLHttpRequest for progress
+              // Upload via server-side proxy
               const xhr = new XMLHttpRequest();
               
               xhr.upload.onprogress = (e) => {
@@ -169,67 +159,57 @@ function FileUploadModal({
                 }
               };
               
-              xhr.onload = async () => {
-                console.log(`🔍 Upload response for ${file.name}: Status ${xhr.status}, StatusText: '${xhr.statusText}'`);
-                console.log(`🔍 Response headers: ${xhr.getAllResponseHeaders()}`);
+              xhr.onload = () => {
+                console.log(`🔍 Server upload response for ${file.name}: Status ${xhr.status}`);
                 console.log(`🔍 Response body: ${xhr.responseText}`);
                 
                 if (xhr.status === 200) {
                   try {
-                    // Step 3: Get download URL
-                    const fileRef = ref(storage, filePath);
-                    const downloadUrl = await getDownloadURL(fileRef);
+                    const response = JSON.parse(xhr.responseText);
                     
                     uploadResults.push({
                       fileName: file.name,
-                      firebasePath: filePath,
-                      downloadUrl,
+                      firebasePath: response.firebasePath,
+                      downloadUrl: response.downloadUrl,
                       contentType: file.type || 'application/octet-stream',
                       fileSize: file.size,
                       category: 'photography'
                     });
                     
-                    console.log(`✅ Upload complete for ${file.name}`);
+                    console.log(`✅ Server upload complete for ${file.name}`);
                     resolve();
                   } catch (error) {
-                    console.error(`Failed to get download URL for ${file.name}:`, error);
-                    setUploadErrors(prev => new Map(prev).set(file.name, 'Failed to get download URL'));
+                    console.error(`Failed to parse server response for ${file.name}:`, error);
+                    setUploadErrors(prev => new Map(prev).set(file.name, 'Invalid server response'));
                     reject(error);
                   }
                 } else {
-                  const errorMsg = `Upload failed with status ${xhr.status}: ${xhr.statusText}`;
+                  const errorMsg = `Server upload failed with status ${xhr.status}`;
                   console.error(`❌ ${errorMsg} for ${file.name}`);
-                  console.error(`❌ Response body: ${xhr.responseText}`);
+                  console.error(`❌ Server response: ${xhr.responseText}`);
                   setUploadErrors(prev => new Map(prev).set(file.name, errorMsg));
                   reject(new Error(errorMsg));
                 }
               };
               
               xhr.onerror = (event) => {
-                console.error(`❌ Network error for ${file.name}:`, event);
-                console.error(`❌ XHR details: readyState=${xhr.readyState}, status=${xhr.status}, statusText='${xhr.statusText}'`);
-                console.error(`❌ Response: ${xhr.responseText}`);
-                const errorMsg = `Upload failed - network issue (status: ${xhr.status})`;
+                console.error(`❌ Server upload network error for ${file.name}:`, event);
+                const errorMsg = 'Server upload failed - network issue';
                 setUploadErrors(prev => new Map(prev).set(file.name, errorMsg));
                 reject(new Error(errorMsg));
               };
               
               xhr.ontimeout = () => {
-                const errorMsg = 'Upload interrupted - check network';
-                console.error(`❌ Timeout for ${file.name}`);
+                const errorMsg = 'Server upload timeout - file too large or slow connection';
+                console.error(`❌ Server upload timeout for ${file.name}`);
                 setUploadErrors(prev => new Map(prev).set(file.name, errorMsg));
                 reject(new Error(errorMsg));
               };
               
-              // Configure and start upload
-              console.log(`🚀 Starting upload for ${file.name}`);
-              console.log(`🔗 Signed URL (first 100 chars): ${signedUrl.substring(0, 100)}...`);
-              console.log(`📄 File details: type=${file.type}, size=${file.size}`);
-              
-              xhr.open('PUT', signedUrl);
-              xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-              xhr.timeout = 60000; // 60 second timeout
-              xhr.send(file);
+              // Configure and start server upload
+              xhr.open('POST', `/api/jobs/${jobCardId}/upload-file`);
+              xhr.timeout = 120000; // 2 minute timeout for server upload
+              xhr.send(formData);
               
             } catch (error) {
               console.error(`Failed to upload ${file.name}:`, error);
@@ -258,7 +238,7 @@ function FileUploadModal({
       // Show success toast
       toast({
         title: "Upload Successful",
-        description: `Successfully uploaded ${uploadResults.length} file(s) via signed URLs`,
+        description: `Successfully uploaded ${uploadResults.length} file(s) via server`,
       });
       
       setCanClose(true); // Re-enable modal close

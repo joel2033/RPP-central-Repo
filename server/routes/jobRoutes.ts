@@ -138,6 +138,7 @@ router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
     const firebaseFile = adminBucket.file(firebasePath);
     
     // Upload file to Firebase Storage
+    console.log(`📤 Uploading to Firebase: ${firebasePath}`);
     await firebaseFile.save(file.buffer, { 
       metadata: { 
         contentType: file.mimetype || parsedBody.contentType,
