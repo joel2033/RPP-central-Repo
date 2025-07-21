@@ -1,6 +1,8 @@
 import { useState } from "react";
+import React from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Plus, Trash2, Upload, X, File, CheckCircle2, AlertCircle, LinkIcon } from "lucide-react";
 import LoadingSpinner from "@/components/shared/loading-spinner";
+import Sidebar from "@/components/layout/sidebar";
+import TopBar from "@/components/layout/topbar";
 import type { JobCard, Client, User, EditorServiceCategory, EditorServiceOption } from "@shared/schema";
 import { editorServiceApi } from "@/lib/api/editorServiceApi";
 import { uploadFileToFirebase, uploadMultipleFilesToFirebase } from "@/lib/firebaseUpload";
@@ -474,7 +478,7 @@ function ServiceBlockComponent({
   );
 }
 
-export default function UploadToEditor() {
+function UploadToEditorContent() {
   const [selectedJob, setSelectedJob] = useState<JobCardWithDetails | null>(null);
   const [selectedEditor, setSelectedEditor] = useState<number | null>(null);
   const [serviceBlocks, setServiceBlocks] = useState<ServiceBlock[]>([]);
@@ -486,7 +490,7 @@ export default function UploadToEditor() {
   const [selectedCategories, setSelectedCategories] = useState<Set<number>>(new Set());
 
   // Load initial data
-  useState(() => {
+  React.useEffect(() => {
     const loadData = async () => {
       try {
         // Load job cards
@@ -507,11 +511,11 @@ export default function UploadToEditor() {
   }, []);
 
   // Load editor services when editor is selected
-  useState(() => {
+  React.useEffect(() => {
     if (selectedEditor) {
       const loadEditorServices = async () => {
         try {
-          const categories = await editorServiceApi.getEditorCategories(selectedEditor);
+          const categories = await editorServiceApi.getEditorServices(selectedEditor.toString());
           setEditorCategories(categories);
         } catch (error) {
           console.error('Error loading editor services:', error);
@@ -635,7 +639,7 @@ export default function UploadToEditor() {
             <SelectContent>
               {jobCards.map((job) => (
                 <SelectItem key={job.id} value={job.id.toString()}>
-                  {job.propertyAddress} - {job.client.name}
+                  Job {job.jobId || job.id} - {job.client.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -661,7 +665,10 @@ export default function UploadToEditor() {
               <SelectContent>
                 {editors.map((editor) => (
                   <SelectItem key={editor.id} value={editor.id.toString()}>
-                    {editor.name || editor.email}
+                    {editor.firstName || editor.lastName ? 
+                      `${editor.firstName || ''} ${editor.lastName || ''}`.trim() : 
+                      editor.email
+                    }
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -687,9 +694,6 @@ export default function UploadToEditor() {
                     <div className="flex items-center justify-between">
                       <div>
                         <h4 className="font-medium">{category.categoryName}</h4>
-                        {category.description && (
-                          <p className="text-sm text-gray-600">{category.description}</p>
-                        )}
                       </div>
                       <input
                         type="checkbox"
@@ -716,7 +720,7 @@ export default function UploadToEditor() {
           <CardContent>
             {serviceBlocks.map((block) => {
               const category = editorCategories.find(cat => cat.id === block.categoryId);
-              const options = category?.options || [];
+              const options: EditorServiceOption[] = [];
               
               return (
                 <ServiceBlockComponent
@@ -768,6 +772,37 @@ export default function UploadToEditor() {
           )}
         </Button>
       )}
+    </div>
+  );
+}
+
+export default function UploadToEditor() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    window.location.href = "/api/login";
+    return null;
+  }
+
+  return (
+    <div className="flex h-screen bg-gray-50">
+      <Sidebar />
+      
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <TopBar title="Upload to Editor" />
+        
+        <div className="flex-1 overflow-y-auto">
+          <UploadToEditorContent />
+        </div>
+      </div>
     </div>
   );
 }
