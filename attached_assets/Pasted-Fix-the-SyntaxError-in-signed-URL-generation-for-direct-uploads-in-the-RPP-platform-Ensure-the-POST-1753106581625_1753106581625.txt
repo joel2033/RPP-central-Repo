@@ -1,0 +1,44 @@
+Fix the SyntaxError in signed URL generation for direct uploads in the RPP platform. Ensure the POST /api/jobs/:jobId/generate-signed-url endpoint returns valid JSON on success and error, and check firebase-admin initialization.
+
+Steps to implement:
+1. In server/utils/firebaseAdmin.js (or create if missing):
+const admin = require('firebase-admin');
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}'); // Use Replit secret
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  });
+}
+module.exports = admin;
+2. In server/routes/jobs.js, update the endpoint to handle errors and set JSON:
+const express = require('express');
+const admin = require('../utils/firebaseAdmin');
+const router = express.Router();
+
+router.post('/:jobId/generate-signed-url', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  try {
+    const { jobId } = req.params;
+    const { fileName } = req.body;
+    if (!fileName) throw new Error('No fileName provided');
+    const bucket = admin.storage().bucket();
+    const [signedUrl] = await bucket.file(`temp_uploads/${jobId}/${fileName}`).getSignedUrl({
+      action: 'write',
+      expires: Date.now() + 15 * 60 * 1000, // 15 min
+    });
+    res.json({ signedUrl });
+  } catch (err) {
+    console.error('Signed URL error:', err);
+    res.status(500).json({ error: err.message || 'Failed to generate signed URL' });
+  }
+});
+module.exports = router;
+3. In client/src/pages/upload-to-editor.tsx handleUpload, add error handling for fetch:
+const response = await fetch(`/api/jobs/${jobCardId}/generate-signed-url`, { method: 'POST', body: JSON.stringify({ fileName: file.name }), headers: { 'Content-Type': 'application/json' } });
+if (!response.ok) throw new Error(`Signed URL fetch failed: ${await response.text()}`);
+const { signedUrl } = await response.json();
+- Then proceed with xhr or fetch to signedUrl.
+4. Manual: Set FIREBASE_SERVICE_ACCOUNT and FIREBASE_STORAGE_BUCKET in Replit secrets from Firebase Console.
+
+This ensures valid JSON responses. Commit with message: "Fix SyntaxError in signed URL endpoint by ensuring JSON responses in Upload to Editor"

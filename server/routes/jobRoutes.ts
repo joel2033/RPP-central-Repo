@@ -198,19 +198,23 @@ const signedUrlSchema = z.object({
 });
 
 router.post('/:id/generate-signed-url', validateParams(idParamSchema), validateBody(signedUrlSchema), async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
   try {
     const { id: jobId } = req.params;
     const { fileName } = req.body;
     
+    if (!fileName) {
+      throw new Error('No fileName provided');
+    }
+    
     console.log(`🔑 Generating signed URL for ${fileName} in job ${jobId}`);
     
-    const admin = require('../utils/firebaseAdmin');
-    const bucket = admin.storage().bucket();
+    const { adminBucket } = await import('../utils/firebaseAdmin');
     const filePath = `temp_uploads/${jobId}/${fileName}`;
     
-    const [signedUrl] = await bucket.file(filePath).getSignedUrl({
+    const [signedUrl] = await adminBucket.file(filePath).getSignedUrl({
       action: 'write',
-      expires: Date.now() + 60 * 60 * 1000, // 1 hour
+      expires: Date.now() + 15 * 60 * 1000, // 15 minutes
       contentType: 'application/octet-stream',
     });
     
@@ -218,7 +222,10 @@ router.post('/:id/generate-signed-url', validateParams(idParamSchema), validateB
     res.json({ signedUrl, filePath });
   } catch (error) {
     console.error('❌ Failed to generate signed URL:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error?.message || 'Failed to generate signed URL',
+      details: error?.stack || 'No stack trace available'
+    });
   }
 });
 

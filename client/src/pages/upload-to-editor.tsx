@@ -149,10 +149,13 @@ function FileUploadModal({
               });
               
               if (!signedUrlResponse.ok) {
-                throw new Error(`Failed to get signed URL: ${signedUrlResponse.status}`);
+                const errorText = await signedUrlResponse.text();
+                console.error(`Signed URL fetch failed: ${signedUrlResponse.status} - ${errorText}`);
+                throw new Error(`Signed URL fetch failed: ${errorText}`);
               }
               
-              const { signedUrl, filePath } = await signedUrlResponse.json();
+              const responseData = await signedUrlResponse.json();
+              const { signedUrl, filePath } = responseData;
               console.log(`✅ Got signed URL for ${file.name}`);
               
               // Step 2: Upload directly to Firebase using XMLHttpRequest for progress

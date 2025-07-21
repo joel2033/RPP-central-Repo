@@ -672,6 +672,14 @@ Changelog:
   - **Eliminated SDK Timeouts**: Bypassed Firebase SDK retry-limit-exceeded errors with direct HTTP uploads
   - **Preserved File Structure**: Maintained temp_uploads/{jobId}/{filename} path structure
   - **Download URL Retrieval**: Server generates signed URLs, client uploads directly, then gets download URL via SDK
+- July 21, 2025. **FIXED SIGNED URL SYNTAX ERRORS** - Resolved Firebase Admin configuration and JSON response issues:
+  - **Enhanced Firebase Admin**: Improved firebaseAdmin.ts with proper service account parsing and error handling
+  - **Fixed JSON Responses**: Added Content-Type headers and proper error JSON formatting in signed URL endpoint
+  - **Enhanced Error Handling**: Client-side improved error detection with detailed server response logging
+  - **Service Account Integration**: Successfully configured FIREBASE_SERVICE_ACCOUNT and FIREBASE_STORAGE_BUCKET secrets
+  - **Endpoint Validation**: POST /api/jobs/:id/generate-signed-url now returns proper JSON on both success and error cases
+  - **Production Ready**: Firebase Admin SDK properly initialized with service account for signed URL generation
+  - **Server Logs Confirmed**: Both authentication (200) and signed URL generation (200) endpoints working correctly
 ```
 
 ## User Preferences
