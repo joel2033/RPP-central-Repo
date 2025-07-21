@@ -8,6 +8,7 @@ import {
   updateJobStatus,
   getJobFiles,
   getJobActivity,
+  uploadJobFile,
   processUploadedFile,
 } from '../controllers/jobController';
 
@@ -55,6 +56,9 @@ router.get('/:id/files', validateParams(idParamSchema), getJobFiles);
 
 // GET /api/jobs/:id/activity - Get job activity
 router.get('/:id/activity', validateParams(idParamSchema), getJobActivity);
+
+// POST /api/jobs/:id/upload - Prepare Firebase upload
+router.post('/:id/upload', validateParams(idParamSchema), uploadJobFile);
 
 // POST /api/jobs/:id/process-file - Process uploaded Firebase file
 router.post('/:id/process-file', validateParams(idParamSchema), validateBody(processFileSchema), processUploadedFile);

@@ -20,7 +20,24 @@ export async function apiRequest(
   });
 
   await throwIfResNotOk(res);
-  return await res.json();
+  
+  // Handle empty responses
+  const contentType = res.headers.get('content-type');
+  if (!contentType?.includes('application/json')) {
+    const text = await res.text();
+    if (!text) {
+      return {};
+    }
+    throw new Error(`Expected JSON response but got: ${contentType || 'unknown'}`);
+  }
+  
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    console.error("Failed to parse response as JSON:", text);
+    throw new Error(`Invalid JSON response: ${text}`);
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -38,7 +55,24 @@ export const getQueryFn: <T>(options: {
     }
 
     await throwIfResNotOk(res);
-    return await res.json();
+    
+    // Handle empty responses
+    const contentType = res.headers.get('content-type');
+    if (!contentType?.includes('application/json')) {
+      const text = await res.text();
+      if (!text) {
+        return {};
+      }
+      throw new Error(`Expected JSON response but got: ${contentType || 'unknown'}`);
+    }
+    
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch (err) {
+      console.error("Failed to parse response as JSON:", text);
+      throw new Error(`Invalid JSON response: ${text}`);
+    }
   };
 
 export const queryClient = new QueryClient({
