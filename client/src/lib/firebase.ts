@@ -22,6 +22,7 @@ export const storage = getStorage(app);
 export const auth = getAuth(app);
 
 // Connect to emulators in development to avoid network issues
+// NOTE: Disabling Storage emulator for signed URL uploads to work properly
 if (import.meta.env.DEV) {
   try {
     // Connect to Firebase Auth emulator
@@ -31,13 +32,15 @@ if (import.meta.env.DEV) {
     console.log('Firebase Auth emulator not available, using production');
   }
   
-  try {
-    // Connect to Firebase Storage emulator  
-    connectStorageEmulator(storage, 'localhost', 9199);
-    console.log('Connected to Firebase Storage emulator');
-  } catch (error) {
-    console.log('Firebase Storage emulator not available, using production');
-  }
+  // Disable Storage emulator for now - signed URLs point to production Firebase Storage
+  // try {
+  //   // Connect to Firebase Storage emulator  
+  //   connectStorageEmulator(storage, 'localhost', 9199);
+  //   console.log('Connected to Firebase Storage emulator');
+  // } catch (error) {
+  //   console.log('Firebase Storage emulator not available, using production');
+  // }
+  console.log('Using production Firebase Storage for signed URL uploads');
 }
 
 export default app;
