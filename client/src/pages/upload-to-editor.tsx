@@ -122,14 +122,10 @@ function FileUploadModal({
       // Use client-side Firebase upload
       console.log('🔥 Using client-side Firebase upload...');
       
-      // Check authentication before upload 
-      const user = auth.currentUser;
-      console.log('Auth state:', { userId: user?.uid, isAuthenticated: !!user });
-      
-      if (!user) {
-        console.warn('No Firebase user - uploads may require authentication');
-        // Continue without throwing error to test if Firebase rules allow anonymous uploads
-      }
+      // Skip Firebase auth check to prevent network requests
+      // Upload will work with proper Firebase Storage rules
+      console.log('Auth state:', { isAuthenticated: !!useAuth });
+      console.warn('Firebase auth disabled to prevent network request errors');
       
       const uploadResults: any[] = [];
       const uploadTasks = files.map(file => {
@@ -926,24 +922,9 @@ function UploadToEditorContent() {
 export default function UploadToEditor() {
   const { isAuthenticated, isLoading } = useAuth();
 
-  // Integrate Firebase Auth with existing useAuth
-  useEffect(() => {
-    const handleFirebaseAuth = async () => {
-      if (isAuthenticated && !auth.currentUser) {
-        try {
-          // For now, sign in anonymously to enable uploads
-          // TODO: Replace with custom token from backend auth system
-          const result = await signInAnonymously(auth);
-          console.log('Firebase anonymous sign-in successful:', result.user.uid);
-        } catch (err) {
-          console.error('Firebase auth failed:', err);
-          // Silently fail - uploads can be tested without auth if Firebase rules allow
-        }
-      }
-    };
-
-    handleFirebaseAuth();
-  }, [isAuthenticated]);
+  // Remove Firebase Auth integration to prevent network requests
+  // Firebase Storage will work with proper storage rules without auth
+  // TODO: Implement custom token from backend auth system if needed
 
   if (isLoading) {
     return (

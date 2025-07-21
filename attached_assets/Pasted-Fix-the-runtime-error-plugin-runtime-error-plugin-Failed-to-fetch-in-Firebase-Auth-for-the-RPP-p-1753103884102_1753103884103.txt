@@ -1,0 +1,45 @@
+Fix the runtime error "[plugin:runtime-error-plugin] Failed to fetch" in Firebase Auth for the RPP platform, caused by Replit's dev environment interfering with fetches. Disable Vite HMR overlay, set up Firebase Auth emulator to bypass remote fetches, and ensure auth integration uses custom token from useAuth instead of anonymous sign-in.
+
+Steps to implement:
+1. In client/vite.config.ts (or create if missing):
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    hmr: {
+      overlay: false,  // Disable error overlay to hide popup
+    },
+  },
+});
+2. Install Firebase CLI in Replit shell: Run 'npm install -g firebase-tools'.
+3. In Replit shell, run 'firebase emulators:start --only auth' to start local auth emulator.
+4. In client/src/lib/firebase.ts, add emulator connection:
+import { connectAuthEmulator } from 'firebase/auth';
+// After getAuth
+if (process.env.NODE_ENV === 'development') {
+  connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+}
+5. In client/src/pages/upload-to-editor.tsx, update auth integration in UploadToEditorContent useEffect or component:
+- Remove signInAnonymously if present.
+- Use signInWithCustomToken with token from useAuth (assume useAuth provides JWT or token):
+useEffect(() => {
+  const syncAuth = async () => {
+    if (isAuthenticated && !auth.currentUser) {
+      try {
+        const token = localStorage.getItem('authToken') || '';  // Get from useAuth context or API
+        if (token) {
+          const credential = await auth.signInWithCustomToken(token);
+          console.log('Firebase auth synced:', credential.user?.uid);
+        }
+      } catch (err) {
+        console.error('Auth sync error:', err.message);
+      }
+    }
+  };
+  syncAuth();
+}, [isAuthenticated]);
+- In handleUpload, keep auth check but add fallback warning if no user.
+6. Manual: Ensure Firebase project has custom token setup (generate on server with firebase-admin, return to client on login).
+
+This bypasses remote fetches in dev and fixes the extension interference. Commit with message: "Disable Vite HMR overlay and add Auth emulator to fix Failed to fetch error in Upload to Editor"

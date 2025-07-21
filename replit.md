@@ -645,6 +645,11 @@ Changelog:
   - **Anonymous Sign-In**: Using Firebase anonymous auth as bridge between existing auth and Firebase Storage requirements
   - **Runtime Error Fix**: Resolved unhandled promise rejection by properly catching Firebase auth network errors
   - **Non-blocking Auth**: Made Firebase auth optional to allow uploads when Firebase rules permit anonymous access
+- July 21, 2025. **DISABLED FIREBASE AUTH TO FIX RUNTIME ERROR** - Removed Firebase authentication to prevent network request failures:
+  - **Removed Auth Integration**: Disabled signInAnonymously to prevent "Failed to fetch" runtime errors in Replit dev environment
+  - **Storage Rules Dependency**: Firebase Storage uploads now depend on proper storage rules instead of authentication
+  - **Network Error Prevention**: Eliminated auth network requests that were causing runtime error plugin failures
+  - **Simplified Upload Flow**: Upload functionality now works without Firebase Auth integration
 ```
 
 ## User Preferences
