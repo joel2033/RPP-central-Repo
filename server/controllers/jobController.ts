@@ -75,6 +75,8 @@ export const uploadJobFile = async (req: Request, res: Response) => {
     );
 
     console.log(`✅ Prepared Firebase upload for ${fileName} (${fileSize} bytes)`);
+    console.log(`📤 Firebase path: ${firebasePath}`);
+    console.log(`🔧 Upload method: firebase`);
 
     res.json({
       firebasePath,
@@ -87,7 +89,9 @@ export const uploadJobFile = async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('❌ Error preparing Firebase upload:', error);
+    console.error('❌ Error preparing Firebase upload - Full details:', JSON.stringify(error, null, 2));
+    console.error('❌ Error preparing Firebase upload - Error type:', typeof error);
+    console.error('❌ Error preparing Firebase upload - Error message:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ 
       message: 'Failed to prepare upload',
       error: error instanceof Error ? error.message : 'Unknown error'

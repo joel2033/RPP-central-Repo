@@ -54,8 +54,12 @@ export const uploadFileToFirebase = async (
           console.log(`Upload progress: ${Math.round(progress)}%`);
         },
         (error) => {
-          console.error('Firebase upload error:', error);
-          reject(new Error(`Upload failed: ${error.message || error.code || 'Unknown error'}`));
+          console.error('Firebase upload error - Full details:', JSON.stringify(error, null, 2));
+          console.error('Firebase upload error - Error object keys:', Object.keys(error));
+          console.error('Firebase upload error - Error code:', error.code);
+          console.error('Firebase upload error - Error message:', error.message);
+          console.error('Firebase upload error - Error name:', error.name);
+          reject(new Error(`Upload failed: ${error.message || error.code || 'Unknown Firebase error'}`));
         },
         async () => {
           try {
@@ -86,7 +90,9 @@ export const uploadFileToFirebase = async (
       );
     });
   } catch (error) {
-    console.error('Failed to upload file to Firebase:', error);
+    console.error('Failed to upload file to Firebase - Full details:', JSON.stringify(error, null, 2));
+    console.error('Failed to upload file to Firebase - Error type:', typeof error);
+    console.error('Failed to upload file to Firebase - Error object keys:', Object.keys(error as any));
     throw error;
   }
 };

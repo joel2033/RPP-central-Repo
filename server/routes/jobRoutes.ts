@@ -189,12 +189,12 @@ router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
 });
 
 // POST /api/jobs/:id/upload - Prepare Firebase upload (JSON endpoint) 
-// NOTE: This route is disabled to avoid conflicts with /upload-file
-// router.post('/:id/upload', validateParams(idParamSchema), (req, res, next) => {
-//   console.log('🚫 WRONG ENDPOINT - upload called instead of upload-file! URL:', req.originalUrl);
-//   console.log('🚫 Content-Type:', req.headers['content-type']);
-//   next();
-// }, uploadJobFile);
+router.post('/:id/upload', validateParams(idParamSchema), (req, res, next) => {
+  console.log('✅ CORRECT ENDPOINT - /upload called for Firebase preparation! URL:', req.originalUrl);
+  console.log('📋 Content-Type:', req.headers['content-type']);
+  console.log('📋 Request body:', req.body);
+  next();
+}, uploadJobFile);
 
 // POST /api/jobs/:id/process-file - Process uploaded Firebase file
 router.post('/:id/process-file', validateParams(idParamSchema), validateBody(processFileSchema), processUploadedFile);
