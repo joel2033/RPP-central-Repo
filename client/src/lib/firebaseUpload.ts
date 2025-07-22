@@ -139,6 +139,13 @@ export const uploadFileToFirebase = async (
         // Log FormData entries for debugging
         console.log('FormData entries:', Object.fromEntries(formData.entries()));
         
+        // Try chunked upload for large files (>5MB)
+        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+        if (file.size > CHUNK_SIZE) {
+          console.log(`📊 Large file detected (${file.size} bytes), using chunked upload`);
+          return await uploadFileInChunks(file, jobId, mediaType, onProgress);
+        }
+        
         let result;
         try {
           // Use XMLHttpRequest for better timeout and progress control
@@ -258,6 +265,144 @@ export const uploadFileToFirebase = async (
     return await Promise.race([uploadPromise(), individualTimeout]);
   } catch (error) {
     console.error(`Failed to upload file ${file.name}:`, error);
+    throw error;
+  }
+};
+
+// Chunked upload function for large files
+const uploadFileInChunks = async (
+  file: File,
+  jobId: string | number,
+  mediaType: 'raw' | 'finished' = 'raw',
+  onProgress?: (progress: UploadProgress) => void
+): Promise<FirebaseUploadResult> => {
+  const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  
+  console.log(`🧩 Starting chunked upload for ${file.name}: ${totalChunks} chunks of ${CHUNK_SIZE} bytes`);
+  
+  // Get signed URL from server
+  try {
+    const signedUrlResponse = await fetch(`/api/jobs/${jobId}/generate-signed-url`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileName: file.name,
+        contentType: file.type,
+        fileSize: file.size
+      })
+    });
+    
+    if (!signedUrlResponse.ok) {
+      throw new Error(`Failed to get signed URL: ${signedUrlResponse.status}`);
+    }
+    
+    const { signedUrl, filePath } = await signedUrlResponse.json();
+    console.log(`🔑 Got signed URL for chunked upload: ${filePath}`);
+    
+    // Set up overall timeout with AbortController
+    const controller = new AbortController();
+    const overallTimeoutId = setTimeout(() => {
+      controller.abort();
+    }, 600000); // 10 minutes total timeout
+    
+    let uploadedBytes = 0;
+    
+    try {
+      // Upload chunks sequentially
+      for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+        const start = chunkIndex * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, file.size);
+        const chunk = file.slice(start, end);
+        
+        console.log(`📦 Uploading chunk ${chunkIndex + 1}/${totalChunks} (${start}-${end})`);
+        
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('PUT', signedUrl);
+          xhr.timeout = 120000; // 2 minutes per chunk
+          
+          // Set Content-Range header for resumable upload
+          xhr.setRequestHeader('Content-Range', `bytes ${start}-${end - 1}/${file.size}`);
+          xhr.setRequestHeader('Content-Type', file.type);
+          xhr.setRequestHeader('X-Goog-Content-Length-Range', `0,${file.size}`);
+          
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const chunkProgress = e.loaded;
+              const totalProgress = uploadedBytes + chunkProgress;
+              const overallProgress = Math.round((totalProgress / file.size) * 100);
+              
+              if (onProgress) {
+                onProgress({
+                  bytesTransferred: totalProgress,
+                  totalBytes: file.size,
+                  progress: overallProgress
+                });
+              }
+              
+              console.log(`🔄 Chunk ${chunkIndex + 1} progress: ${Math.round((chunkProgress / chunk.size) * 100)}%, Overall: ${overallProgress}%`);
+            }
+          };
+          
+          xhr.onload = () => {
+            if (xhr.status === 200 || xhr.status === 308) { // 308 = Resume Incomplete
+              uploadedBytes += chunk.size;
+              console.log(`✅ Chunk ${chunkIndex + 1} uploaded successfully`);
+              resolve();
+            } else {
+              reject(new Error(`Chunk upload failed: ${xhr.status} - ${xhr.responseText}`));
+            }
+          };
+          
+          xhr.onerror = () => {
+            reject(new Error(`Network error during chunk ${chunkIndex + 1} upload`));
+          };
+          
+          xhr.ontimeout = () => {
+            reject(new Error(`Chunk ${chunkIndex + 1} upload timed out`));
+          };
+          
+          xhr.onabort = () => {
+            reject(new Error(`Chunk ${chunkIndex + 1} upload aborted`));
+          };
+          
+          xhr.send(chunk);
+        });
+        
+        // Check if overall upload was aborted
+        if (controller.signal.aborted) {
+          throw new Error('Overall upload timeout after 10 minutes');
+        }
+      }
+      
+      clearTimeout(overallTimeoutId);
+      console.log(`🎉 All ${totalChunks} chunks uploaded successfully`);
+      
+      // Get download URL using Firebase SDK
+      const { storage } = await import('./firebase');
+      const { ref, getDownloadURL } = await import('firebase/storage');
+      const fileRef = ref(storage, filePath);
+      const downloadUrl = await getDownloadURL(fileRef);
+      
+      console.log(`📥 Got download URL for chunked upload: ${downloadUrl}`);
+      
+      return {
+        downloadUrl,
+        firebasePath: filePath,
+        fileName: file.name,
+        fileSize: file.size,
+        contentType: file.type
+      };
+      
+    } catch (chunkError) {
+      clearTimeout(overallTimeoutId);
+      console.error('Chunked upload failed:', chunkError);
+      throw chunkError;
+    }
+    
+  } catch (error) {
+    console.error('Failed to initialize chunked upload:', error);
     throw error;
   }
 };

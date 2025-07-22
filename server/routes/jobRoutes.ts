@@ -54,13 +54,40 @@ router.use((req, res, next) => {
 router.use(isAuthenticated);
 
 // GET /api/jobs - Get all jobs with optional filters
-router.get('/', validateQuery(jobQuerySchema), getJobs);
+router.get('/', validateQuery(jobQuerySchema), async (req, res) => {
+  try {
+    const jobs = await storage.getJobCards();
+    res.json(jobs);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch jobs' });
+  }
+});
 
 // GET /api/jobs/:id - Get specific job
-router.get('/:id', validateParams(idParamSchema), getJob);
+router.get('/:id', validateParams(idParamSchema), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const job = await storage.getJobCard(parseInt(id));
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+    res.json(job);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch job' });
+  }
+});
 
 // PATCH /api/jobs/:id - Update job status
-router.patch('/:id', validateParams(idParamSchema), validateBody(statusUpdateSchema), updateJobStatus);
+router.patch('/:id', validateParams(idParamSchema), validateBody(statusUpdateSchema), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    await storage.updateJobCardStatus(parseInt(id), status, req.user?.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update job status' });
+  }
+});
 
 // GET /api/jobs/:id/files - Get job files
 router.get('/:id/files', validateParams(idParamSchema), getJobFiles);
@@ -166,7 +193,7 @@ router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
     try {
       const job = await storage.getJobCard(parseInt(jobId));
       if (job && job.status === 'unassigned') {
-        await storage.updateJobCardStatus(parseInt(jobId), 'in_progress');
+        await storage.updateJobCardStatus(parseInt(jobId), 'in_progress', req.user?.id);
       }
     } catch (dbError) {
       console.warn('Failed to update job status:', dbError);
@@ -201,34 +228,36 @@ router.post('/:id/upload', validateParams(idParamSchema), (req, res, next) => {
 // POST /api/jobs/:id/process-file - Process uploaded Firebase file
 router.post('/:id/process-file', validateParams(idParamSchema), validateBody(processFileSchema), processUploadedFile);
 
-// POST /api/jobs/:id/generate-signed-url - Generate signed URL for direct upload
+// POST /api/jobs/:id/generate-signed-url - Generate signed URL for resumable upload
 const signedUrlSchema = z.object({
   fileName: z.string().min(1, 'File name is required'),
+  contentType: z.string().min(1, 'Content type is required'),
+  fileSize: z.number().positive('File size must be positive'),
 });
 
 router.post('/:id/generate-signed-url', validateParams(idParamSchema), validateBody(signedUrlSchema), async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   try {
     const { id: jobId } = req.params;
-    const { fileName } = req.body;
+    const { fileName, contentType, fileSize } = req.body;
     
-    if (!fileName) {
-      throw new Error('No fileName provided');
-    }
-    
-    console.log(`🔑 Generating signed URL for ${fileName} in job ${jobId}`);
+    console.log(`🔑 Generating resumable signed URL for ${fileName} (${fileSize} bytes) in job ${jobId}`);
     
     const { adminBucket } = await import('../utils/firebaseAdmin');
     const filePath = `temp_uploads/${jobId}/${fileName}`;
     
+    // Generate resumable upload URL for chunked uploads
     const [signedUrl] = await adminBucket.file(filePath).getSignedUrl({
-      action: 'write',
-      expires: Date.now() + 15 * 60 * 1000, // 15 minutes
-      contentType: 'application/octet-stream',
+      action: 'resumable',
+      expires: Date.now() + 60 * 60 * 1000, // 1 hour for large files
+      contentType: contentType,
+      extensionHeaders: {
+        'x-goog-content-length-range': `0,${fileSize}`
+      }
     });
     
-    console.log(`✅ Generated signed URL for ${fileName}`);
-    res.json({ signedUrl, filePath });
+    console.log(`✅ Generated resumable signed URL for ${fileName}`);
+    res.json({ signedUrl, filePath, fileSize, contentType });
   } catch (error) {
     console.error('❌ Failed to generate signed URL:', error);
     res.status(500).json({ 
