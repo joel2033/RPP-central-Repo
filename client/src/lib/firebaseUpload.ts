@@ -23,6 +23,9 @@ export const uploadFileToFirebase = async (
   onProgress?: (progress: UploadProgress) => void
 ): Promise<FirebaseUploadResult> => {
   try {
+    // Try Firebase SDK upload first
+    console.log(`🚀 Attempting Firebase SDK upload for ${file.name} (${file.size} bytes)`);
+    
     const prepareResponse = await apiRequest('POST', `/api/jobs/${jobId}/upload`, {
       fileName: file.name,
       contentType: file.type,
@@ -93,7 +96,51 @@ export const uploadFileToFirebase = async (
     console.error('Failed to upload file to Firebase - Full details:', JSON.stringify(error, null, 2));
     console.error('Failed to upload file to Firebase - Error type:', typeof error);
     console.error('Failed to upload file to Firebase - Error object keys:', Object.keys(error as any));
-    throw error;
+    
+    // Try server-side FormData upload as fallback
+    console.log('🔄 Falling back to server-side upload with FormData');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('fileName', file.name);
+      formData.append('contentType', file.type);
+      formData.append('fileSize', file.size.toString());
+      formData.append('category', 'photography');
+      formData.append('mediaType', mediaType);
+      
+      console.log('📤 Sending FormData to server:', {
+        fileName: file.name,
+        contentType: file.type,
+        fileSize: file.size,
+        category: 'photography',
+        mediaType: mediaType
+      });
+      
+      const response = await fetch(`/api/jobs/${jobId}/upload-file`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Server upload failed:', response.status, errorText);
+        throw new Error(`Server upload failed: ${response.status} ${errorText}`);
+      }
+      
+      const result = await response.json();
+      console.log('✅ Server upload successful:', result);
+      
+      return {
+        downloadUrl: result.downloadUrl,
+        firebasePath: result.firebasePath,
+        fileName: result.fileName,
+        fileSize: result.fileSize || file.size,
+        contentType: result.contentType || file.type
+      };
+    } catch (serverError) {
+      console.error('Server upload also failed:', serverError);
+      throw new Error(`Both Firebase SDK and server upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 };
 

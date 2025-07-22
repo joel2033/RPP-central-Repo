@@ -32,7 +32,7 @@ function initializeFirebaseAdmin(): admin.app.App {
       console.log('Firebase Admin initialized with default credentials');
     }
   } else {
-    firebaseAdmin = admin.apps[0];
+    firebaseAdmin = admin.apps[0] as admin.app.App;
   }
   
   return firebaseAdmin;

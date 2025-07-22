@@ -1,0 +1,51 @@
+Complete and fix the upload functionality in the RPP platform to resolve persistent errors in client/src/pages/upload-to-editor.tsx and server routes. Add missing files for Firebase init, ensure Multer parses FormData, and remove validation for testing.
+
+Steps to implement:
+1. Create client/src/lib/firebase.ts if missing:
+import { initializeApp } from 'firebase/app';
+import { getStorage } from 'firebase/storage';
+const firebaseConfig = { apiKey: process.env.REACT_APP_FIREBASE_API_KEY, authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN, projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID, storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET, messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID, appId: process.env.REACT_APP_FIREBASE_APP_ID };
+const app = initializeApp(firebaseConfig);
+export const storage = getStorage(app);
+2. Create server/utils/firebaseAdmin.js if missing:
+const admin = require('firebase-admin');
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}');
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  });
+}
+module.exports = admin;
+3. Create or update server/routes/jobs.js:
+const express = require('express');
+const multer = require('multer');
+const admin = require('../utils/firebaseAdmin');
+const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage() });
+
+router.post('/:jobId/upload-file', upload.single('file'), async (req, res) => {
+  console.log('Received body:', req.body);
+  console.log('Received file:', req.file ? 'Yes' : 'No');
+  try {
+    const { jobId } = req.params;
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'No file provided' });
+    const fileName = req.body.fileName || file.originalname;
+    const contentType = req.body.contentType || file.mimetype;
+    const bucket = admin.storage().bucket();
+    const firebaseFile = bucket.file(`temp_uploads/${jobId}/${fileName}`);
+    await firebaseFile.save(file.buffer, { metadata: { contentType } });
+    const [downloadUrl] = await firebaseFile.getSignedUrl({ action: 'read', expires: '03-09-2491' });
+    res.json({ firebasePath: `temp_uploads/${jobId}/${fileName}`, downloadUrl });
+  } catch (err) {
+    console.error('Upload error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+module.exports = router;
+- Install Multer: 'npm install multer'.
+4. In client/src/pages/upload-to-editor.tsx, complete the file if truncated, ensure handleUpload uses FormData with all fields appended, and log response.text() on error.
+5. Manual: Set Firebase env vars in Replit secrets.
+
+This completes the upload setup. Commit with message: "Complete and debug upload code to fix validation and network errors in Upload to Editor"

@@ -6,13 +6,12 @@ import multer from 'multer';
 import { firebaseStorageService } from '../services/firebaseService';
 import { storage } from '../storage';
 import {
-  getJobs,
-  getJob,
-  updateJobStatus,
   getJobFiles,
   getJobActivity,
   uploadJobFile,
   processUploadedFile,
+  downloadMediaFile,
+  getJobMediaFiles
 } from '../controllers/jobController';
 
 const router = Router();
