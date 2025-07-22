@@ -119,29 +119,63 @@ export const uploadFileToFirebase = async (
       // Log FormData entries for debugging
       console.log('FormData entries:', Object.fromEntries(formData.entries()));
       
-      const response = await fetch(`/api/jobs/${jobId}/upload-file`, {
-        method: 'POST',
-        body: formData,
+      // Use XMLHttpRequest for better timeout and progress control
+      const result = await new Promise<any>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `/api/jobs/${jobId}/upload-file`);
+        xhr.timeout = 300000; // 5 minute timeout for large files
+        
+        xhr.ontimeout = () => {
+          console.error('Upload timeout for', file.name);
+          reject(new Error('Upload timed out after 5 minutes'));
+        };
+        
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable && onProgress) {
+            const progress = Math.round((e.loaded / e.total) * 100);
+            onProgress({
+              bytesTransferred: e.loaded,
+              totalBytes: e.total,
+              progress: progress
+            });
+            console.log(`Server upload progress: ${progress}%`);
+          }
+        };
+        
+        xhr.onload = () => {
+          console.log('Server response status:', xhr.status);
+          console.log('Server response text:', xhr.responseText);
+          
+          if (xhr.status === 200) {
+            try {
+              const result = JSON.parse(xhr.responseText);
+              console.log('✅ Server upload successful:', result);
+              
+              if (!result.success) {
+                reject(new Error(result.error || 'Server upload failed without success flag'));
+              } else {
+                resolve(result);
+              }
+            } catch (parseError) {
+              console.error('Failed to parse server response:', parseError);
+              reject(new Error(`Failed to parse server response: ${xhr.responseText}`));
+            }
+          } else {
+            console.error('Upload failed status:', xhr.status, xhr.responseText);
+            reject(new Error(`Server upload failed: ${xhr.status} - ${xhr.responseText}`));
+          }
+        };
+        
+        xhr.onerror = (err) => {
+          console.error('XHR network error:', err);
+          reject(new Error('Network error during upload'));
+        };
+        
+        console.log('📤 Starting XMLHttpRequest upload...');
+        xhr.send(formData);
       });
       
-      console.log('Server response status:', response.status);
-      console.log('Server response headers:', Object.fromEntries(response.headers.entries()));
-      
-      if (!response.ok) {
-        const contentType = response.headers.get('Content-Type');
-        const errorText = await response.text();
-        console.error('Server upload failed - Status:', response.status);
-        console.error('Server upload failed - Content-Type:', contentType);
-        console.error('Server upload failed - Response:', errorText);
-        throw new Error(`Server upload failed: ${response.status} - ${errorText}`);
-      }
-      
-      const result = await response.json();
-      console.log('✅ Server upload successful:', result);
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Server upload failed without success flag');
-      }
+      console.log('XMLHttpRequest upload completed:', result);
       
       return {
         downloadUrl: result.downloadUrl,
@@ -167,24 +201,29 @@ export const uploadMultipleFilesToFirebase = async (
 ): Promise<FirebaseUploadResult[]> => {
   const results: FirebaseUploadResult[] = [];
 
-  for (const file of files) {
-    try {
-      const result = await uploadFileToFirebase(
-        file,
-        jobId,
-        mediaType,
-        (progress) => {
-          if (onProgress) {
-            onProgress(file.name, progress);
+  // Add timeout wrapper for the entire upload process
+  const uploadWithTimeout = async () => {
+    for (const file of files) {
+      try {
+        console.log(`📁 Processing file ${file.name} (${file.size} bytes)`);
+        const result = await uploadFileToFirebase(
+          file,
+          jobId,
+          mediaType,
+          (progress) => {
+            if (onProgress) {
+              onProgress(file.name, progress);
+            }
           }
-        }
-      );
-      results.push(result);
-    } catch (error) {
-      console.error(`Failed to upload file ${file.name}:`, error);
-      throw error;
+        );
+        results.push(result);
+      } catch (error) {
+        console.error(`Failed to upload file ${file.name}:`, error);
+        throw error;
+      }
     }
-  }
+    return results;
+  };
 
-  return results;
+  return await uploadWithTimeout();
 };
