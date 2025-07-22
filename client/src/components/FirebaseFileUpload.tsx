@@ -4,8 +4,8 @@ import { apiRequest } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Upload, X } from 'lucide-react';
-import { initializeApp, getApps } from 'firebase/app';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface FirebaseFileUploadProps {
   jobCardId: number;
@@ -23,15 +23,7 @@ interface UploadingFile {
   error?: string;
 }
 
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_GOOGLE_API_KEY,
-  authDomain: "rpp-central-database.firebaseapp.com",
-  projectId: "rpp-central-database",
-  storageBucket: "rpp-central-database.appspot.com",
-  messagingSenderId: "308973286016",
-  appId: "1:308973286016:web:dd689d8c6ea79713242c65",
-  measurementId: "G-2WHBQW1QES"
-};
+
 
 export const FirebaseFileUpload: React.FC<FirebaseFileUploadProps> = ({
   jobCardId,
@@ -46,13 +38,7 @@ export const FirebaseFileUpload: React.FC<FirebaseFileUploadProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
 
-  // Initialize Firebase
-  const getFirebaseApp = () => {
-    if (getApps().length === 0) {
-      return initializeApp(firebaseConfig);
-    }
-    return getApps()[0];
-  };
+
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -169,7 +155,7 @@ export const FirebaseFileUpload: React.FC<FirebaseFileUploadProps> = ({
 
   const uploadSingleFile = async (file: File, index: number) => {
     try {
-      console.log(`🚀 Starting Firebase upload for: ${file.name}`);
+      console.log(`Starting Firebase upload for: ${file.name}`);
 
       // Update progress
       setUploadingFiles(prev => 
@@ -181,11 +167,9 @@ export const FirebaseFileUpload: React.FC<FirebaseFileUploadProps> = ({
       // Generate Firebase path
       const timestamp = Date.now();
       const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const firebasePath = `jobs/${jobCardId}/${mediaType}/${timestamp}-${cleanFileName}`;
+      const firebasePath = `temp_uploads/${jobCardId}/${timestamp}-${cleanFileName}`;
 
-      // Initialize Firebase and upload
-      const app = getFirebaseApp();
-      const storage = getStorage(app);
+      // Create storage reference
       const storageRef = ref(storage, firebasePath);
 
       // Update progress
@@ -210,7 +194,7 @@ export const FirebaseFileUpload: React.FC<FirebaseFileUploadProps> = ({
       // Get download URL
       const downloadUrl = await getDownloadURL(uploadResult.ref);
 
-      console.log(`✅ Firebase upload complete: ${file.name}`);
+      console.log(`Firebase upload complete: ${file.name}`);
 
       // Update progress
       setUploadingFiles(prev => 
@@ -219,18 +203,7 @@ export const FirebaseFileUpload: React.FC<FirebaseFileUploadProps> = ({
         )
       );
 
-      // Save file to mediaFiles table (new Firebase approach)
-      const mediaFileData = {
-        jobId: jobCardId,
-        fileName: file.name,
-        mediaType,
-        firebasePath,
-        downloadUrl,
-        fileSize: file.size,
-        contentType: file.type
-      };
-
-      // Process the uploaded file on the server - save to mediaFiles table
+      // Process the uploaded file on the server
       const result = await apiRequest('POST', `/api/jobs/${jobCardId}/process-file`, {
         firebasePath,
         downloadUrl,
@@ -248,10 +221,10 @@ export const FirebaseFileUpload: React.FC<FirebaseFileUploadProps> = ({
         )
       );
 
-      console.log(`✅ File processing complete: ${file.name}`);
+      console.log(`File processing complete: ${file.name}`);
 
     } catch (error) {
-      console.error(`❌ Upload failed for ${file.name}:`, error);
+      console.error(`Upload failed for ${file.name}:`, error);
       
       setUploadingFiles(prev => 
         prev.map((item, i) => 
