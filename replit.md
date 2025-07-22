@@ -712,6 +712,13 @@ Changelog:
   - **Endpoint Validation**: POST /api/jobs/:id/generate-signed-url now returns proper JSON on both success and error cases
   - **Production Ready**: Firebase Admin SDK properly initialized with service account for signed URL generation
   - **Server Logs Confirmed**: Both authentication (200) and signed URL generation (200) endpoints working correctly
+- July 22, 2025. **REWRITTEN FIREBASEUPLOAD.TS MODULE** - Cleaned Firebase upload module and enhanced error handling:
+  - **Removed Emojis**: Cleaned all emoji characters from logging for professional output
+  - **Centralized Firebase Config**: Uses storage from firebase.ts instead of reinitializing Firebase
+  - **Enhanced Server Fallback**: Improved error logging with detailed server response information
+  - **Better Error Messages**: Added comprehensive error details for both Firebase and server upload failures
+  - **Network Debugging**: Added response status and headers logging for server upload debugging
+  - **TypeScript Error Resolution**: Fixed serverError type declarations for proper error handling
 ```
 
 ## User Preferences

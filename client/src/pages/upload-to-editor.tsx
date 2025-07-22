@@ -214,11 +214,17 @@ function FileUploadModal({
               body: formData,
             });
             
+            console.log(`Server response status: ${response.status}`);
+            console.log(`Server response headers:`, response.headers);
+            
             if (!response.ok) {
-              throw new Error(`Server upload failed with status ${response.status}`);
+              const errorText = await response.text();
+              console.error(`Server upload failed with status ${response.status}, response:`, errorText);
+              throw new Error(`Server upload failed with status ${response.status}: ${errorText}`);
             }
             
             const result = await response.json();
+            console.log(`Server upload result:`, result);
             uploadResults.push({
               fileName: file.name,
               firebasePath: result.firebasePath,
@@ -231,11 +237,17 @@ function FileUploadModal({
             console.log(`✅ Server upload successful for ${file.name}`);
             setUploadingFiles(prev => new Map(prev).set(file.name, 100));
             
-          } catch (serverError) {
+          } catch (serverError: unknown) {
             console.error(`Both Firebase and server upload failed for ${file.name}:`, serverError);
-            const errorMsg = serverError instanceof Error ? serverError.message : 'Upload failed';
+            console.error('Server error details:', {
+              message: serverError instanceof Error ? serverError.message : 'Unknown error',
+              status: (serverError as any)?.status || 'No status',
+              response: (serverError as any)?.response || 'No response'
+            });
+            
+            const errorMsg = serverError instanceof Error ? serverError.message : 'Upload failed completely';
             setUploadErrors(prev => new Map(prev).set(file.name, errorMsg));
-            throw serverError;
+            throw new Error(`Upload failed: ${errorMsg}`);
           }
         }
       }

@@ -1,3 +1,15 @@
+// 📦 Replit AI Agent Task:
+// Rewrite `client/src/lib/firebaseUpload.ts` to:
+// 1. Remove all emojis from logs
+// 2. Use the initialized `storage` and `app` from `firebase.ts` instead of reinitializing Firebase here
+// 3. Ensure clear logging and minimal error noise
+// 4. Keep existing functionality, including:
+//    - `uploadFileToFirebase`
+//    - `uploadMultipleFilesToFirebase`
+// 5. Ensure the upload path uses `temp_uploads/{jobId}/{filename}` as previously implemented
+
+// 🔁 Replace the entire contents of firebaseUpload.ts with the following:
+
 import { storage } from './firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { apiRequest } from "./queryClient";
