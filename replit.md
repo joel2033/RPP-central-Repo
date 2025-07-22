@@ -745,3 +745,11 @@ Preferred communication style: Simple, everyday language.
   - **Improved Network Error Handling**: Better detection and logging of XHR network errors with specific error messages
   - **Timeout Management**: Proper cleanup of timeout handlers and AbortController to prevent memory leaks
   - **Error Recovery**: Enhanced fallback logic from Firebase SDK to XHR FormData uploads with detailed error reporting
+- July 22, 2025. Advanced upload resilience with multi-layer fallback and extended timeouts:
+  - **Extended Timeout Support**: Increased timeout to 10 minutes for large RAW files (up to 600,000ms) in both SDK and XHR paths
+  - **Promise.race Timeout**: Added overall timeout wrapper for Firebase SDK uploads to prevent indefinite hanging
+  - **Enhanced Abort Handling**: Improved abort detection with "Upload aborted - check network" messages for better debugging
+  - **Fetch Keepalive Fallback**: Added third-tier fallback using fetch with keepalive for browser persistence when XHR fails
+  - **Multi-Layer Resilience**: Three-tier upload system (Firebase SDK → XHR → Fetch keepalive) ensuring maximum upload success
+  - **Enhanced SDK Error Logging**: Added customData and serverResponse logging for comprehensive Firebase error analysis
+  - **Network Persistence**: Keepalive option maintains connection integrity even during browser navigation or connection issues

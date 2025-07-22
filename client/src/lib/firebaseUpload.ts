@@ -52,7 +52,7 @@ export const uploadFileToFirebase = async (
         const storageRef = ref(storage, firebasePath);
         const uploadTask = uploadBytesResumable(storageRef, file);
 
-        return new Promise((resolve, reject) => {
+        const uploadPromise = new Promise((resolve, reject) => {
           uploadTask.on(
             'state_changed',
             (snapshot) => {
@@ -67,7 +67,7 @@ export const uploadFileToFirebase = async (
               console.log(`Upload progress: ${Math.round(progress)}%`);
             },
             (err) => {
-              console.error('SDK upload error code:', err.code, 'message:', err.message, 'serverResponse:', err.serverResponse);
+              console.error('SDK upload error code:', err.code, 'serverResponse:', err.serverResponse, 'customData:', err.customData);
               console.error('Firebase upload error - Full details:', JSON.stringify(err, null, 2));
               console.error('Firebase upload error - Error object keys:', Object.keys(err));
               reject(err);
@@ -100,6 +100,14 @@ export const uploadFileToFirebase = async (
             }
           );
         });
+
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => {
+            reject(new Error('SDK upload timeout after 10 minutes'));
+          }, 600000); // 10 minutes
+        });
+
+        return await Promise.race([uploadPromise, timeoutPromise]) as FirebaseUploadResult;
       } catch (sdkError: any) {
         console.error('SDK catch:', sdkError?.code, sdkError?.message);
         throw sdkError;
@@ -131,77 +139,102 @@ export const uploadFileToFirebase = async (
         // Log FormData entries for debugging
         console.log('FormData entries:', Object.fromEntries(formData.entries()));
         
-        // Use XMLHttpRequest for better timeout and progress control
-        const result = await new Promise<any>((resolve, reject) => {
-          const controller = new AbortController();
-          const xhr = new XMLHttpRequest();
-          xhr.open('POST', `/api/jobs/${jobId}/upload-file`);
-          xhr.timeout = 300000; // 5 minute timeout for large files
-          
-          // Set up AbortController for timeout
-          const timeoutId = setTimeout(() => {
-            controller.abort();
-          }, 300000);
-          
-          xhr.ontimeout = () => {
-            console.error('Upload timeout for', file.name);
-            clearTimeout(timeoutId);
-            reject(new Error('Upload timed out after 5 minutes'));
-          };
-          
-          xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable && onProgress) {
-              const progress = Math.round((e.loaded / e.total) * 100);
-              onProgress({
-                bytesTransferred: e.loaded,
-                totalBytes: e.total,
-                progress: progress
-              });
-              console.log(`Server upload progress: ${progress}%`);
-            }
-          };
-          
-          xhr.onload = () => {
-            clearTimeout(timeoutId);
-            console.log('Server response status:', xhr.status);
-            console.log('Server response text:', xhr.responseText);
+        let result;
+        try {
+          // Use XMLHttpRequest for better timeout and progress control
+          result = await new Promise<any>((resolve, reject) => {
+            const controller = new AbortController();
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', `/api/jobs/${jobId}/upload-file`);
+            xhr.timeout = 600000; // 10 min for large RAW files
             
-            if (xhr.status === 200) {
-              try {
-                const result = JSON.parse(xhr.responseText);
-                console.log('✅ Server upload successful:', result);
-                
-                if (!result || !result.firebasePath) {
-                  reject(new Error('Invalid response format - missing firebasePath'));
-                } else if (!result.success) {
-                  reject(new Error(result.error || 'Server upload failed without success flag'));
-                } else {
-                  resolve(result);
-                }
-              } catch (parseError) {
-                console.error('Failed to parse server response:', parseError);
-                reject(new Error(`Failed to parse server response: ${xhr.responseText}`));
+            // Set up AbortController for timeout
+            const timeoutId = setTimeout(() => {
+              controller.abort();
+            }, 600000);
+            
+            xhr.ontimeout = () => {
+              console.error('Upload timeout for', file.name);
+              clearTimeout(timeoutId);
+              reject(new Error('Upload timed out after 10 minutes'));
+            };
+            
+            xhr.upload.onprogress = (e) => {
+              if (e.lengthComputable && onProgress) {
+                const progress = Math.round((e.loaded / e.total) * 100);
+                onProgress({
+                  bytesTransferred: e.loaded,
+                  totalBytes: e.total,
+                  progress: progress
+                });
+                console.log(`Server upload progress: ${progress}%`);
               }
-            } else {
-              reject(new Error(`Status ${xhr.status}: ${xhr.responseText}`));
-            }
-          };
+            };
+            
+            xhr.onload = () => {
+              clearTimeout(timeoutId);
+              console.log('Server response status:', xhr.status);
+              console.log('Server response text:', xhr.responseText);
+              
+              if (xhr.status === 200) {
+                try {
+                  const result = JSON.parse(xhr.responseText);
+                  console.log('✅ Server upload successful:', result);
+                  
+                  if (!result || !result.firebasePath) {
+                    reject(new Error('Invalid response format - missing firebasePath'));
+                  } else if (!result.success) {
+                    reject(new Error(result.error || 'Server upload failed without success flag'));
+                  } else {
+                    resolve(result);
+                  }
+                } catch (parseError) {
+                  console.error('Failed to parse server response:', parseError);
+                  reject(new Error(`Failed to parse server response: ${xhr.responseText}`));
+                }
+              } else {
+                reject(new Error(`Status ${xhr.status}: ${xhr.responseText}`));
+              }
+            };
+            
+            xhr.onerror = (err) => {
+              clearTimeout(timeoutId);
+              console.error('XHR network error:', err);
+              reject(new Error('Network error during upload'));
+            };
+            
+            xhr.onabort = () => {
+              clearTimeout(timeoutId);
+              console.error('Upload aborted for', file.name);
+              reject(new Error('Upload aborted - check network'));
+            };
+            
+            console.log('📤 Starting XMLHttpRequest upload...');
+            xhr.send(formData);
+          });
+        } catch (xhrError) {
+          console.error('XHR upload failed, trying fetch with keepalive:', xhrError);
           
-          xhr.onerror = (err) => {
-            clearTimeout(timeoutId);
-            console.error('XHR network error:', err);
-            reject(new Error('Network error during upload'));
-          };
+          // Fallback to fetch with keepalive for browser persistence
+          const response = await fetch(`/api/jobs/${jobId}/upload-file`, {
+            method: 'POST',
+            body: formData,
+            keepalive: true
+          });
           
-          xhr.onabort = () => {
-            clearTimeout(timeoutId);
-            console.error('Upload aborted for', file.name);
-            reject(new Error('Upload aborted'));
-          };
+          if (!response.ok) {
+            throw new Error(`Fetch upload failed: ${response.status} - ${response.statusText}`);
+          }
           
-          console.log('📤 Starting XMLHttpRequest upload...');
-          xhr.send(formData);
-        });
+          result = await response.json();
+          console.log('✅ Fetch keepalive upload successful:', result);
+          
+          if (!result || !result.firebasePath) {
+            throw new Error('Invalid response format - missing firebasePath');
+          } else if (!result.success) {
+            throw new Error(result.error || 'Server upload failed without success flag');
+          }
+        }
         
         console.log('XMLHttpRequest upload completed:', result);
         
