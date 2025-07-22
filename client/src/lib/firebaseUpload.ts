@@ -47,59 +47,63 @@ export const uploadFileToFirebase = async (
       }
 
       const { firebasePath } = prepareResponse;
-      const storageRef = ref(storage, firebasePath);
-      const uploadTask = uploadBytesResumable(storageRef, file);
+      
+      try {
+        const storageRef = ref(storage, firebasePath);
+        const uploadTask = uploadBytesResumable(storageRef, file);
 
-      return new Promise((resolve, reject) => {
-        uploadTask.on(
-          'state_changed',
-          (snapshot) => {
-            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            if (onProgress) {
-              onProgress({
-                bytesTransferred: snapshot.bytesTransferred,
-                totalBytes: snapshot.totalBytes,
-                progress: Math.round(progress),
-              });
+        return new Promise((resolve, reject) => {
+          uploadTask.on(
+            'state_changed',
+            (snapshot) => {
+              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+              if (onProgress) {
+                onProgress({
+                  bytesTransferred: snapshot.bytesTransferred,
+                  totalBytes: snapshot.totalBytes,
+                  progress: Math.round(progress),
+                });
+              }
+              console.log(`Upload progress: ${Math.round(progress)}%`);
+            },
+            (err) => {
+              console.error('SDK upload error code:', err.code, 'message:', err.message, 'serverResponse:', err.serverResponse);
+              console.error('Firebase upload error - Full details:', JSON.stringify(err, null, 2));
+              console.error('Firebase upload error - Error object keys:', Object.keys(err));
+              reject(err);
+            },
+            async () => {
+              try {
+                const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+
+                await apiRequest('POST', `/api/jobs/${jobId}/process-file`, {
+                  firebasePath,
+                  downloadUrl,
+                  fileName: file.name,
+                  contentType: file.type,
+                  fileSize: file.size,
+                  category: 'photography',
+                  mediaType: mediaType
+                });
+
+                resolve({
+                  downloadUrl,
+                  firebasePath,
+                  fileName: file.name,
+                  fileSize: file.size,
+                  contentType: file.type
+                });
+              } catch (error) {
+                console.error('Error finalizing upload with backend:', error);
+                reject(error);
+              }
             }
-            console.log(`Upload progress: ${Math.round(progress)}%`);
-          },
-          (error) => {
-            console.error('Firebase upload error - Full details:', JSON.stringify(error, null, 2));
-            console.error('Firebase upload error - Error object keys:', Object.keys(error));
-            console.error('Firebase upload error - Error code:', error.code);
-            console.error('Firebase upload error - Error message:', error.message);
-            console.error('Firebase upload error - Error name:', error.name);
-            reject(new Error(`Upload failed: ${error.message || error.code || 'Unknown Firebase error'}`));
-          },
-          async () => {
-            try {
-              const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-
-              await apiRequest('POST', `/api/jobs/${jobId}/process-file`, {
-                firebasePath,
-                downloadUrl,
-                fileName: file.name,
-                contentType: file.type,
-                fileSize: file.size,
-                category: 'photography',
-                mediaType: mediaType
-              });
-
-              resolve({
-                downloadUrl,
-                firebasePath,
-                fileName: file.name,
-                fileSize: file.size,
-                contentType: file.type
-              });
-            } catch (error) {
-              console.error('Error finalizing upload with backend:', error);
-              reject(error);
-            }
-          }
-        );
-      });
+          );
+        });
+      } catch (sdkError: any) {
+        console.error('SDK catch:', sdkError?.code, sdkError?.message);
+        throw sdkError;
+      }
     } catch (error) {
       console.error('Failed to upload file to Firebase - Full details:', JSON.stringify(error, null, 2));
       console.error('Failed to upload file to Firebase - Error type:', typeof error);
@@ -129,12 +133,19 @@ export const uploadFileToFirebase = async (
         
         // Use XMLHttpRequest for better timeout and progress control
         const result = await new Promise<any>((resolve, reject) => {
+          const controller = new AbortController();
           const xhr = new XMLHttpRequest();
           xhr.open('POST', `/api/jobs/${jobId}/upload-file`);
           xhr.timeout = 300000; // 5 minute timeout for large files
           
+          // Set up AbortController for timeout
+          const timeoutId = setTimeout(() => {
+            controller.abort();
+          }, 300000);
+          
           xhr.ontimeout = () => {
             console.error('Upload timeout for', file.name);
+            clearTimeout(timeoutId);
             reject(new Error('Upload timed out after 5 minutes'));
           };
           
@@ -151,6 +162,7 @@ export const uploadFileToFirebase = async (
           };
           
           xhr.onload = () => {
+            clearTimeout(timeoutId);
             console.log('Server response status:', xhr.status);
             console.log('Server response text:', xhr.responseText);
             
@@ -159,7 +171,9 @@ export const uploadFileToFirebase = async (
                 const result = JSON.parse(xhr.responseText);
                 console.log('✅ Server upload successful:', result);
                 
-                if (!result.success) {
+                if (!result || !result.firebasePath) {
+                  reject(new Error('Invalid response format - missing firebasePath'));
+                } else if (!result.success) {
                   reject(new Error(result.error || 'Server upload failed without success flag'));
                 } else {
                   resolve(result);
@@ -169,19 +183,20 @@ export const uploadFileToFirebase = async (
                 reject(new Error(`Failed to parse server response: ${xhr.responseText}`));
               }
             } else {
-              console.error('Upload failed status:', xhr.status, xhr.responseText);
-              reject(new Error(`Server upload failed: ${xhr.status} - ${xhr.responseText}`));
+              reject(new Error(`Status ${xhr.status}: ${xhr.responseText}`));
             }
           };
           
           xhr.onerror = (err) => {
+            clearTimeout(timeoutId);
             console.error('XHR network error:', err);
             reject(new Error('Network error during upload'));
           };
           
           xhr.onabort = () => {
-            console.warn('XHR upload canceled for', file.name);
-            reject(new Error('Upload canceled'));
+            clearTimeout(timeoutId);
+            console.error('Upload aborted for', file.name);
+            reject(new Error('Upload aborted'));
           };
           
           console.log('📤 Starting XMLHttpRequest upload...');
