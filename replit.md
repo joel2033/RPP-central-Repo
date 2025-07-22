@@ -761,3 +761,6 @@ Preferred communication style: Simple, everyday language.
   - **Chunked Upload Timeout**: Updated chunked upload overall timeout from 10 to 15 minutes for large file handling
   - **ServerResponse Logging**: Added Firebase SDK serverResponse capture for empty error objects debugging
   - **Resilient Upload Path**: Simplified to Firebase SDK → Chunked Upload → XHR with retry for maximum reliability
+  - **Enhanced Error Debugging**: Added Firebase SDK customData logging alongside serverResponse for comprehensive error analysis
+  - **Fixed XHR Event Handling**: Changed from xhr.onload to xhr.onloadend for proper request completion detection
+  - **Improved Retry Logic**: Fixed retry loop structure to properly handle exponential backoff within XMLHttpRequest promise chain

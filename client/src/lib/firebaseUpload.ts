@@ -117,9 +117,14 @@ export const uploadFileToFirebase = async (
       console.error('Failed to upload file to Firebase - Error type:', typeof error);
       console.error('Failed to upload file to Firebase - Error object keys:', Object.keys(error as any));
       
-      // Log serverResponse if available for empty errors
-      if (error && typeof error === 'object' && 'serverResponse' in error) {
-        console.error('Firebase SDK serverResponse:', (error as any).serverResponse);
+      // Log serverResponse and customData if available for empty errors
+      if (error && typeof error === 'object') {
+        if ('serverResponse' in error) {
+          console.error('Firebase SDK serverResponse:', (error as any).serverResponse);
+        }
+        if ('customData' in error) {
+          console.error('Firebase SDK customData:', (error as any).customData);
+        }
       }
       
       // Try server-side FormData upload as fallback
@@ -153,10 +158,11 @@ export const uploadFileToFirebase = async (
         
         let result;
         let retries = 3;
+        let delay = 1000; // Start with 1 second delay
         
         while (retries > 0) {
           try {
-            // Use XMLHttpRequest with retry logic
+            // Use XMLHttpRequest with exponential backoff retry logic
             result = await new Promise<any>((resolve, reject) => {
               const xhr = new XMLHttpRequest();
               xhr.open('POST', `/api/jobs/${jobId}/upload-file`);
@@ -179,7 +185,7 @@ export const uploadFileToFirebase = async (
                 }
               };
               
-              xhr.onload = () => {
+              xhr.onloadend = () => {
                 console.log('Server response status:', xhr.status);
                 console.log('Server response text:', xhr.responseText);
                 
@@ -210,12 +216,8 @@ export const uploadFileToFirebase = async (
               };
               
               xhr.onabort = () => {
-                console.error('Upload aborted, retrying...', retries);
-                if (retries > 1) {
-                  reject(new Error('Upload aborted - retrying'));
-                } else {
-                  reject(new Error('Upload aborted after retries'));
-                }
+                console.error(`Upload aborted, retrying after ${delay}ms...`);
+                reject(new Error('Upload aborted - retrying'));
               };
               
               console.log(`📤 Starting XMLHttpRequest upload (attempt ${4 - retries}/3)...`);
@@ -233,8 +235,10 @@ export const uploadFileToFirebase = async (
               throw xhrError;
             }
             
-            // Wait 1 second before retry
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Wait with exponential backoff before retry
+            console.log(`Waiting ${delay}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            delay *= 2; // Double the delay for next retry (1s, 2s, 4s)
           }
         }
         
