@@ -22,7 +22,15 @@ export const uploadFileToFirebase = async (
   mediaType: 'raw' | 'finished' = 'raw',
   onProgress?: (progress: UploadProgress) => void
 ): Promise<FirebaseUploadResult> => {
-  try {
+  // 10-minute timeout for individual file uploads
+  const individualTimeout = new Promise<never>((_, reject) => {
+    setTimeout(() => {
+      reject(new Error(`Individual file upload timeout: ${file.name} exceeded 10 minutes`));
+    }, 600000); // 10 minutes
+  });
+
+  const uploadPromise = async (): Promise<FirebaseUploadResult> => {
+    try {
     // Try Firebase SDK upload first
     console.log(`🚀 Attempting Firebase SDK upload for ${file.name} (${file.size} bytes)`);
     
@@ -171,6 +179,11 @@ export const uploadFileToFirebase = async (
           reject(new Error('Network error during upload'));
         };
         
+        xhr.onabort = () => {
+          console.warn('XHR upload canceled for', file.name);
+          reject(new Error('Upload canceled'));
+        };
+        
         console.log('📤 Starting XMLHttpRequest upload...');
         xhr.send(formData);
       });
@@ -190,6 +203,13 @@ export const uploadFileToFirebase = async (
       const originalErrorMessage = error instanceof Error ? error.message : 'Unknown Firebase error';
       throw new Error(`Both Firebase SDK and server upload failed. Firebase: ${originalErrorMessage}, Server: ${serverErrorMessage}`);
     }
+  };
+
+  try {
+    return await Promise.race([uploadPromise(), individualTimeout]);
+  } catch (error) {
+    console.error(`Upload failed for ${file.name}:`, error);
+    throw error;
   }
 };
 
@@ -199,31 +219,57 @@ export const uploadMultipleFilesToFirebase = async (
   mediaType: 'raw' | 'finished' = 'raw',
   onProgress?: (fileName: string, progress: UploadProgress) => void
 ): Promise<FirebaseUploadResult[]> => {
-  const results: FirebaseUploadResult[] = [];
+  console.log(`🚀 Starting parallel upload of ${files.length} files`);
 
-  // Add timeout wrapper for the entire upload process
-  const uploadWithTimeout = async () => {
-    for (const file of files) {
-      try {
-        console.log(`📁 Processing file ${file.name} (${file.size} bytes)`);
-        const result = await uploadFileToFirebase(
-          file,
-          jobId,
-          mediaType,
-          (progress) => {
-            if (onProgress) {
-              onProgress(file.name, progress);
-            }
-          }
-        );
-        results.push(result);
-      } catch (error) {
-        console.error(`Failed to upload file ${file.name}:`, error);
-        throw error;
+  // Use Promise.allSettled for parallel uploads that handle individual failures
+  const uploadPromises = files.map(file => 
+    uploadFileToFirebase(
+      file, 
+      jobId, 
+      mediaType, 
+      (progress) => {
+        if (onProgress) {
+          onProgress(file.name, progress);
+        }
       }
-    }
-    return results;
-  };
+    )
+  );
 
-  return await uploadWithTimeout();
+  // 10-minute overall timeout for the entire batch
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => {
+      reject(new Error('Batch upload timeout: exceeded 10 minutes'));
+    }, 600000); // 10 minutes
+  });
+
+  try {
+    const results = await Promise.race([
+      Promise.allSettled(uploadPromises),
+      timeoutPromise
+    ]);
+
+    const successfulResults: FirebaseUploadResult[] = [];
+    const failedFiles: string[] = [];
+
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        successfulResults.push(result.value);
+        console.log(`✅ Successfully uploaded: ${files[index].name}`);
+      } else {
+        failedFiles.push(files[index].name);
+        console.error(`❌ File upload failed: ${files[index].name}`, result.reason);
+      }
+    });
+
+    if (failedFiles.length > 0) {
+      console.warn(`⚠️ ${failedFiles.length} files failed to upload:`, failedFiles);
+    }
+
+    console.log(`📊 Batch complete: ${successfulResults.length}/${files.length} files uploaded`);
+    return successfulResults;
+
+  } catch (error) {
+    console.error('Batch upload failed:', error);
+    throw error;
+  }
 };
