@@ -110,6 +110,7 @@ const uploadFormDataSchema = z.object({
 
 // POST /api/jobs/:id/upload-file - Direct file upload with FormData (must be before /upload route)
 router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
   console.log('🎯 ENTERING /upload-file endpoint - this is the correct path!');
   console.log('📥 Server upload request received');
   console.log('Received req.body:', req.body);
@@ -181,8 +182,10 @@ router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
     });
   } catch (error) {
     console.error('Upload error:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     res.status(500).json({ 
-      message: error instanceof Error ? error.message : 'Unknown error' 
+      error: error instanceof Error ? error.message : 'Server upload failed',
+      success: false
     });
   }
 });
@@ -229,8 +232,8 @@ router.post('/:id/generate-signed-url', validateParams(idParamSchema), validateB
   } catch (error) {
     console.error('❌ Failed to generate signed URL:', error);
     res.status(500).json({ 
-      error: error?.message || 'Failed to generate signed URL',
-      details: error?.stack || 'No stack trace available'
+      error: error instanceof Error ? error.message : 'Failed to generate signed URL',
+      details: error instanceof Error ? error.stack : 'No stack trace available'
     });
   }
 });

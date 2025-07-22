@@ -1,0 +1,44 @@
+Fix the TypeError and Failed to fetch in server upload fallback for RPP platform by ensuring the /api/jobs/:jobId/upload-file endpoint returns JSON, uses Multer for FormData, and handles errors properly.
+
+Steps to implement:
+1. In server/routes/jobs.js, set JSON header early and catch all errors to return JSON:
+const express = require('express');
+const multer = require('multer');
+const admin = require('../utils/firebaseAdmin');
+const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage() });
+
+router.post('/:jobId/upload-file', upload.single('file'), async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  try {
+    console.log('FormData received:', req.body, 'File:', req.file);
+    const { jobId } = req.params;
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'No file provided' });
+    const fileName = req.body.fileName || file.originalname;
+    const contentType = req.body.contentType || file.mimetype;
+    const bucket = admin.storage().bucket();
+    const firebaseFile = bucket.file(`temp_uploads/${jobId}/${fileName}`);
+    await firebaseFile.save(file.buffer, { metadata: { contentType } });
+    const [downloadUrl] = await firebaseFile.getSignedUrl({ action: 'read', expires: '03-09-2491' });
+    res.json({ firebasePath: `temp_uploads/${jobId}/${fileName}`, downloadUrl });
+  } catch (err) {
+    console.error('Upload error:', err);
+    res.status(500).json({ error: err.message || 'Server upload failed' });
+  }
+});
+module.exports = router;
+- Install Multer: 'npm install multer'.
+2. In client/src/pages/upload-to-editor.tsx handleUpload fallback:
+const response = await fetch(`/api/jobs/${jobCardId}/upload-file`, { method: 'POST', body: formData });
+if (!response.ok) {
+  const contentType = response.headers.get('Content-Type');
+  const text = await response.text();
+  console.error('Server response type:', contentType, 'Text:', text);
+  throw new Error(`Server upload failed: ${text}`);
+}
+const result = await response.json();
+3. Ensure FormData appends all fields before send, log Object.fromEntries(formData).
+4. Manual: Check Replit console for server logs on test.
+
+This ensures JSON responses. Commit with message: "Ensure JSON responses and fix TypeError in upload fallback for Upload to Editor"

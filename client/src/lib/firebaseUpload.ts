@@ -116,19 +116,32 @@ export const uploadFileToFirebase = async (
         mediaType: mediaType
       });
       
+      // Log FormData entries for debugging
+      console.log('FormData entries:', Object.fromEntries(formData.entries()));
+      
       const response = await fetch(`/api/jobs/${jobId}/upload-file`, {
         method: 'POST',
         body: formData,
       });
       
+      console.log('Server response status:', response.status);
+      console.log('Server response headers:', Object.fromEntries(response.headers.entries()));
+      
       if (!response.ok) {
+        const contentType = response.headers.get('Content-Type');
         const errorText = await response.text();
-        console.error('Server upload failed:', response.status, errorText);
-        throw new Error(`Server upload failed: ${response.status} ${errorText}`);
+        console.error('Server upload failed - Status:', response.status);
+        console.error('Server upload failed - Content-Type:', contentType);
+        console.error('Server upload failed - Response:', errorText);
+        throw new Error(`Server upload failed: ${response.status} - ${errorText}`);
       }
       
       const result = await response.json();
       console.log('✅ Server upload successful:', result);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Server upload failed without success flag');
+      }
       
       return {
         downloadUrl: result.downloadUrl,
@@ -139,7 +152,9 @@ export const uploadFileToFirebase = async (
       };
     } catch (serverError) {
       console.error('Server upload also failed:', serverError);
-      throw new Error(`Both Firebase SDK and server upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const serverErrorMessage = serverError instanceof Error ? serverError.message : 'Unknown server error';
+      const originalErrorMessage = error instanceof Error ? error.message : 'Unknown Firebase error';
+      throw new Error(`Both Firebase SDK and server upload failed. Firebase: ${originalErrorMessage}, Server: ${serverErrorMessage}`);
     }
   }
 };
