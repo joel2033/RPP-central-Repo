@@ -15,10 +15,7 @@ import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/topbar";
 import type { JobCard, Client, User, EditorServiceCategory, EditorServiceOption } from "@shared/schema";
 import { editorServiceApi } from "@/lib/api/editorServiceApi";
-import { uploadFileToFirebase, uploadMultipleFilesToFirebase } from "@/lib/firebaseUpload";
-import { storage, auth } from '@/lib/firebase';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { signInWithCustomToken, signInAnonymously } from 'firebase/auth';
+import { uploadMultipleFilesToFirebase } from "@/lib/firebaseUpload";
 
 interface JobCardWithDetails extends JobCard {
   client: Client;
@@ -124,196 +121,49 @@ function FileUploadModal({
     if (files.length === 0) return;
     
     setIsUploading(true);
-    setCanClose(false); // Prevent modal close during upload
+    setCanClose(false);
     setUploadErrors(new Map());
-    console.log(`Starting upload of ${files.length} files`);
+    console.log(`Starting upload of ${files.length} files using firebaseUpload.ts`);
     
     try {
-      // Try Firebase direct upload first, fallback to server on failure
-      const uploadResults: any[] = [];
-      
-      // Upload each file 
-      for (const file of files) {
-        try {
-          console.log(`🚀 Uploading ${file.name} to Firebase...`);
-          
-          // Set initial progress
-          setUploadingFiles(prev => new Map(prev).set(file.name, 5));
-          
-          // Create Firebase path: temp_uploads/{jobId}/{filename}
-          const firebasePath = `temp_uploads/${jobCardId}/${file.name}`;
-          
-          // Get storage instance with explicit bucket
-          const storageRef = ref(storage, firebasePath);
-          
-          // Use uploadBytesResumable for progress tracking
-          const uploadTask = uploadBytesResumable(storageRef, file, {
-            contentType: file.type || 'application/octet-stream'
-          });
-          
-          // Create promise to handle upload
-          const uploadResult = await new Promise<any>((resolve, reject) => {
-            // Progress tracking
-            uploadTask.on('state_changed', 
-              (snapshot) => {
-                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                console.log(`Firebase upload progress for ${file.name}: ${progress.toFixed(1)}%`);
-                setUploadingFiles(prev => new Map(prev).set(file.name, progress));
-              },
-              (error) => {
-                console.error(`Firebase upload error for ${file.name}:`, {
-                  code: error.code,
-                  message: error.message,
-                  name: error.name,
-                  customData: error.customData
-                });
-                setUploadErrors(prev => new Map(prev).set(file.name, `Firebase error: ${error.message}`));
-                reject(error);
-              },
-              async () => {
-                try {
-                  // Get download URL after successful upload
-                  const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-                  console.log(`✅ Firebase upload complete for ${file.name}`);
-                  
-                  resolve({
-                    fileName: file.name,
-                    firebasePath,
-                    downloadUrl,
-                    contentType: file.type || 'application/octet-stream',
-                    fileSize: file.size,
-                    category: 'photography'
-                  });
-                } catch (urlError) {
-                  console.error(`Failed to get download URL for ${file.name}:`, urlError);
-                  reject(urlError);
-                }
-              }
-            );
-          });
-          
-          uploadResults.push(uploadResult);
-          console.log(`✅ Firebase upload successful for ${file.name}`);
-          
-        } catch (firebaseError) {
-          console.error(`Firebase upload failed for ${file.name}, trying server upload...`, firebaseError);
-          
-          // Fallback to server upload
-          try {
-            console.log(`🔧 Fallback: Uploading ${file.name} via server...`);
-            
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('fileName', file.name);
-            formData.append('contentType', file.type || 'application/octet-stream');
-            formData.append('fileSize', file.size.toString());
-            formData.append('category', 'photography');
-            
-            const response = await fetch(`/api/jobs/${jobCardId}/upload-file`, {
-              method: 'POST',
-              body: formData,
-            });
-            
-            console.log(`Server response status: ${response.status}`);
-            console.log(`Server response headers:`, response.headers);
-            
-            if (!response.ok) {
-              const errorText = await response.text();
-              console.error(`Server upload failed with status ${response.status}, response:`, errorText);
-              throw new Error(`Server upload failed with status ${response.status}: ${errorText}`);
-            }
-            
-            const result = await response.json();
-            console.log(`Server upload result:`, result);
-            uploadResults.push({
-              fileName: file.name,
-              firebasePath: result.firebasePath,
-              downloadUrl: result.downloadUrl,
-              contentType: file.type || 'application/octet-stream',
-              fileSize: file.size,
-              category: 'photography'
-            });
-            
-            console.log(`✅ Server upload successful for ${file.name}`);
-            setUploadingFiles(prev => new Map(prev).set(file.name, 100));
-            
-          } catch (serverError: unknown) {
-            console.error(`Both Firebase and server upload failed for ${file.name}:`, serverError);
-            console.error('Server error details:', {
-              message: serverError instanceof Error ? serverError.message : 'Unknown error',
-              status: (serverError as any)?.status || 'No status',
-              response: (serverError as any)?.response || 'No response'
-            });
-            
-            const errorMsg = serverError instanceof Error ? serverError.message : 'Upload failed completely';
-            setUploadErrors(prev => new Map(prev).set(file.name, errorMsg));
-            throw new Error(`Upload failed: ${errorMsg}`);
-          }
+      // Use the centralized Firebase upload function
+      const uploadResults = await uploadMultipleFilesToFirebase(
+        files,
+        jobCardId,
+        'raw', // Upload to editor always uses 'raw' mediaType
+        (fileName, progress) => {
+          console.log(`Upload progress for ${fileName}: ${progress.progress}%`);
+          setUploadingFiles(prev => new Map(prev).set(fileName, progress.progress));
         }
-      }
-      
-      console.log('All files uploaded successfully:', uploadResults);
-      
-      // Clear progress tracking
-      setUploadingFiles(new Map());
-      
-      // Add files to uploaded files
-      onFilesUpload([...uploadedFiles, ...files]);
-      
-      setFiles([]);
-      setUrlLink("");
-      
-      // Show success toast
-      const successMethod = uploadResults.some(r => r.firebasePath.startsWith('temp_uploads/')) ? 'Firebase' : 'Server';
-      toast({
-        title: "Upload Successful",
-        description: `Successfully uploaded ${uploadResults.length} file(s) via ${successMethod}`,
-      });
-      
-      setCanClose(true); // Re-enable modal close
-      // Close modal after successful upload
-      setTimeout(() => onClose(), 1000);
-      
-      console.log('All files uploaded successfully:', uploadResults);
-      
-      // Clear progress tracking
-      setUploadingFiles(new Map());
-      
-      // Add files to uploaded files
-      onFilesUpload([...uploadedFiles, ...files]);
-      
-      setFiles([]);
-      setUrlLink("");
-      
-      // Show success toast
-      toast({
-        title: "Upload Successful",
-        description: `Successfully uploaded ${uploadResults.length} file(s) via server`,
-      });
-      
-      setCanClose(true); // Re-enable modal close
-      // Close modal after successful upload
-      setTimeout(() => onClose(), 1000);
-    } catch (error) {
-      console.error('Firebase upload error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
-      // Check if there are specific file upload errors
-      const uploadErrorsList = Array.from(uploadErrors.entries());
-      const errorDetails = uploadErrorsList.length > 0 
-        ? `Errors: ${uploadErrorsList.map(([file, err]) => `${file}: ${err}`).join(', ')}`
-        : errorMessage;
-      
-      // Show error toast with specific details
-      const hasCanceledOrTimeout = uploadErrorsList.some(([, err]) => 
-        err.includes('canceled') || err.includes('timed out')
       );
+      
+      console.log('All files uploaded successfully via firebaseUpload.ts:', uploadResults);
+      
+      // Clear progress tracking
+      setUploadingFiles(new Map());
+      
+      // Add files to uploaded files
+      onFilesUpload([...uploadedFiles, ...files]);
+      
+      setFiles([]);
+      setUrlLink("");
+      
+      toast({
+        title: "Upload Successful",
+        description: `Successfully uploaded ${uploadResults.length} file(s) to Firebase Storage`,
+      });
+      
+      setCanClose(true);
+      // Close modal after successful upload
+      setTimeout(() => onClose(), 1000);
+      
+    } catch (error) {
+      console.error('Upload error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
       toast({
         title: "Upload Failed",
-        description: hasCanceledOrTimeout 
-          ? "Upload interrupted - retry or check connection"
-          : `Failed to upload files: ${errorDetails}`,
+        description: `Failed to upload files: ${errorMessage}`,
         variant: "destructive"
       });
       
@@ -321,7 +171,7 @@ function FileUploadModal({
       setUploadingFiles(new Map());
     } finally {
       setIsUploading(false);
-      setCanClose(true); // Re-enable modal close on error too
+      setCanClose(true);
     }
   };
 
