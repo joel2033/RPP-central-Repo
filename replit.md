@@ -753,3 +753,11 @@ Preferred communication style: Simple, everyday language.
   - **Multi-Layer Resilience**: Three-tier upload system (Firebase SDK → XHR → Fetch keepalive) ensuring maximum upload success
   - **Enhanced SDK Error Logging**: Added customData and serverResponse logging for comprehensive Firebase error analysis
   - **Network Persistence**: Keepalive option maintains connection integrity even during browser navigation or connection issues
+- July 22, 2025. **REMOVED KEEPALIVE AND ADDED XHR RETRY LOGIC** - Fixed network errors and TypeErrors in upload fallback system:
+  - **Removed Fetch Keepalive**: Eliminated fetch with keepalive fallback that was causing TypeErrors and network issues
+  - **XHR Retry Mechanism**: Implemented 3-retry system for XMLHttpRequest uploads with 1-second delays between attempts
+  - **Extended Timeout**: Increased xhr.timeout to 900000ms (15 minutes) for large RAW files to prevent timeouts
+  - **Enhanced Abort Handling**: Added retry counter in xhr.onabort with "Upload aborted, retrying..." logging
+  - **Chunked Upload Timeout**: Updated chunked upload overall timeout from 10 to 15 minutes for large file handling
+  - **ServerResponse Logging**: Added Firebase SDK serverResponse capture for empty error objects debugging
+  - **Resilient Upload Path**: Simplified to Firebase SDK → Chunked Upload → XHR with retry for maximum reliability
