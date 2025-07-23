@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import clientRoutes from './clientRoutes';
 import jobRoutes from './jobRoutes';
+import jobsSimpleRoutes from './jobsSimple';
 import { errorHandler, notFoundHandler } from '../utils/errorHandler';
 
 const router = Router();
@@ -13,6 +14,7 @@ router.get('/health', (req, res) => {
 // API routes
 router.use('/clients', clientRoutes);
 router.use('/jobs', jobRoutes);
+router.use('/jobs', jobsSimpleRoutes); // Additional simplified routes for server uploads
 
 // Remove duplicate upload routes - now handled in jobRoutes
 // import uploadRoutes from './uploadRoutes';
