@@ -168,85 +168,21 @@ export const uploadFileToFirebase = async (
         // Log FormData entries for debugging
         console.log('FormData entries:', Object.fromEntries(formData.entries()));
         
-        // Try chunked upload for large files (>5MB)
-        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
-        if (file.size > CHUNK_SIZE) {
-          console.log(`📊 Large file detected (${file.size} bytes), using chunked upload`);
-          return await uploadFileInChunks(file, jobId, mediaType, onProgress);
-        }
-        
-        let result;
-        let retries = 3;
-        let delay = 1000; // Start with 1 second delay
-        
-        while (retries > 0) {
-          try {
-            // Use fetch API instead of XMLHttpRequest to avoid network issues
-            console.log(`📤 Uploading ${file.name} via fetch API (attempt ${4 - retries}/3)`);
-            
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 900000); // 15 min timeout
-            
-            const response = await fetch(`/api/jobs/${jobId}/upload-file`, {
-              method: 'POST',
-              body: formData,
-              signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-            
-            if (!response.ok) {
-              throw new Error(`Server upload failed: ${response.status} ${response.statusText}`);
-            }
-            
-            result = await response.json();
-            console.log('✅ Fetch upload successful:', result);
-            
-            if (!result || !result.success) {
-              throw new Error(result?.error || 'Server upload failed without success flag');
-            }
-            
-            // Transform to expected format
-            const transformedResult = {
-              downloadUrl: result.downloadUrl,
-              firebasePath: result.firebasePath,
-              fileName: result.fileName || file.name,
-              fileSize: result.fileSize || file.size,
-              contentType: file.type
-            };
-            
-            console.log('✅ File uploaded successfully via server:', transformedResult);
-            return transformedResult;
-            
-          } catch (fetchError) {
-            console.error(`Fetch upload attempt ${4 - retries} failed:`, fetchError);
-            retries--;
-            
-            if (retries > 0) {
-              console.log(`Waiting ${delay}ms before retry...`);
-              await new Promise(resolve => setTimeout(resolve, delay));
-              delay *= 2; // Exponential backoff
-            } else {
-              throw fetchError;
-            }
-          }
-        }
-        
-        // This should never be reached due to return statements above
-        throw new Error('Upload method reached unexpected end');
+        // Go directly to chunked upload for reliable file handling
+        console.log(`📊 Using chunked upload for ${file.name} (${file.size} bytes)`);
+        return await uploadFileInChunks(file, jobId, mediaType, onProgress);
 
       } catch (serverError) {
-        console.error('Server upload also failed, trying chunked upload:', serverError);
+        console.error('Firebase upload failed, trying chunked upload:', serverError);
         
         // Try chunked upload as final fallback
         try {
           return await uploadFileInChunks(file, jobId, mediaType, onProgress);
         } catch (chunkError) {
           console.error('Chunked upload also failed:', chunkError);
-          const serverErrorMessage = serverError instanceof Error ? serverError.message : 'Unknown server error';
           const originalErrorMessage = error instanceof Error ? error.message : 'Unknown Firebase error';
           const chunkErrorMessage = chunkError instanceof Error ? chunkError.message : 'Unknown chunk error';
-          throw new Error(`All upload methods failed. Firebase: ${originalErrorMessage}, Server: ${serverErrorMessage}, Chunked: ${chunkErrorMessage}`);
+          throw new Error(`All upload methods failed. Firebase: ${originalErrorMessage}, Chunked: ${chunkErrorMessage}`);
         }
       }
     }

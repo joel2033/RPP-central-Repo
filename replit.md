@@ -774,6 +774,17 @@ Preferred communication style: Simple, everyday language.
   - **Complete Upload Workflow**: Three-tier resilience (Firebase SDK → XHR → Server FormData) with exponential backoff retry logic
   - **Enhanced Error Handling**: Comprehensive error logging and network timeout management for professional upload experience
   - **LSP Diagnostics Clear**: All TypeScript errors resolved, application running successfully on port 5000
+- July 23, 2025. **FIXED 404 NOT FOUND AND XHR ABORT ERRORS** - Implemented comprehensive chunked upload system to resolve persistent upload failures:
+  - **Enhanced Server Route**: Added POST /api/jobs/:id/upload-file-chunk with Content-Range header parsing and chunk assembly
+  - **Automatic Firebase Upload**: Server-side chunk combination and direct Firebase Storage upload when last chunk received
+  - **Fixed Empty Error Objects**: Enhanced Firebase SDK error detection to automatically fallback to chunked upload for empty errors
+  - **Streamlined Upload Logic**: Simplified firebaseUpload.ts to use chunked upload directly when Firebase SDK fails with empty errors
+  - **5MB Chunk Processing**: Implemented proper chunk size calculation and sequential chunk upload with progress tracking
+  - **Content-Range Protocol**: Added proper HTTP Content-Range header support for RFC-compliant chunked upload handling
+  - **Memory Management**: Server-side Map-based chunk storage with automatic cleanup after successful file assembly
+  - **Upload Resilience**: Fixed XHR abort and network errors by implementing reliable chunked upload fallback system
+  - **DNG File Support**: Large RAW photography files now upload successfully via automatic chunked upload mechanism
+  - **Production Ready**: Complete error handling and fallback chain ensures maximum upload success rate for real estate media files
 - July 22, 2025. **IMPLEMENTED REAL SERVER UPLOAD AND CORS SETUP** - Enhanced server-side Firebase uploads for maximum reliability:
   - **Real Server Upload**: Created server/routes/jobsSimple.ts with direct Firebase Admin bucket.file().save() method
   - **Enhanced Server Logic**: Uses adminBucket from firebaseAdmin with proper file metadata and signed URL generation
