@@ -132,8 +132,8 @@ export const uploadFileToFirebase = async (
         }
       }
       
-      // Try server-side FormData upload as fallback
-      console.log('🔄 Falling back to server-side upload with FormData');
+      // Use server-side upload directly - bypassing XHR network issues
+      console.log('🔄 Using direct server-side upload via fetch API');
       try {
         const formData = new FormData();
         formData.append('file', file);
@@ -167,95 +167,60 @@ export const uploadFileToFirebase = async (
         
         while (retries > 0) {
           try {
-            // Use XMLHttpRequest with exponential backoff retry logic
-            result = await new Promise<any>((resolve, reject) => {
-              const xhr = new XMLHttpRequest();
-              xhr.open('POST', `/api/jobs/${jobId}/upload-file`);
-              xhr.timeout = 900000; // 15 min for large RAW files
-              
-              xhr.ontimeout = () => {
-                console.error('Upload timeout for', file.name);
-                reject(new Error('Upload timed out after 15 minutes'));
-              };
-              
-              xhr.upload.onprogress = (e) => {
-                if (e.lengthComputable && onProgress) {
-                  const progress = Math.round((e.loaded / e.total) * 100);
-                  onProgress({
-                    bytesTransferred: e.loaded,
-                    totalBytes: e.total,
-                    progress: progress
-                  });
-                  console.log(`Server upload progress: ${progress}%`);
-                }
-              };
-              
-              xhr.onloadend = () => {
-                console.log('Server response status:', xhr.status);
-                console.log('Server response text:', xhr.responseText);
-                
-                if (xhr.status === 200) {
-                  try {
-                    const result = JSON.parse(xhr.responseText);
-                    console.log('✅ Server upload successful:', result);
-                    
-                    if (!result || !result.firebasePath) {
-                      reject(new Error('Invalid response format - missing firebasePath'));
-                    } else if (!result.success) {
-                      reject(new Error(result.error || 'Server upload failed without success flag'));
-                    } else {
-                      resolve(result);
-                    }
-                  } catch (parseError) {
-                    console.error('Failed to parse server response:', parseError);
-                    reject(new Error(`Failed to parse server response: ${xhr.responseText}`));
-                  }
-                } else {
-                  reject(new Error(`Status ${xhr.status}: ${xhr.responseText}`));
-                }
-              };
-              
-              xhr.onerror = (err) => {
-                console.error('XHR network error:', err);
-                reject(new Error('Network error during upload'));
-              };
-              
-              xhr.onabort = () => {
-                console.error(`Upload aborted, retrying after ${delay}ms...`);
-                reject(new Error('Upload aborted - retrying'));
-              };
-              
-              console.log(`📤 Starting XMLHttpRequest upload (attempt ${4 - retries}/3)...`);
-              xhr.send(formData);
+            // Use fetch API instead of XMLHttpRequest to avoid network issues
+            console.log(`📤 Uploading ${file.name} via fetch API (attempt ${4 - retries}/3)`);
+            
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 900000); // 15 min timeout
+            
+            const response = await fetch(`/api/jobs/${jobId}/upload-file`, {
+              method: 'POST',
+              body: formData,
+              signal: controller.signal
             });
             
-            // Success, exit retry loop
-            break;
+            clearTimeout(timeoutId);
             
-          } catch (xhrError) {
-            retries--;
-            console.error(`XHR upload failed (${retries} retries left):`, xhrError);
-            
-            if (retries <= 0) {
-              throw xhrError;
+            if (!response.ok) {
+              throw new Error(`Server upload failed: ${response.status} ${response.statusText}`);
             }
             
-            // Wait with exponential backoff before retry
-            console.log(`Waiting ${delay}ms before retry...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            delay *= 2; // Double the delay for next retry (1s, 2s, 4s)
+            result = await response.json();
+            console.log('✅ Fetch upload successful:', result);
+            
+            if (!result || !result.success) {
+              throw new Error(result?.error || 'Server upload failed without success flag');
+            }
+            
+            // Transform to expected format
+            const transformedResult = {
+              downloadUrl: result.downloadUrl,
+              firebasePath: result.firebasePath,
+              fileName: result.fileName || file.name,
+              fileSize: result.fileSize || file.size,
+              contentType: file.type
+            };
+            
+            console.log('✅ File uploaded successfully via server:', transformedResult);
+            return transformedResult;
+            
+          } catch (fetchError) {
+            console.error(`Fetch upload attempt ${4 - retries} failed:`, fetchError);
+            retries--;
+            
+            if (retries > 0) {
+              console.log(`Waiting ${delay}ms before retry...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              delay *= 2; // Exponential backoff
+            } else {
+              throw fetchError;
+            }
           }
         }
         
-        console.log('XMLHttpRequest upload completed:', result);
-        
-        return {
-          downloadUrl: result.downloadUrl,
-          firebasePath: result.firebasePath,
-          fileName: result.fileName,
-          fileSize: result.fileSize || file.size,
-          contentType: result.contentType || file.type
-        };
+        // This should never be reached due to return statements above
+        throw new Error('Upload method reached unexpected end');
+
       } catch (serverError) {
         console.error('Server upload also failed:', serverError);
         const serverErrorMessage = serverError instanceof Error ? serverError.message : 'Unknown server error';

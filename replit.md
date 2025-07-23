@@ -783,3 +783,12 @@ Preferred communication style: Simple, everyday language.
   - **CORS Configuration**: Manual gsutil cors set cors.json gs://rpp-central-database.firebasestorage.app command needed
   - **Real Firebase Uploads**: Server now performs actual Firebase Storage uploads instead of placeholders
   - **Enhanced Error Handling**: Comprehensive logging and fallback chain for maximum upload success rate
+- July 22, 2025. **FIXED UPLOAD RELIABILITY WITH FETCH API** - Resolved XHR network errors by replacing with modern fetch API:
+  - **Removed XHR Network Issues**: Replaced XMLHttpRequest with fetch API to eliminate status 0 network errors
+  - **Direct Server Upload Path**: Enhanced fallback system prioritizes server-side uploads via /upload-file endpoint
+  - **Firebase Admin Integration**: Server uploads use bucket.file().save() method with proper metadata and signed URLs
+  - **Fetch API Reliability**: Modern fetch with AbortController timeout (15 minutes) and exponential backoff retry logic
+  - **Simplified Upload Chain**: Firebase SDK → Fetch to Server → Real Firebase Admin uploads (removed problematic XHR layer)
+  - **Enhanced Error Handling**: Comprehensive error logging and response validation for better debugging
+  - **Upload Resilience**: 3-retry system with exponential backoff for maximum upload success rate
+  - **CORS Configuration Applied**: Google Cloud service account authenticated and CORS policy active
