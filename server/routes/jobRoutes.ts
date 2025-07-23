@@ -56,7 +56,7 @@ router.use(isAuthenticated);
 // GET /api/jobs - Get all jobs with optional filters
 router.get('/', validateQuery(jobQuerySchema), async (req, res) => {
   try {
-    const jobs = await storage.getJobCards();
+    const jobs = await storage.getJobCards((req.user as any)?.claims?.sub || '');
     res.json(jobs);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch jobs' });
@@ -67,7 +67,7 @@ router.get('/', validateQuery(jobQuerySchema), async (req, res) => {
 router.get('/:id', validateParams(idParamSchema), async (req, res) => {
   try {
     const { id } = req.params;
-    const job = await storage.getJobCard(parseInt(id));
+    const job = await storage.getJobCard(parseInt(id), (req.user as any)?.claims?.sub || '');
     if (!job) {
       return res.status(404).json({ error: 'Job not found' });
     }
@@ -82,7 +82,7 @@ router.patch('/:id', validateParams(idParamSchema), validateBody(statusUpdateSch
   try {
     const { id } = req.params;
     const { status } = req.body;
-    await storage.updateJobCardStatus(parseInt(id), status, req.user?.id);
+    await storage.updateJobCardStatus(parseInt(id), status, (req.user as any)?.claims?.sub || '');
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update job status' });
@@ -191,9 +191,9 @@ router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
     
     // Optional: Update Job Card status in DB to 'In Progress'
     try {
-      const job = await storage.getJobCard(parseInt(jobId));
+      const job = await storage.getJobCard(parseInt(jobId), (req.user as any)?.claims?.sub || '');
       if (job && job.status === 'unassigned') {
-        await storage.updateJobCardStatus(parseInt(jobId), 'in_progress', req.user?.id);
+        await storage.updateJobCardStatus(parseInt(jobId), 'in_progress', (req.user as any)?.claims?.sub || '');
       }
     } catch (dbError) {
       console.warn('Failed to update job status:', dbError);

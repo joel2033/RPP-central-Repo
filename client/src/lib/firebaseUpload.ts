@@ -1,4 +1,4 @@
-import { storage } from './firebase';
+import { storage, auth } from './firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { apiRequest } from "./queryClient";
 
@@ -30,6 +30,11 @@ export const uploadFileToFirebase = async (
   });
 
   const uploadPromise = async (): Promise<FirebaseUploadResult> => {
+    // Check authentication
+    if (!auth.currentUser) {
+      console.warn('No authenticated user found, proceeding without Firebase auth');
+    }
+    
     try {
       // Try Firebase SDK upload first
       console.log(`🚀 Attempting Firebase SDK upload for ${file.name} (${file.size} bytes)`);
