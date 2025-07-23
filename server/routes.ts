@@ -33,6 +33,7 @@ import { jobCards, clients } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import archiver from "archiver";
 import { Readable } from "stream";
+import jobRoutes from "./routes/jobRoutes";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -2621,11 +2622,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Centralized S3 upload routes
-  app.get('/api/jobs', isAuthenticated, jobController.getAllJobs);
-  app.get('/api/jobs/:id', isAuthenticated, jobController.getJobById);
-  app.get('/api/jobs/:id/files', isAuthenticated, jobController.getJobFiles);
-  app.get('/api/jobs/:id/activity', isAuthenticated, jobController.getJobActivity);
+  // Mount job routes (includes chunked upload functionality)
+  app.use('/api/jobs', jobRoutes);
   
   // S3 file upload workflow
   // app.post('/api/jobs/:id/upload-file', isAuthenticated, jobController.uploadJobFile); // Disabled - using jobRoutes.ts version instead

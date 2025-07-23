@@ -1,0 +1,36 @@
+Add vite.config.js to disable HMR overlay and fix "Failed to fetch" caused by Replit extension in the RPP platform. Also, ensure the /upload-file-chunk route is added in server/routes/jobs.js for chunked uploads.
+
+Steps to implement:
+
+Create client/vite.config.js if missing: import { defineConfig } from 'vite'; import react from '@vitejs/plugin-react'; export default defineConfig({ plugins: [react()], server: { hmr: { overlay: false, // Disable HMR error overlay to avoid extension interference }, }, });
+In server/routes/jobs.js, add the /upload-file-chunk route with chunk assembly: const express = require('express'); const multer = require('multer'); const admin = require('../utils/firebaseAdmin'); const router = express.Router(); const upload = multer({ storage: multer.memoryStorage() });
+// Existing routes...
+router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res) => {
+res.setHeader('Content-Type', 'application/json');
+try {
+const { jobId } = req.params;
+const file = req.file;
+if (!file) return res.status(400).json({ error: 'No chunk' });
+const range = req.headers['content-range']?.match(/bytes (\d+)-(\d+)/(\d+)/);
+if (!range) return res.status(400).json({ error: 'Invalid range' });
+const [start, end, total] = range.slice(1).map(Number);
+const bucket = admin.storage().bucket();
+const filePath = temp_uploads/${jobId}/${req.body.fileName || file.originalname};
+const fileRef = bucket.file(filePath);
+const writeStream = fileRef.createWriteStream({ start: start });
+writeStream.end(file.buffer);
+if (end + 1 === total) {
+const [url] = await fileRef.getSignedUrl({ action: 'read', expires: '03-09-2491' });
+res.json({ success: true, downloadUrl: url });
+} else {
+res.json({ success: true });
+}
+} catch (err) {
+res.status(500).json({ error: err.message });
+}
+});
+module.exports = router;
+3. In client/src/lib/firebaseUpload.ts, confirm chunk logic uses /upload-file-chunk and handles retries on abort.
+4. Manual: Disable the Replit Chrome extension (chrome://extensions/) to avoid fetch interference; test large .dng upload.
+
+This fixes extension issues and chunking. Commit with message: "Disable HMR overlay and add /upload-file-chunk route to fix fetch error in Upload to Editor"
