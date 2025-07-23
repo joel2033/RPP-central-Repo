@@ -1,0 +1,47 @@
+Implement signed URL chunked uploads in client/src/lib/firebaseUpload.ts and server/routes/jobs.js for RPP platform to fix XHR abort on large files.
+
+Steps to implement:
+1. In server/routes/jobs.js, add /generate-signed-url route:
+router.post('/:jobId/generate-signed-url', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const { fileName, contentType } = req.body;
+    const bucket = admin.storage().bucket();
+    const [signedUrl] = await bucket.file(`temp_uploads/${jobId}/${fileName}`).getSignedUrl({
+      action: 'write',
+      expires: Date.now() + 60 * 60 * 1000, // 1 hour
+      contentType
+    });
+    res.json({ signedUrl });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+2. In firebaseUpload.ts, replace fallback with signed URL chunked upload:
+const response = await fetch(`/api/jobs/${jobId}/generate-signed-url`, {
+  method: 'POST',
+  body: JSON.stringify({ fileName: file.name, contentType: file.type }),
+  headers: { 'Content-Type': 'application/json' }
+});
+const { signedUrl } = await response.json();
+const chunkSize = 5 * 1024 * 1024;
+const chunks = Math.ceil(file.size / chunkSize);
+let uploaded = 0;
+for (let i = 0; i < chunks; i++) {
+  const start = i * chunkSize;
+  const end = Math.min(start + chunkSize, file.size);
+  const chunk = file.slice(start, end);
+  await fetch(signedUrl, {
+    method: 'PUT',
+    body: chunk,
+    headers: { 'Content-Length': (end - start).toString(), 'Content-Range': `bytes ${start}-${end-1}/${file.size}` }
+  });
+  uploaded += (end - start);
+  if (onProgress) onProgress({ bytesTransferred: uploaded, totalBytes: file.size, progress: (uploaded / file.size) * 100 });
+}
+const downloadUrl = await getDownloadURL(ref(storage, `temp_uploads/${jobId}/${file.name}`));
+return { downloadUrl, firebasePath: `temp_uploads/${jobId}/${file.name}`, ... };
+3. Remove XHR and keepalive; add SDK auth check if (!auth.currentUser) throw new Error('Auth required');
+4. Manual: Test with large .dng; check Firebase for files.
+
+This enables direct chunked uploads. Commit with message: "Switch to signed URL chunked uploads to fix abort on large files in Upload to Editor"

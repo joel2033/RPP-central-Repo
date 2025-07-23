@@ -146,44 +146,75 @@ export const uploadFileToFirebase = async (
         }
       }
       
-      // Use server-side upload directly - bypassing XHR network issues
-      console.log('🔄 Using direct server-side upload via fetch API');
+      // Use signed URL chunked upload as fallback
+      console.log('🔄 Using signed URL chunked upload');
+      
+      // Check authentication first
+      if (!auth.currentUser) {
+        throw new Error('Auth required');
+      }
+      
       try {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('fileName', file.name);
-        formData.append('contentType', file.type);
-        formData.append('fileSize', file.size.toString());
-        formData.append('category', 'photography');
-        formData.append('mediaType', mediaType);
-        
-        console.log('📤 Sending FormData to server:', {
-          fileName: file.name,
-          contentType: file.type,
-          fileSize: file.size,
-          category: 'photography',
-          mediaType: mediaType
+        // Get signed URL from server
+        const response = await fetch(`/api/jobs/${jobId}/generate-signed-url`, {
+          method: 'POST',
+          body: JSON.stringify({ fileName: file.name, contentType: file.type }),
+          headers: { 'Content-Type': 'application/json' }
         });
         
-        // Log FormData entries for debugging
-        console.log('FormData entries:', Object.fromEntries(formData.entries()));
-        
-        // Go directly to chunked upload for reliable file handling
-        console.log(`📊 Using chunked upload for ${file.name} (${file.size} bytes)`);
-        return await uploadFileInChunks(file, jobId, mediaType, onProgress);
-
-      } catch (serverError) {
-        console.error('Firebase upload failed, trying chunked upload:', serverError);
-        
-        // Try chunked upload as final fallback
-        try {
-          return await uploadFileInChunks(file, jobId, mediaType, onProgress);
-        } catch (chunkError) {
-          console.error('Chunked upload also failed:', chunkError);
-          const originalErrorMessage = error instanceof Error ? error.message : 'Unknown Firebase error';
-          const chunkErrorMessage = chunkError instanceof Error ? chunkError.message : 'Unknown chunk error';
-          throw new Error(`All upload methods failed. Firebase: ${originalErrorMessage}, Chunked: ${chunkErrorMessage}`);
+        if (!response.ok) {
+          throw new Error(`Failed to get signed URL: ${response.status}`);
         }
+        
+        const { signedUrl } = await response.json();
+        
+        // Upload file in chunks
+        const chunkSize = 5 * 1024 * 1024; // 5MB chunks
+        const chunks = Math.ceil(file.size / chunkSize);
+        let uploaded = 0;
+        
+        for (let i = 0; i < chunks; i++) {
+          const start = i * chunkSize;
+          const end = Math.min(start + chunkSize, file.size);
+          const chunk = file.slice(start, end);
+          
+          const uploadResponse = await fetch(signedUrl, {
+            method: 'PUT',
+            body: chunk,
+            headers: { 
+              'Content-Length': (end - start).toString(), 
+              'Content-Range': `bytes ${start}-${end-1}/${file.size}` 
+            }
+          });
+          
+          if (!uploadResponse.ok) {
+            throw new Error(`Chunk ${i+1} upload failed: ${uploadResponse.status}`);
+          }
+          
+          uploaded += (end - start);
+          if (onProgress) {
+            onProgress({ 
+              bytesTransferred: uploaded, 
+              totalBytes: file.size, 
+              progress: Math.round((uploaded / file.size) * 100) 
+            });
+          }
+        }
+        
+        // Get download URL after successful upload
+        const downloadUrl = await getDownloadURL(ref(storage, `temp_uploads/${jobId}/${file.name}`));
+        
+        return { 
+          downloadUrl, 
+          firebasePath: `temp_uploads/${jobId}/${file.name}`,
+          fileName: file.name,
+          fileSize: file.size,
+          contentType: file.type
+        };
+        
+      } catch (signedUrlError) {
+        console.error('Signed URL upload failed:', signedUrlError);
+        throw signedUrlError;
       }
     }
   };
@@ -196,8 +227,8 @@ export const uploadFileToFirebase = async (
   }
 };
 
-// Chunked upload function for large files
-const uploadFileInChunks = async (
+// Remove old chunked upload function - replaced with signed URL approach
+const uploadFileInChunks_deprecated = async (
   file: File,
   jobId: string | number,
   mediaType: 'raw' | 'finished' = 'raw',

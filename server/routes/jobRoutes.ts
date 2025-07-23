@@ -231,42 +231,27 @@ router.post('/:id/upload', validateParams(idParamSchema), (req, res, next) => {
 // POST /api/jobs/:id/process-file - Process uploaded Firebase file
 router.post('/:id/process-file', validateParams(idParamSchema), validateBody(processFileSchema), processUploadedFile);
 
-// POST /api/jobs/:id/generate-signed-url - Generate signed URL for resumable upload
+// POST /api/jobs/:id/generate-signed-url - Generate signed URL for direct upload
 const signedUrlSchema = z.object({
   fileName: z.string().min(1, 'File name is required'),
   contentType: z.string().min(1, 'Content type is required'),
-  fileSize: z.number().positive('File size must be positive'),
 });
 
 router.post('/:id/generate-signed-url', validateParams(idParamSchema), validateBody(signedUrlSchema), async (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
   try {
     const { id: jobId } = req.params;
-    const { fileName, contentType, fileSize } = req.body;
-    
-    console.log(`🔑 Generating resumable signed URL for ${fileName} (${fileSize} bytes) in job ${jobId}`);
+    const { fileName, contentType } = req.body;
     
     const { adminBucket } = await import('../utils/firebaseAdmin');
-    const filePath = `temp_uploads/${jobId}/${fileName}`;
-    
-    // Generate resumable upload URL for chunked uploads
-    const [signedUrl] = await adminBucket.file(filePath).getSignedUrl({
-      action: 'resumable',
-      expires: Date.now() + 60 * 60 * 1000, // 1 hour for large files
-      contentType: contentType,
-      extensionHeaders: {
-        'x-goog-content-length-range': `0,${fileSize}`
-      }
+    const [signedUrl] = await adminBucket.file(`temp_uploads/${jobId}/${fileName}`).getSignedUrl({
+      action: 'write',
+      expires: Date.now() + 60 * 60 * 1000, // 1 hour
+      contentType
     });
     
-    console.log(`✅ Generated resumable signed URL for ${fileName}`);
-    res.json({ signedUrl, filePath, fileSize, contentType });
-  } catch (error) {
-    console.error('❌ Failed to generate signed URL:', error);
-    res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Failed to generate signed URL',
-      details: error instanceof Error ? error.stack : 'No stack trace available'
-    });
+    res.json({ signedUrl });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate signed URL' });
   }
 });
 
