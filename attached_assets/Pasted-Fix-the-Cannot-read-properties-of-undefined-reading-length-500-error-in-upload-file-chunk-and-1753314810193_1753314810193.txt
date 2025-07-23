@@ -1,0 +1,42 @@
+Fix the "Cannot read properties of undefined (reading 'length')" 500 error in /upload-file-chunk and XHR network errors in the RPP platform by handling undefined range in server/routes/jobs.js and refining chunk headers in client/src/lib/firebaseUpload.ts.
+
+Steps to implement:
+1. In server/routes/jobs.js, update /upload-file-chunk to handle undefined range:
+router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  try {
+    const { jobId } = req.params;
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'No chunk' });
+    const rangeHeader = req.headers['content-range'];
+    if (!rangeHeader) return res.status(400).json({ error: 'Missing Content-Range header' });
+    const range = rangeHeader.match(/bytes (\d+)-(\d+)\/(\d+)/);
+    if (!range) return res.status(400).json({ error: 'Invalid Content-Range format' });
+    const [ , start, end, total ] = range;
+    const bucket = admin.storage().bucket();
+    const filePath = `temp_uploads/${jobId}/${req.body.fileName || file.originalname}`;
+    const fileRef = bucket.file(filePath);
+    const writeStream = fileRef.createWriteStream({ start: parseInt(start) });
+    writeStream.end(file.buffer);
+    if (parseInt(end) + 1 === parseInt(total)) {
+      const [url] = await fileRef.getSignedUrl({ action: 'read', expires: '03-09-2491' });
+      res.json({ success: true, downloadUrl: url });
+    } else {
+      res.json({ success: true });
+    }
+  } catch (err) {
+    console.error('Chunk error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+2. In client/src/lib/firebaseUpload.ts, ensure chunk fetch sends Content-Range correctly and add retry on network error:
+const response = await fetch(`/api/jobs/${jobId}/upload-file-chunk`, {
+  method: 'POST',
+  body: chunk,
+  headers: { 'Content-Range': `bytes ${start}-${end-1}/${file.size}`, 'Content-Length': chunk.size.toString() }
+});
+if (!response.ok) throw new Error(`Chunk upload failed: ${response.status}`);
+3. Add extension disable to README.md: "To avoid fetch errors, disable the Replit extension in chrome://extensions/".
+4. Manual: Test with large .dng; check server logs for range header.
+
+This fixes header parsing and errors. Commit with message: "Handle undefined range and refine chunk headers to fix 500 and network errors in Upload to Editor"

@@ -167,11 +167,12 @@ router.post('/:id/upload-file', upload.single('file'), async (req, res) => {
     console.log('✅ Skipping validation, using direct values:', parsedBody);
     
     // Import Firebase Admin
-    const { adminBucket } = await import('../utils/firebaseAdmin');
+    const { admin } = await import('../utils/firebaseAdmin');
+    const bucket = admin.storage().bucket();
     
     // Use temp_uploads path as specified in requirements
     const firebasePath = `temp_uploads/${jobId}/${parsedBody.fileName}`;
-    const firebaseFile = adminBucket.file(firebasePath);
+    const firebaseFile = bucket.file(firebasePath);
     
     // Upload file to Firebase Storage
     console.log(`📤 Uploading to Firebase: ${firebasePath}`);
@@ -242,8 +243,9 @@ router.post('/:id/generate-signed-url', validateParams(idParamSchema), validateB
     const { id: jobId } = req.params;
     const { fileName, contentType } = req.body;
     
-    const { adminBucket } = await import('../utils/firebaseAdmin');
-    const [signedUrl] = await adminBucket.file(`temp_uploads/${jobId}/${fileName}`).getSignedUrl({
+    const { admin } = await import('../utils/firebaseAdmin');
+    const bucket = admin.storage().bucket();
+    const [signedUrl] = await bucket.file(`temp_uploads/${jobId}/${fileName}`).getSignedUrl({
       action: 'write',
       expires: Date.now() + 60 * 60 * 1000, // 1 hour
       contentType
@@ -327,9 +329,10 @@ router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res)
       
       // Upload to Firebase
       try {
-        const { adminBucket } = await import('../utils/firebaseAdmin');
+        const { admin } = await import('../utils/firebaseAdmin');
+        const bucket = admin.storage().bucket();
         const firebasePath = `temp_uploads/${jobId}/${fileName}`;
-        const firebaseFile = adminBucket.file(firebasePath);
+        const firebaseFile = bucket.file(firebasePath);
         
         await firebaseFile.save(combinedBuffer, {
           metadata: {
@@ -396,9 +399,10 @@ router.post('/:id/finalize-chunked-upload', async (req, res) => {
     console.log(`Combining ${storage_data.chunks.length} chunks into ${combinedBuffer.length} bytes for ${fileName}`);
     
     // Upload to Firebase
-    const { adminBucket } = await import('../utils/firebaseAdmin');
+    const { admin } = await import('../utils/firebaseAdmin');
+    const bucket = admin.storage().bucket();
     const firebasePath = `temp_uploads/${jobId}/${fileName}`;
-    const firebaseFile = adminBucket.file(firebasePath);
+    const firebaseFile = bucket.file(firebasePath);
     
     await firebaseFile.save(combinedBuffer, {
       metadata: {

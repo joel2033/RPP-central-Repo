@@ -42,9 +42,13 @@ function initializeFirebaseAdmin(): admin.app.App {
   return admin.app();
 }
 
-// Export initialized admin instance
+// Export initialized admin instance and functions
 export const adminApp = initializeFirebaseAdmin();
-export const adminBucket = adminApp.storage().bucket();
 export { admin };
+
+// Export a function to get bucket to avoid initialization timing issues
+export function getBucket() {
+  return admin.storage().bucket();
+}
 
 export default admin;
