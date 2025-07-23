@@ -23,81 +23,88 @@ const uploadWithSignedUrl = async (
   mediaType: 'raw' | 'finished' = 'raw',
   onProgress?: (progress: UploadProgress) => void
 ): Promise<FirebaseUploadResult> => {
-  console.log('Using signed URL chunked upload for', file.name);
+  console.log('Using chunked upload via server for', file.name);
   
-  // Get signed URL from server
-  const response = await fetch(`/api/jobs/${jobId}/generate-signed-url`, {
-    method: 'POST',
-    body: JSON.stringify({ fileName: file.name, contentType: file.type }),
-    headers: { 'Content-Type': 'application/json' }
-  });
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to get signed URL: ${response.status} - ${errorText}`);
-  }
-  
-  const { signedUrl } = await response.json();
-  console.log('Got signed URL for upload');
-  
-  // Upload file in chunks
-  const chunkSize = 5 * 1024 * 1024; // 5MB chunks
-  const chunks = Math.ceil(file.size / chunkSize);
-  let uploaded = 0;
-  
-  console.log(`Uploading ${file.name} in ${chunks} chunks`);
-  
-  for (let i = 0; i < chunks; i++) {
-    const start = i * chunkSize;
-    const end = Math.min(start + chunkSize, file.size);
-    const chunk = file.slice(start, end);
+  try {
+    // Upload file in chunks to server endpoint
+    const chunkSize = 5 * 1024 * 1024; // 5MB chunks
+    const chunks = Math.ceil(file.size / chunkSize);
+    let uploaded = 0;
+    let downloadUrl = '';
+    let firebasePath = '';
     
-    const uploadResponse = await fetch(signedUrl, {
-      method: 'PUT',
-      body: chunk,
-      headers: { 
-        'Content-Length': (end - start).toString(), 
-        'Content-Range': `bytes ${start}-${end-1}/${file.size}` 
+    console.log(`Uploading ${file.name} in ${chunks} chunks`);
+    
+    for (let i = 0; i < chunks; i++) {
+      const start = i * chunkSize;
+      const end = Math.min(start + chunkSize, file.size);
+      const chunk = file.slice(start, end);
+      
+      const formData = new FormData();
+      formData.append('file', chunk);
+      formData.append('fileName', file.name);
+      
+      const response = await fetch(`/api/jobs/${jobId}/upload-file-chunk`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Content-Range': `bytes ${start}-${end-1}/${file.size}`
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Chunk ${i+1} upload failed: ${response.status} - ${errorText}`);
       }
+      
+      const result = await response.json();
+      
+      // If this was the last chunk, we get the download URL
+      if (result.downloadUrl) {
+        downloadUrl = result.downloadUrl;
+        firebasePath = result.firebasePath;
+      }
+      
+      uploaded += (end - start);
+      if (onProgress) {
+        onProgress({ 
+          bytesTransferred: uploaded, 
+          totalBytes: file.size, 
+          progress: Math.round((uploaded / file.size) * 100) 
+        });
+      }
+      console.log(`Chunk ${i+1}/${chunks} uploaded`);
+    }
+    
+    console.log('All chunks uploaded successfully');
+    
+    // Ensure we have the downloadUrl and firebasePath from the last chunk
+    if (!downloadUrl || !firebasePath) {
+      throw new Error('Upload completed but no download URL received');
+    }
+    
+    // Process the file on the backend
+    await apiRequest('POST', `/api/jobs/${jobId}/process-file`, {
+      firebasePath,
+      downloadUrl,
+      fileName: file.name,
+      contentType: file.type,
+      fileSize: file.size,
+      category: 'photography',
+      mediaType: mediaType
     });
     
-    if (!uploadResponse.ok) {
-      const errorText = await uploadResponse.text();
-      throw new Error(`Chunk ${i+1} upload failed: ${uploadResponse.status} - ${errorText}`);
-    }
-    
-    uploaded += (end - start);
-    if (onProgress) {
-      onProgress({ 
-        bytesTransferred: uploaded, 
-        totalBytes: file.size, 
-        progress: Math.round((uploaded / file.size) * 100) 
-      });
-    }
-    console.log(`Chunk ${i+1}/${chunks} uploaded`);
+    return { 
+      downloadUrl, 
+      firebasePath,
+      fileName: file.name,
+      fileSize: file.size,
+      contentType: file.type
+    };
+  } catch (error) {
+    console.error('Chunked upload error:', error);
+    throw error;
   }
-  
-  // Get download URL after successful upload
-  const downloadUrl = await getDownloadURL(ref(storage, `temp_uploads/${jobId}/${file.name}`));
-  
-  // Process the file on the backend
-  await apiRequest('POST', `/api/jobs/${jobId}/process-file`, {
-    firebasePath: `temp_uploads/${jobId}/${file.name}`,
-    downloadUrl,
-    fileName: file.name,
-    contentType: file.type,
-    fileSize: file.size,
-    category: 'photography',
-    mediaType: mediaType
-  });
-  
-  return { 
-    downloadUrl, 
-    firebasePath: `temp_uploads/${jobId}/${file.name}`,
-    fileName: file.name,
-    fileSize: file.size,
-    contentType: file.type
-  };
 };
 
 export const uploadFileToFirebase = async (
