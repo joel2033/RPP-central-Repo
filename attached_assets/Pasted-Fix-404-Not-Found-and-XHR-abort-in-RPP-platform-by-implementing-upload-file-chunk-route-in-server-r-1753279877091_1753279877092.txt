@@ -1,0 +1,45 @@
+Fix 404 Not Found and XHR abort in RPP platform by implementing /upload-file-chunk route in server/routes/jobs.js and enhancing SDK error logging in client/src/lib/firebaseUpload.ts.
+
+Steps to implement:
+1. In server/routes/jobs.js, add chunk route with buffer assembly:
+const express = require('express');
+const multer = require('multer');
+const admin = require('../utils/firebaseAdmin');
+const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage() });
+
+// Existing routes...
+router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  try {
+    const { jobId } = req.params;
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'No chunk' });
+    const range = req.headers['content-range']?.match(/bytes (\d+)-(\d+)\/(\d+)/);
+    if (!range) return res.status(400).json({ error: 'Invalid range' });
+    const [start, end, total] = range.slice(1).map(Number);
+    const bucket = admin.storage().bucket();
+    const filePath = `temp_uploads/${jobId}/${req.body.fileName || file.originalname}`;
+    let fileRef = bucket.file(filePath);
+    if (start === 0) await fileRef.save(Buffer.alloc(0)); // Initialize
+    await fileRef.createWriteStream({ start, end }).end(file.buffer);
+    if (end + 1 === total) {
+      const [url] = await fileRef.getSignedUrl({ action: 'read', expires: '03-09-2491' });
+      res.json({ success: true, downloadUrl: url });
+    } else {
+      res.json({ success: true });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+module.exports = router;
+2. In firebaseUpload.ts, enhance SDK error:
+uploadTask.on('state_changed', ... , err => {
+  console.error('SDK error:', { code: err.code, message: err.message, serverResponse: err.serverResponse });
+  if (err.code === 'storage/unauthorized') throw new Error('Auth failed - re-login');
+  reject(new Error(`SDK error: ${err.code || 'unknown'} - ${err.message}`));
+});
+3. Manual: Redeploy, test with large .dng; check logs for 404 or auth errors.
+
+This adds chunk support and error detail. Commit with message: "Implement /upload-file-chunk and enhance SDK error logging to fix 404 and abort in Upload to Editor"

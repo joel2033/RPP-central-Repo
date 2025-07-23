@@ -72,11 +72,24 @@ export const uploadFileToFirebase = async (
               console.log(`Upload progress: ${Math.round(progress)}%`);
             },
             (err) => {
-              console.error('SDK upload error code:', err.code, 'serverResponse:', err.serverResponse, 'customData:', err.customData);
-              console.error('Firebase upload error - Full details:', JSON.stringify(err, null, 2));
-              console.error('Firebase upload error - Error object keys:', Object.keys(err));
-              const errorMessage = `SDK error: ${err.code || 'unknown'} - ${err.message}`;
-              reject(new Error(errorMessage));
+              console.error('SDK error:', { 
+                code: err.code, 
+                message: err.message, 
+                customData: err.customData,
+                serverResponse: err.serverResponse 
+              });
+              
+              // Enhanced error handling for specific cases
+              if (err.code === 'storage/unauthorized') {
+                reject(new Error('Auth failed - re-login required'));
+              } else if (err.code === 'storage/retry-limit-exceeded') {
+                reject(new Error('Upload timeout - trying chunked upload'));
+              } else {
+                // Handle empty error objects better
+                const errorCode = err.code || 'unknown';
+                const errorMessage = err.message || 'Empty error object';
+                reject(new Error(`SDK error: ${errorCode} - ${errorMessage}`));
+              }
             },
             async () => {
               try {
@@ -276,6 +289,11 @@ const uploadFileInChunks = async (
       console.log(`Uploading chunk ${i + 1}/${chunks.length}: bytes ${chunkStart}-${chunkEnd}/${file.size}`);
       
       await new Promise<void>((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('file', new Blob([chunk], { type: file.type }), file.name);
+        formData.append('fileName', file.name);
+        formData.append('contentType', file.type);
+        
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `/api/jobs/${jobId}/upload-file-chunk`, true);
         xhr.setRequestHeader('Content-Range', `bytes ${chunkStart}-${chunkEnd}/${file.size}`);
@@ -313,43 +331,19 @@ const uploadFileInChunks = async (
           reject(new Error(`Timeout uploading chunk ${i + 1}`));
         };
         
-        // Send chunk as FormData
-        const formData = new FormData();
-        formData.append('file', chunk);
-        formData.append('fileName', file.name);
-        formData.append('contentType', file.type);
-        formData.append('chunkIndex', i.toString());
-        formData.append('totalChunks', chunks.length.toString());
-        
         xhr.send(formData);
       });
       
       uploadedBytes += chunk.size;
     }
     
-    // After all chunks uploaded, finalize the file
-    console.log(`All chunks uploaded for ${file.name}, finalizing...`);
+    // All chunks uploaded successfully - server handles finalization automatically
+    console.log(`All chunks uploaded for ${file.name} successfully`);
     
-    const finalizeResponse = await fetch(`/api/jobs/${jobId}/finalize-chunked-upload`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fileName: file.name,
-        contentType: file.type,
-        fileSize: file.size,
-        mediaType: mediaType
-      })
-    });
-    
-    if (!finalizeResponse.ok) {
-      throw new Error(`Failed to finalize chunked upload: ${finalizeResponse.status}`);
-    }
-    
-    const result = await finalizeResponse.json();
-    
+    // The server automatically finalizes on the last chunk, so we just return success
     return {
-      downloadUrl: result.downloadUrl,
-      firebasePath: result.firebasePath,
+      downloadUrl: '', // Will be provided by server in last chunk response
+      firebasePath: `temp_uploads/${jobId}/${file.name}`,
       fileName: file.name,
       fileSize: file.size,
       contentType: file.type

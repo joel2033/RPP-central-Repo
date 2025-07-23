@@ -281,41 +281,100 @@ router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res)
       return res.status(400).json({ error: 'No chunk' });
     }
     
-    const fileName = req.body.fileName || req.headers['x-file-name'] as string;
+    const fileName = req.headers['x-file-name'] as string || req.body.fileName;
     const contentRange = req.headers['content-range'] as string;
-    const chunkIndex = parseInt(req.body.chunkIndex || '0');
-    const totalChunks = parseInt(req.body.totalChunks || '1');
     
-    console.log(`Received chunk ${chunkIndex + 1}/${totalChunks} for ${fileName} (${file.size} bytes)`);
-    console.log('Content-Range header:', contentRange);
+    console.log(`📦 Received chunk for ${fileName} (${file.size} bytes)`);
+    console.log('📋 Content-Range header:', contentRange);
+    console.log('📋 Request headers:', Object.keys(req.headers));
     
     if (!fileName) {
       return res.status(400).json({ error: 'File name required' });
     }
     
+    // Parse Content-Range header: "bytes start-end/total"
+    const range = contentRange?.match(/bytes (\d+)-(\d+)\/(\d+)/);
+    if (!range) {
+      return res.status(400).json({ error: 'Invalid Content-Range header' });
+    }
+    
+    const [, start, end, total] = range;
+    const startByte = parseInt(start);
+    const endByte = parseInt(end);
+    const totalBytes = parseInt(total);
+    
+    console.log(`📊 Chunk range: ${startByte}-${endByte}/${totalBytes}`);
+    
     const chunkKey = `${jobId}-${fileName}`;
     
-    // Initialize chunk storage for this file
+    // Initialize storage for this file if not exists
     if (!chunkStorage.has(chunkKey)) {
+      const totalChunks = Math.ceil(totalBytes / (5 * 1024 * 1024)); // 5MB chunks
       chunkStorage.set(chunkKey, {
         chunks: new Array(totalChunks),
         metadata: {
           fileName,
-          contentType: req.body.contentType || file.mimetype,
+          contentType: file.mimetype,
           totalChunks,
+          totalBytes,
           jobId
         }
       });
     }
     
     const storage_data = chunkStorage.get(chunkKey)!;
+    const chunkIndex = Math.floor(startByte / (5 * 1024 * 1024));
     storage_data.chunks[chunkIndex] = file.buffer;
     
-    console.log(`Stored chunk ${chunkIndex + 1}/${totalChunks} for ${fileName}`);
+    console.log(`✅ Stored chunk ${chunkIndex + 1}/${storage_data.metadata.totalChunks} for ${fileName}`);
     
-    res.json({ success: true, chunkIndex, totalChunks });
+    // Check if this is the last chunk
+    if (endByte + 1 === totalBytes) {
+      console.log(`🎯 Last chunk received, finalizing upload for ${fileName}`);
+      
+      // Combine all chunks
+      const combinedBuffer = Buffer.concat(storage_data.chunks.filter(chunk => chunk));
+      console.log(`📊 Combined ${storage_data.chunks.length} chunks into ${combinedBuffer.length} bytes`);
+      
+      // Upload to Firebase
+      const { adminBucket } = await import('../utils/firebaseAdmin');
+      const firebasePath = `temp_uploads/${jobId}/${fileName}`;
+      const firebaseFile = adminBucket.file(firebasePath);
+      
+      await firebaseFile.save(combinedBuffer, {
+        metadata: {
+          contentType: storage_data.metadata.contentType,
+          metadata: {
+            jobId: jobId,
+            category: 'photography',
+            mediaType: 'raw'
+          }
+        }
+      });
+      
+      // Generate download URL
+      const [downloadUrl] = await firebaseFile.getSignedUrl({
+        action: 'read',
+        expires: '03-09-2491'
+      });
+      
+      // Clean up chunk storage
+      chunkStorage.delete(chunkKey);
+      
+      console.log(`🎉 Successfully uploaded chunked file ${fileName} to Firebase`);
+      
+      res.json({ 
+        success: true, 
+        downloadUrl,
+        firebasePath,
+        fileName,
+        fileSize: combinedBuffer.length
+      });
+    } else {
+      res.json({ success: true, chunkIndex, totalChunks: storage_data.metadata.totalChunks });
+    }
   } catch (err) {
-    console.error('Chunk upload error:', err);
+    console.error('❌ Chunk upload error:', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Chunk upload failed' });
   }
 });
