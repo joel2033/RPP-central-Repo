@@ -126,6 +126,9 @@ const upload = multer({
   }
 });
 
+// Temporary storage for chunked uploads
+const chunkStorage = new Map<string, { chunks: Buffer[], metadata: any }>();
+
 // Define upload schema for FormData validation
 const uploadFormDataSchema = z.object({
   fileName: z.string(),
@@ -263,6 +266,117 @@ router.post('/:id/generate-signed-url', validateParams(idParamSchema), validateB
     res.status(500).json({ 
       error: error instanceof Error ? error.message : 'Failed to generate signed URL',
       details: error instanceof Error ? error.stack : 'No stack trace available'
+    });
+  }
+});
+
+// POST /api/jobs/:jobId/upload-file-chunk - Handle chunked file uploads
+router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  try {
+    const { jobId } = req.params;
+    const file = req.file;
+    
+    if (!file) {
+      return res.status(400).json({ error: 'No chunk' });
+    }
+    
+    const fileName = req.body.fileName || req.headers['x-file-name'] as string;
+    const contentRange = req.headers['content-range'] as string;
+    const chunkIndex = parseInt(req.body.chunkIndex || '0');
+    const totalChunks = parseInt(req.body.totalChunks || '1');
+    
+    console.log(`Received chunk ${chunkIndex + 1}/${totalChunks} for ${fileName} (${file.size} bytes)`);
+    console.log('Content-Range header:', contentRange);
+    
+    if (!fileName) {
+      return res.status(400).json({ error: 'File name required' });
+    }
+    
+    const chunkKey = `${jobId}-${fileName}`;
+    
+    // Initialize chunk storage for this file
+    if (!chunkStorage.has(chunkKey)) {
+      chunkStorage.set(chunkKey, {
+        chunks: new Array(totalChunks),
+        metadata: {
+          fileName,
+          contentType: req.body.contentType || file.mimetype,
+          totalChunks,
+          jobId
+        }
+      });
+    }
+    
+    const storage_data = chunkStorage.get(chunkKey)!;
+    storage_data.chunks[chunkIndex] = file.buffer;
+    
+    console.log(`Stored chunk ${chunkIndex + 1}/${totalChunks} for ${fileName}`);
+    
+    res.json({ success: true, chunkIndex, totalChunks });
+  } catch (err) {
+    console.error('Chunk upload error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Chunk upload failed' });
+  }
+});
+
+// POST /api/jobs/:id/finalize-chunked-upload - Combine chunks and upload to Firebase
+router.post('/:id/finalize-chunked-upload', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  try {
+    const { id: jobId } = req.params;
+    const { fileName, contentType, fileSize, mediaType } = req.body;
+    
+    const chunkKey = `${jobId}-${fileName}`;
+    const storage_data = chunkStorage.get(chunkKey);
+    
+    if (!storage_data) {
+      return res.status(400).json({ error: 'No chunks found for this file' });
+    }
+    
+    // Combine all chunks
+    const combinedBuffer = Buffer.concat(storage_data.chunks.filter(chunk => chunk));
+    console.log(`Combining ${storage_data.chunks.length} chunks into ${combinedBuffer.length} bytes for ${fileName}`);
+    
+    // Upload to Firebase
+    const { adminBucket } = await import('../utils/firebaseAdmin');
+    const firebasePath = `temp_uploads/${jobId}/${fileName}`;
+    const firebaseFile = adminBucket.file(firebasePath);
+    
+    await firebaseFile.save(combinedBuffer, {
+      metadata: {
+        contentType: contentType,
+        metadata: {
+          jobId: jobId,
+          category: 'photography',
+          mediaType: mediaType || 'raw'
+        }
+      }
+    });
+    
+    // Generate download URL
+    const [downloadUrl] = await firebaseFile.getSignedUrl({
+      action: 'read',
+      expires: '03-09-2491'
+    });
+    
+    // Clean up chunk storage
+    chunkStorage.delete(chunkKey);
+    
+    console.log(`Successfully uploaded chunked file ${fileName} to Firebase`);
+    
+    res.json({
+      success: true,
+      downloadUrl,
+      firebasePath,
+      fileName,
+      fileSize: combinedBuffer.length,
+      contentType
+    });
+  } catch (error) {
+    console.error('Finalize chunked upload error:', error);
+    res.status(500).json({ 
+      error: error instanceof Error ? error.message : 'Failed to finalize chunked upload' 
     });
   }
 });

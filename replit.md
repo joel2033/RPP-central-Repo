@@ -792,3 +792,14 @@ Preferred communication style: Simple, everyday language.
   - **Enhanced Error Handling**: Comprehensive error logging and response validation for better debugging
   - **Upload Resilience**: 3-retry system with exponential backoff for maximum upload success rate
   - **CORS Configuration Applied**: Google Cloud service account authenticated and CORS policy active
+- July 23, 2025. **IMPLEMENTED CHUNKED UPLOADS AND AUTHENTICATION CHECKS** - Fixed XHR abort and SDK errors with comprehensive chunked upload system:
+  - **Strict Authentication Required**: Added auth.currentUser check before all uploads with clear error messages
+  - **Enhanced SDK Error Debugging**: Improved error formatting with "SDK error: {code} - {message}" for better troubleshooting
+  - **5MB Chunked Upload Fallback**: Implemented chunked upload as final fallback for large files with Content-Range headers
+  - **Server-Side Chunk Handling**: Added /upload-file-chunk and /finalize-chunked-upload endpoints with temporary storage
+  - **Chunk Assembly Logic**: Server combines Buffer chunks and uploads to Firebase Storage using adminBucket.file().save()
+  - **3-Tier Upload Resilience**: Firebase SDK → Fetch to Server → Chunked Upload for maximum reliability
+  - **Content-Range Headers**: Proper HTTP range headers (bytes start-end/total) for chunked upload protocol
+  - **Memory Management**: Temporary Map-based chunk storage with automatic cleanup after successful uploads
+  - **Large File Support**: Specifically designed for .dng RAW files and other large real estate media uploads
+  - **Production Ready**: Complete error handling, progress tracking, and fallback chains for professional use

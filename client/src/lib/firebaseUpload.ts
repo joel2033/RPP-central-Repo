@@ -30,9 +30,9 @@ export const uploadFileToFirebase = async (
   });
 
   const uploadPromise = async (): Promise<FirebaseUploadResult> => {
-    // Check authentication
+    // Authentication check - required for uploads
     if (!auth.currentUser) {
-      console.warn('No authenticated user found, proceeding without Firebase auth');
+      throw new Error('Authentication required - please sign in before uploading files');
     }
     
     try {
@@ -75,7 +75,8 @@ export const uploadFileToFirebase = async (
               console.error('SDK upload error code:', err.code, 'serverResponse:', err.serverResponse, 'customData:', err.customData);
               console.error('Firebase upload error - Full details:', JSON.stringify(err, null, 2));
               console.error('Firebase upload error - Error object keys:', Object.keys(err));
-              reject(err);
+              const errorMessage = `SDK error: ${err.code || 'unknown'} - ${err.message}`;
+              reject(new Error(errorMessage));
             },
             async () => {
               try {
@@ -222,10 +223,18 @@ export const uploadFileToFirebase = async (
         throw new Error('Upload method reached unexpected end');
 
       } catch (serverError) {
-        console.error('Server upload also failed:', serverError);
-        const serverErrorMessage = serverError instanceof Error ? serverError.message : 'Unknown server error';
-        const originalErrorMessage = error instanceof Error ? error.message : 'Unknown Firebase error';
-        throw new Error(`Both Firebase SDK and server upload failed. Firebase: ${originalErrorMessage}, Server: ${serverErrorMessage}`);
+        console.error('Server upload also failed, trying chunked upload:', serverError);
+        
+        // Try chunked upload as final fallback
+        try {
+          return await uploadFileInChunks(file, jobId, mediaType, onProgress);
+        } catch (chunkError) {
+          console.error('Chunked upload also failed:', chunkError);
+          const serverErrorMessage = serverError instanceof Error ? serverError.message : 'Unknown server error';
+          const originalErrorMessage = error instanceof Error ? error.message : 'Unknown Firebase error';
+          const chunkErrorMessage = chunkError instanceof Error ? chunkError.message : 'Unknown chunk error';
+          throw new Error(`All upload methods failed. Firebase: ${originalErrorMessage}, Server: ${serverErrorMessage}, Chunked: ${chunkErrorMessage}`);
+        }
       }
     }
   };
@@ -245,133 +254,109 @@ const uploadFileInChunks = async (
   mediaType: 'raw' | 'finished' = 'raw',
   onProgress?: (progress: UploadProgress) => void
 ): Promise<FirebaseUploadResult> => {
-  const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
-  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  const chunkSize = 5 * 1024 * 1024; // 5MB chunks
+  const chunks = [];
   
-  console.log(`🧩 Starting chunked upload for ${file.name}: ${totalChunks} chunks of ${CHUNK_SIZE} bytes`);
+  // Split file into chunks
+  for (let start = 0; start < file.size; start += chunkSize) {
+    chunks.push(file.slice(start, start + chunkSize));
+  }
   
-  // Get signed URL from server
+  console.log(`Starting chunked upload for ${file.name}: ${chunks.length} chunks of ${chunkSize} bytes`);
+  
+  let uploadedBytes = 0;
+  
   try {
-    const signedUrlResponse = await fetch(`/api/jobs/${jobId}/generate-signed-url`, {
+    // Upload chunks sequentially with Content-Range headers
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const chunkStart = uploadedBytes;
+      const chunkEnd = uploadedBytes + chunk.size - 1;
+      
+      console.log(`Uploading chunk ${i + 1}/${chunks.length}: bytes ${chunkStart}-${chunkEnd}/${file.size}`);
+      
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `/api/jobs/${jobId}/upload-file-chunk`, true);
+        xhr.setRequestHeader('Content-Range', `bytes ${chunkStart}-${chunkEnd}/${file.size}`);
+        xhr.setRequestHeader('X-File-Name', file.name);
+        xhr.timeout = 300000; // 5 minutes per chunk
+        
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable && onProgress) {
+            const totalProgress = Math.round(((uploadedBytes + e.loaded) / file.size) * 100);
+            onProgress({
+              bytesTransferred: uploadedBytes + e.loaded,
+              totalBytes: file.size,
+              progress: totalProgress
+            });
+          }
+        };
+        
+        xhr.onloadend = () => {
+          if (xhr.status === 200) {
+            console.log(`Chunk ${i + 1} uploaded successfully`);
+            resolve();
+          } else {
+            console.error(`Chunk ${i + 1} failed with status ${xhr.status}: ${xhr.responseText}`);
+            reject(new Error(`Chunk upload failed: ${xhr.status} ${xhr.responseText}`));
+          }
+        };
+        
+        xhr.onerror = () => {
+          console.error(`Network error uploading chunk ${i + 1}`);
+          reject(new Error(`Network error uploading chunk ${i + 1}`));
+        };
+        
+        xhr.ontimeout = () => {
+          console.error(`Timeout uploading chunk ${i + 1}`);
+          reject(new Error(`Timeout uploading chunk ${i + 1}`));
+        };
+        
+        // Send chunk as FormData
+        const formData = new FormData();
+        formData.append('file', chunk);
+        formData.append('fileName', file.name);
+        formData.append('contentType', file.type);
+        formData.append('chunkIndex', i.toString());
+        formData.append('totalChunks', chunks.length.toString());
+        
+        xhr.send(formData);
+      });
+      
+      uploadedBytes += chunk.size;
+    }
+    
+    // After all chunks uploaded, finalize the file
+    console.log(`All chunks uploaded for ${file.name}, finalizing...`);
+    
+    const finalizeResponse = await fetch(`/api/jobs/${jobId}/finalize-chunked-upload`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         fileName: file.name,
         contentType: file.type,
-        fileSize: file.size
+        fileSize: file.size,
+        mediaType: mediaType
       })
     });
     
-    if (!signedUrlResponse.ok) {
-      throw new Error(`Failed to get signed URL: ${signedUrlResponse.status}`);
+    if (!finalizeResponse.ok) {
+      throw new Error(`Failed to finalize chunked upload: ${finalizeResponse.status}`);
     }
     
-    const { signedUrl, filePath } = await signedUrlResponse.json();
-    console.log(`🔑 Got signed URL for chunked upload: ${filePath}`);
+    const result = await finalizeResponse.json();
     
-    // Set up overall timeout with AbortController
-    const controller = new AbortController();
-    const overallTimeoutId = setTimeout(() => {
-      controller.abort();
-    }, 900000); // 15 minutes total timeout
-    
-    let uploadedBytes = 0;
-    
-    try {
-      // Upload chunks sequentially
-      for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-        const start = chunkIndex * CHUNK_SIZE;
-        const end = Math.min(start + CHUNK_SIZE, file.size);
-        const chunk = file.slice(start, end);
-        
-        console.log(`📦 Uploading chunk ${chunkIndex + 1}/${totalChunks} (${start}-${end})`);
-        
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open('PUT', signedUrl);
-          xhr.timeout = 120000; // 2 minutes per chunk
-          
-          // Set Content-Range header for resumable upload
-          xhr.setRequestHeader('Content-Range', `bytes ${start}-${end - 1}/${file.size}`);
-          xhr.setRequestHeader('Content-Type', file.type);
-          xhr.setRequestHeader('X-Goog-Content-Length-Range', `0,${file.size}`);
-          
-          xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable) {
-              const chunkProgress = e.loaded;
-              const totalProgress = uploadedBytes + chunkProgress;
-              const overallProgress = Math.round((totalProgress / file.size) * 100);
-              
-              if (onProgress) {
-                onProgress({
-                  bytesTransferred: totalProgress,
-                  totalBytes: file.size,
-                  progress: overallProgress
-                });
-              }
-              
-              console.log(`🔄 Chunk ${chunkIndex + 1} progress: ${Math.round((chunkProgress / chunk.size) * 100)}%, Overall: ${overallProgress}%`);
-            }
-          };
-          
-          xhr.onload = () => {
-            if (xhr.status === 200 || xhr.status === 308) { // 308 = Resume Incomplete
-              uploadedBytes += chunk.size;
-              console.log(`✅ Chunk ${chunkIndex + 1} uploaded successfully`);
-              resolve();
-            } else {
-              reject(new Error(`Chunk upload failed: ${xhr.status} - ${xhr.responseText}`));
-            }
-          };
-          
-          xhr.onerror = () => {
-            reject(new Error(`Network error during chunk ${chunkIndex + 1} upload`));
-          };
-          
-          xhr.ontimeout = () => {
-            reject(new Error(`Chunk ${chunkIndex + 1} upload timed out`));
-          };
-          
-          xhr.onabort = () => {
-            reject(new Error(`Chunk ${chunkIndex + 1} upload aborted`));
-          };
-          
-          xhr.send(chunk);
-        });
-        
-        // Check if overall upload was aborted
-        if (controller.signal.aborted) {
-          throw new Error('Overall upload timeout after 15 minutes');
-        }
-      }
-      
-      clearTimeout(overallTimeoutId);
-      console.log(`🎉 All ${totalChunks} chunks uploaded successfully`);
-      
-      // Get download URL using Firebase SDK
-      const { storage } = await import('./firebase');
-      const { ref, getDownloadURL } = await import('firebase/storage');
-      const fileRef = ref(storage, filePath);
-      const downloadUrl = await getDownloadURL(fileRef);
-      
-      console.log(`📥 Got download URL for chunked upload: ${downloadUrl}`);
-      
-      return {
-        downloadUrl,
-        firebasePath: filePath,
-        fileName: file.name,
-        fileSize: file.size,
-        contentType: file.type
-      };
-      
-    } catch (chunkError) {
-      clearTimeout(overallTimeoutId);
-      console.error('Chunked upload failed:', chunkError);
-      throw chunkError;
-    }
+    return {
+      downloadUrl: result.downloadUrl,
+      firebasePath: result.firebasePath,
+      fileName: file.name,
+      fileSize: file.size,
+      contentType: file.type
+    };
     
   } catch (error) {
-    console.error('Failed to initialize chunked upload:', error);
+    console.error('Chunked upload failed:', error);
     throw error;
   }
 };
