@@ -4,6 +4,14 @@ import { setupVite, serveStatic, log } from "./vite";
 import { securityHeaders, rateLimiter, requestSizeLimit, inputSanitization } from "./middleware/securityMiddleware";
 import apiRoutes from "./routes/index";
 
+// Check environment variables for Firebase
+if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+  console.warn('⚠️ Missing FIREBASE_SERVICE_ACCOUNT environment variable');
+}
+if (!process.env.FIREBASE_STORAGE_BUCKET) {
+  console.warn('⚠️ Missing FIREBASE_STORAGE_BUCKET environment variable');
+}
+
 const app = express();
 
 // Security middleware
