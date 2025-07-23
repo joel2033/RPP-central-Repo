@@ -4,7 +4,7 @@ import * as admin from 'firebase-admin';
 let firebaseAdmin: admin.app.App;
 
 function initializeFirebaseAdmin(): admin.app.App {
-  if (!admin.apps.length) {
+  if (!admin.apps || !admin.apps.length) {
     // Check if service account is provided via environment variable
     const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
     

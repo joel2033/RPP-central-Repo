@@ -1,0 +1,51 @@
+Fix server 500 error in /upload-file-chunk and Failed to fetch from extension in RPP platform by handling undefined range in server/routes/jobs.js and adding CSP to vite.config.js.
+
+Steps to implement:
+1. In server/routes/jobs.js, handle undefined range in /upload-file-chunk:
+router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  try {
+    const { jobId } = req.params;
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'No chunk' });
+    const rangeHeader = req.headers['content-range'];
+    if (!rangeHeader) return res.status(400).json({ error: 'Missing Content-Range header' });
+    const range = rangeHeader.match(/bytes (\d+)-(\d+)\/(\d+)/);
+    if (!range) return res.status(400).json({ error: 'Invalid Content-Range format' });
+    const [ , start, end, total ] = range;
+    const bucket = admin.storage().bucket();
+    const filePath = `temp_uploads/${jobId}/${req.body.fileName || file.originalname}`;
+    const fileRef = bucket.file(filePath);
+    const writeStream = fileRef.createWriteStream({ start: parseInt(start) });
+    writeStream.end(file.buffer);
+    if (parseInt(end) + 1 === parseInt(total)) {
+      const [url] = await fileRef.getSignedUrl({ action: 'read', expires: '03-09-2491' });
+      res.json({ success: true, downloadUrl: url });
+    } else {
+      res.json({ success: true });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+3. In client/vite.config.js, add CSP to allow Replit fetches:
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    hmr: {
+      overlay: false,
+    },
+    csp: {
+      'default-src': "'self'",
+      'connect-src': "'self' *",
+      'script-src': "'self' 'unsafe-eval' 'unsafe-inline'",
+      'style-src': "'self' 'unsafe-inline'",
+      'img-src': "'self' data: blob: *",
+    },
+  },
+});
+4. In client/src/lib/firebaseUpload.ts, ensure Content-Range header is set correctly for chunk fetch:
+headers: { 'Content-Range': `bytes ${start}-${end-1}/${file.size}`, 'Content-Length': chunk.size.toString() }
+5. Manual: Disable Replit extension (chrome://extensions/); test large .dng.
+
+This fixes undefined and extension issues. Commit with message: "Handle undefined range and add CSP to fix 500 and fetch error in Upload to Editor"

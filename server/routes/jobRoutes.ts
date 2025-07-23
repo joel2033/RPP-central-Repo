@@ -278,9 +278,13 @@ router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res)
     }
     
     // Parse Content-Range header: "bytes start-end/total"
-    const range = contentRange?.match(/bytes (\d+)-(\d+)\/(\d+)/);
+    if (!contentRange) {
+      return res.status(400).json({ error: 'Missing Content-Range header' });
+    }
+    
+    const range = contentRange.match(/bytes (\d+)-(\d+)\/(\d+)/);
     if (!range) {
-      return res.status(400).json({ error: 'Invalid Content-Range header' });
+      return res.status(400).json({ error: 'Invalid Content-Range format' });
     }
     
     const [, start, end, total] = range;
@@ -322,39 +326,48 @@ router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res)
       console.log(`📊 Combined ${storage_data.chunks.length} chunks into ${combinedBuffer.length} bytes`);
       
       // Upload to Firebase
-      const { adminBucket } = await import('../utils/firebaseAdmin');
-      const firebasePath = `temp_uploads/${jobId}/${fileName}`;
-      const firebaseFile = adminBucket.file(firebasePath);
-      
-      await firebaseFile.save(combinedBuffer, {
-        metadata: {
-          contentType: storage_data.metadata.contentType,
+      try {
+        const { adminBucket } = await import('../utils/firebaseAdmin');
+        const firebasePath = `temp_uploads/${jobId}/${fileName}`;
+        const firebaseFile = adminBucket.file(firebasePath);
+        
+        await firebaseFile.save(combinedBuffer, {
           metadata: {
-            jobId: jobId,
-            category: 'photography',
-            mediaType: 'raw'
+            contentType: storage_data.metadata.contentType,
+            metadata: {
+              jobId: jobId,
+              category: 'photography',
+              mediaType: 'raw'
+            }
           }
-        }
-      });
-      
-      // Generate download URL
-      const [downloadUrl] = await firebaseFile.getSignedUrl({
-        action: 'read',
-        expires: '03-09-2491'
-      });
-      
-      // Clean up chunk storage
-      chunkStorage.delete(chunkKey);
-      
-      console.log(`🎉 Successfully uploaded chunked file ${fileName} to Firebase`);
-      
-      res.json({ 
-        success: true, 
-        downloadUrl,
-        firebasePath,
-        fileName,
-        fileSize: combinedBuffer.length
-      });
+        });
+        
+        // Generate download URL
+        const [downloadUrl] = await firebaseFile.getSignedUrl({
+          action: 'read',
+          expires: '03-09-2491'
+        });
+        
+        // Clean up chunk storage
+        chunkStorage.delete(chunkKey);
+        
+        console.log(`🎉 Successfully uploaded chunked file ${fileName} to Firebase`);
+        
+        res.json({ 
+          success: true, 
+          downloadUrl,
+          firebasePath,
+          fileName,
+          fileSize: combinedBuffer.length,
+          contentType: storage_data.metadata.contentType
+        });
+      } catch (firebaseError) {
+        console.error('❌ Firebase upload error:', firebaseError);
+        chunkStorage.delete(chunkKey); // Clean up on error
+        return res.status(500).json({ 
+          error: `Firebase upload failed: ${firebaseError instanceof Error ? firebaseError.message : 'Unknown error'}` 
+        });
+      }
     } else {
       res.json({ success: true, chunkIndex, totalChunks: storage_data.metadata.totalChunks });
     }
