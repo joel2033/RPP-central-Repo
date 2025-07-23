@@ -57,12 +57,26 @@ const uploadWithSignedUrl = async (
         throw new Error(`Chunk ${i+1} upload failed: ${response.status} - ${errorText}`);
       }
       
-      const result = await response.json();
+      const responseText = await response.text();
+      console.log(`Chunk ${i+1} response:`, responseText);
+      
+      let result;
+      try {
+        result = responseText ? JSON.parse(responseText) : {};
+      } catch (e) {
+        console.error('Failed to parse response:', responseText);
+        throw new Error(`Invalid JSON response: ${responseText}`);
+      }
+      
+      // Check if result is actually an object
+      if (!result || typeof result !== 'object') {
+        throw new Error(`Unexpected response format: ${typeof result}`);
+      }
       
       // If this was the last chunk, we get the download URL
       if (result.downloadUrl) {
         downloadUrl = result.downloadUrl;
-        firebasePath = result.firebasePath;
+        firebasePath = result.firebasePath || `temp_uploads/${jobId}/${file.name}`;
       }
       
       uploaded += (end - start);
@@ -102,7 +116,11 @@ const uploadWithSignedUrl = async (
       contentType: file.type
     };
   } catch (error) {
-    console.error('Chunked upload error:', error);
+    console.error('Chunked upload error details:', {
+      error,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
     throw error;
   }
 };

@@ -814,14 +814,12 @@ Preferred communication style: Simple, everyday language.
   - **Memory Management**: Temporary Map-based chunk storage with automatic cleanup after successful uploads
   - **Large File Support**: Specifically designed for .dng RAW files and other large real estate media uploads
   - **Production Ready**: Complete error handling, progress tracking, and fallback chains for professional use
-- July 23, 2025. **IMPLEMENTED SIGNED URL CHUNKED UPLOADS** - Replaced server-side chunked uploads with direct client-to-Firebase signed URL uploads:
-  - **Signed URL Generation**: Updated /generate-signed-url route to use 'write' action for direct PUT uploads
-  - **Client-Side Chunked Upload**: Implemented uploadFileWithSignedUrl function with 5MB chunk processing
-  - **Direct Firebase Access**: Files upload directly to Firebase Storage using signed URLs, bypassing server limitations
-  - **Authentication Check**: Added auth.currentUser requirement before initiating signed URL uploads
-  - **Progress Tracking**: Maintained real-time progress updates during chunked upload process
-  - **Error Handling**: Comprehensive error detection and reporting for signed URL generation and chunk uploads
-  - **Removed XHR Fallback**: Eliminated problematic XMLHttpRequest and keepalive methods in favor of signed URLs
+- July 23, 2025. **FIXED DNG UPLOAD WITH SERVER CHUNKED UPLOAD** - Resolved empty error objects for DNG files:
+  - **Automatic DNG Detection**: DNG files and files >50MB automatically bypass Firebase SDK and use server chunked upload
+  - **Server-Side Chunk Processing**: Uses existing /upload-file-chunk endpoint with FormData and Content-Range headers
+  - **Enhanced Response Parsing**: Added detailed response logging and JSON parsing error handling
+  - **Direct Server Upload**: DNG files upload via server chunks that are assembled and uploaded to Firebase Storage
+  - **Removed Signed URL Approach**: Firebase Storage doesn't support chunked uploads via signed URLs, using server-side processing instead
   - **Performance Optimization**: Direct client-to-Firebase uploads reduce server load and improve upload reliability
   - **Large File Support**: Successfully handles DNG and other large RAW files without timeout issues
 - July 22, 2025. **IMPLEMENTED REAL SERVER UPLOAD AND CORS SETUP** - Enhanced server-side Firebase uploads for maximum reliability:
