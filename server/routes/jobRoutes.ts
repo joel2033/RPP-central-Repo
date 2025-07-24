@@ -300,7 +300,14 @@ router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res)
           throw new Error('Firebase Admin not properly initialized');
         }
         
-        const bucket = admin.storage().bucket();
+        let bucket;
+        try {
+          bucket = admin.storage().bucket();
+        } catch (bucketError) {
+          console.error('Failed to get Firebase Storage bucket (fallback):', bucketError);
+          throw new Error('Bucket initialization failed: ' + (bucketError instanceof Error ? bucketError.message : 'Unknown error'));
+        }
+        
         const firebasePath = `temp_uploads/${jobId}/${fileName}`;
         const firebaseFile = bucket.file(firebasePath);
         

@@ -17,7 +17,7 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
 // Export Firebase Storage and Auth instances with correct bucket URL
-export const storage = getStorage(app, "gs://rpp-central-database.appspot.com");
+export const storage = getStorage(app, "gs://rpp-central-database.firebasestorage.app");
 export const auth = getAuth(app);
 
 // Connect to emulators in development
@@ -29,7 +29,15 @@ if (import.meta.env.DEV) {
     console.log('Firebase Auth emulator not available, using production');
   }
   
-  console.log('Using production Firebase Storage for signed URL uploads');
+  try {
+    connectStorageEmulator(storage, 'localhost', 9199);
+    console.log('Connected to Firebase Storage emulator');
+  } catch (error) {
+    console.log('Firebase Storage emulator not available, using production');
+  }
+  
+  // Refresh auth token if user is authenticated
+  auth.currentUser?.getIdToken(true);
 }
 
 export default app;

@@ -42,10 +42,23 @@ function initializeFirebaseAdmin(): admin.app.App {
       }
       
       // Priority 3: Fall back to default credentials
-      admin.initializeApp({
+      const appConfig = {
         storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'rpp-central-database.firebasestorage.app'
-      });
+      };
+      
+      admin.initializeApp(appConfig);
       console.log('✅ Firebase Admin initialized with default credentials (fallback)');
+      
+      // Development emulator setup
+      if (process.env.NODE_ENV === 'development') {
+        try {
+          // Note: Firebase Admin doesn't support storage emulator the same way as client SDK
+          console.log('Development mode: Firebase Admin Storage using production bucket');
+        } catch (error) {
+          console.log('Firebase Admin emulator setup skipped:', error);
+        }
+      }
+      
       isInitialized = true;
       
     } catch (error) {
