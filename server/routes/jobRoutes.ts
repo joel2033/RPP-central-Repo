@@ -330,6 +330,12 @@ router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res)
       // Upload to Firebase
       try {
         const { admin } = await import('../utils/firebaseAdmin');
+        
+        // Validate admin is properly initialized
+        if (!admin || typeof admin.storage !== 'function') {
+          throw new Error('Firebase Admin not properly initialized');
+        }
+        
         const bucket = admin.storage().bucket();
         const firebasePath = `temp_uploads/${jobId}/${fileName}`;
         const firebaseFile = bucket.file(firebasePath);

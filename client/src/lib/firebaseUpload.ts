@@ -44,17 +44,45 @@ const uploadWithSignedUrl = async (
       formData.append('file', chunk);
       formData.append('fileName', file.name);
       
-      const response = await fetch(`/api/jobs/${jobId}/upload-file-chunk`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Content-Range': `bytes ${start}-${end-1}/${file.size}`
-        }
-      });
+      // Add retry logic for 500 errors
+      let retries = 3;
+      let response: Response | undefined;
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Chunk ${i+1} upload failed: ${response.status} - ${errorText}`);
+      while (retries > 0) {
+        try {
+          response = await fetch(`/api/jobs/${jobId}/upload-file-chunk`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'Content-Range': `bytes ${start}-${end-1}/${file.size}`,
+              'Content-Length': chunk.size.toString()
+            }
+          });
+          
+          if (response.status === 500) {
+            throw new Error('Server 500 - retrying');
+          }
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Chunk ${i+1} upload failed: ${response.status} - ${errorText}`);
+          }
+          
+          break; // Success, exit retry loop
+          
+        } catch (err) {
+          retries--;
+          if (retries === 0) {
+            throw err; // Final attempt failed
+          }
+          
+          console.log(`Chunk ${i+1} failed, retrying... (${retries} attempts left)`);
+          await new Promise(resolve => setTimeout(resolve, 2000 * (3 - retries))); // Exponential backoff
+        }
+      }
+      
+      if (!response) {
+        throw new Error('Failed to get response after retries');
       }
       
       const responseText = await response.text();

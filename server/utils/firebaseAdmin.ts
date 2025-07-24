@@ -11,19 +11,44 @@ function initializeFirebaseAdmin(): admin.app.App {
       
       if (serviceAccountJson) {
         try {
+          // Try to parse as JSON first
           const serviceAccount = JSON.parse(serviceAccountJson);
           admin.initializeApp({
             credential: admin.credential.cert(serviceAccount),
             storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'rpp-central-database.firebasestorage.app'
           });
-          console.log('✅ Firebase Admin initialized with service account');
+          console.log('✅ Firebase Admin initialized with JSON service account');
         } catch (parseError) {
-          console.error('Error parsing Firebase service account:', parseError);
-          // Fall back to default credentials
-          admin.initializeApp({
-            storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'rpp-central-database.firebasestorage.app'
-          });
-          console.log('✅ Firebase Admin initialized with default credentials (service account parse failed)');
+          console.error('Error parsing Firebase service account as JSON:', parseError instanceof Error ? parseError.message : 'Unknown parse error');
+          
+          // Check if it's a raw private key (starts with "-----BEGIN")
+          if (serviceAccountJson.startsWith('-----BEGIN') || serviceAccountJson.startsWith('nMII')) {
+            console.log('🔑 Detected raw private key format, using GOOGLE_CLOUD_KEY');
+            
+            // Use GOOGLE_CLOUD_KEY environment variable if available
+            const googleCloudKey = process.env.GOOGLE_CLOUD_KEY;
+            if (googleCloudKey) {
+              try {
+                const parsedKey = JSON.parse(googleCloudKey);
+                admin.initializeApp({
+                  credential: admin.credential.cert(parsedKey),
+                  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'rpp-central-database.firebasestorage.app'
+                });
+                console.log('✅ Firebase Admin initialized with GOOGLE_CLOUD_KEY');
+              } catch (gckError) {
+                console.error('Error with GOOGLE_CLOUD_KEY:', gckError instanceof Error ? gckError.message : 'Unknown GOOGLE_CLOUD_KEY error');
+                throw new Error('Both FIREBASE_SERVICE_ACCOUNT and GOOGLE_CLOUD_KEY failed to parse');
+              }
+            } else {
+              throw new Error('Raw private key detected but no GOOGLE_CLOUD_KEY provided');
+            }
+          } else {
+            // Fall back to default credentials
+            admin.initializeApp({
+              storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'rpp-central-database.firebasestorage.app'
+            });
+            console.log('✅ Firebase Admin initialized with default credentials (fallback)');
+          }
         }
       } else {
         // Initialize with default credentials (for environments like Google Cloud)
