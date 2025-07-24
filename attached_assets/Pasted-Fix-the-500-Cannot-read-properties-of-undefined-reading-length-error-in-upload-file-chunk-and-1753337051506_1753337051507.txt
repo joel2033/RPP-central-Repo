@@ -1,0 +1,54 @@
+Fix the 500 "Cannot read properties of undefined (reading 'length')" error in /upload-file-chunk and XHR network errors in client/src/lib/firebaseUpload.ts for RPP platform by ensuring firebase-admin initialization and adding env check.
+
+Steps to implement:
+1. In server/utils/firebaseAdmin.js, update init with env check:
+const admin = require('firebase-admin');
+if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+  throw new Error('Missing FIREBASE_SERVICE_ACCOUNT env var');
+}
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'rpp-central-database.firebasestorage.app'
+});
+module.exports = admin;
+2. In server/routes/jobs.js, add init error handling in /upload-file-chunk:
+try {
+  const bucket = admin.storage().bucket();
+  // ... rest of code
+} catch (err) {
+  console.error('Firebase admin error:', err);
+  res.status(500).json({ error: err.message || 'Firebase initialization failed' });
+}
+3. In client/vite.config.js, add CSP to allow * connect-src:
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    hmr: {
+      overlay: false,
+    },
+    headers: {
+      'Content-Security-Policy': "default-src 'self'; connect-src 'self' *; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: *;"
+    },
+  },
+});
+4. In client/src/lib/firebaseUpload.ts, add retry on 500 errors in chunk upload:
+let retries = 3;
+while (retries > 0) {
+  try {
+    const response = await fetch(`/api/jobs/${jobId}/upload-file-chunk`, {
+      method: 'POST',
+      body: chunk,
+      headers: { 'Content-Range': `bytes ${start}-${end-1}/${file.size}`, 'Content-Length': chunk.size.toString() }
+    });
+    if (response.status === 500) throw new Error('Server 500 - retrying');
+    if (!response.ok) throw new Error(`Chunk failed: ${response.status}`);
+    break;
+  } catch (err) {
+    retries--;
+    await new Promise(resolve => setTimeout(resolve, 2000 * (3 - retries)));
+  }
+}
+6. Manual: Disable Replit extension in chrome://extensions/; test large .dng upload; check Firebase for files.
+
+This fixes init and 500 errors. Commit with message: "Fix firebase-admin init and add chunk retry to resolve 500 and network errors in Upload to Editor"
