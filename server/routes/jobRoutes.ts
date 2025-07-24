@@ -243,7 +243,13 @@ router.post('/:id/generate-signed-url', validateParams(idParamSchema), validateB
     const { id: jobId } = req.params;
     const { fileName, contentType } = req.body;
     
-    const { admin } = await import('../utils/firebaseAdmin');
+    const firebaseAdminModule = await import('../utils/firebaseAdmin');
+    const admin = firebaseAdminModule.default;
+    
+    if (!admin || !admin.storage) {
+      throw new Error('Firebase Admin not properly initialized');
+    }
+    
     const bucket = admin.storage().bucket();
     const [signedUrl] = await bucket.file(`temp_uploads/${jobId}/${fileName}`).getSignedUrl({
       action: 'write',
@@ -253,6 +259,7 @@ router.post('/:id/generate-signed-url', validateParams(idParamSchema), validateB
     
     res.json({ signedUrl });
   } catch (err) {
+    console.error('Signed URL generation error:', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate signed URL' });
   }
 });
@@ -273,6 +280,7 @@ router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res)
     
     console.log(`📦 Received chunk for ${fileName} (${file.size} bytes)`);
     console.log('📋 Content-Range header:', contentRange);
+    console.log('📋 File buffer length:', file.buffer?.length || 'undefined');
     console.log('📋 Request headers:', Object.keys(req.headers));
     
     if (!fileName) {
@@ -283,10 +291,16 @@ router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res)
     if (!contentRange) {
       console.log('⚠️ No Content-Range header - performing full file upload');
       try {
-        const { getBucket } = await import('../utils/firebaseAdmin');
+        const firebaseAdminModule = await import('../utils/firebaseAdmin');
+        const admin = firebaseAdminModule.default;
         
-        // Use getBucket function for fallback upload
-        const bucket = getBucket();
+        // Validate admin for fallback upload
+        if (!admin || !admin.storage) {
+          console.error('Firebase Admin not available for fallback:', { admin: !!admin, storage: !!admin?.storage });
+          throw new Error('Firebase Admin not properly initialized');
+        }
+        
+        const bucket = admin.storage().bucket();
         const firebasePath = `temp_uploads/${jobId}/${fileName}`;
         const firebaseFile = bucket.file(firebasePath);
         
@@ -362,10 +376,16 @@ router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res)
       
       // Upload to Firebase
       try {
-        const { getBucket } = await import('../utils/firebaseAdmin');
+        const firebaseAdminModule = await import('../utils/firebaseAdmin');
+        const admin = firebaseAdminModule.default;
         
-        // Use getBucket function which handles initialization
-        const bucket = getBucket();
+        // Validate admin is properly initialized
+        if (!admin || !admin.storage) {
+          console.error('Firebase Admin not available:', { admin: !!admin, storage: !!admin?.storage });
+          throw new Error('Firebase Admin not properly initialized');
+        }
+        
+        const bucket = admin.storage().bucket();
         const firebasePath = `temp_uploads/${jobId}/${fileName}`;
         const firebaseFile = bucket.file(firebasePath);
         

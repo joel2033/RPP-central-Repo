@@ -44,6 +44,8 @@ const uploadWithSignedUrl = async (
       formData.append('file', chunk);
       formData.append('fileName', file.name);
       
+      console.log(`📤 Sending chunk ${i+1}: ${chunk.size} bytes for ${file.name}`);
+      
       // Add retry logic for 500 errors
       let retries = 5;
       let delay = 5000;
