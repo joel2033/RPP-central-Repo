@@ -45,7 +45,8 @@ const uploadWithSignedUrl = async (
       formData.append('fileName', file.name);
       
       // Add retry logic for 500 errors
-      let retries = 3;
+      let retries = 5;
+      let delay = 5000;
       let response: Response | undefined;
       
       while (retries > 0) {
@@ -77,7 +78,8 @@ const uploadWithSignedUrl = async (
           }
           
           console.log(`Chunk ${i+1} failed, retrying... (${retries} attempts left)`);
-          await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay between retries
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay *= 2; // Exponential backoff
         }
       }
       

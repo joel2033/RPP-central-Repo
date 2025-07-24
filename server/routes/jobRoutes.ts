@@ -264,8 +264,8 @@ router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res)
     const { jobId } = req.params;
     const file = req.file;
     
-    if (!file) {
-      return res.status(400).json({ error: 'No chunk' });
+    if (!file || !file.buffer) {
+      return res.status(400).json({ error: 'No chunk data' });
     }
     
     const fileName = req.headers['x-file-name'] as string || req.body.fileName;
@@ -283,15 +283,10 @@ router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res)
     if (!contentRange) {
       console.log('⚠️ No Content-Range header - performing full file upload');
       try {
-        const { admin } = await import('../utils/firebaseAdmin');
+        const { getBucket } = await import('../utils/firebaseAdmin');
         
-        // Validate admin is properly initialized
-        if (!admin || typeof admin.storage !== 'function') {
-          console.error('Firebase Admin validation failed during fallback upload');
-          return res.status(500).json({ error: 'Firebase Admin not properly initialized' });
-        }
-        
-        const bucket = admin.storage().bucket();
+        // Use getBucket function for fallback upload
+        const bucket = getBucket();
         const firebasePath = `temp_uploads/${jobId}/${fileName}`;
         const firebaseFile = bucket.file(firebasePath);
         
@@ -367,15 +362,10 @@ router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res)
       
       // Upload to Firebase
       try {
-        const { admin } = await import('../utils/firebaseAdmin');
+        const { getBucket } = await import('../utils/firebaseAdmin');
         
-        // Validate admin is properly initialized
-        if (!admin || typeof admin.storage !== 'function') {
-          console.error('Firebase Admin validation failed:', { admin: !!admin, storage: admin ? typeof admin.storage : 'undefined' });
-          throw new Error('Firebase Admin not properly initialized');
-        }
-        
-        const bucket = admin.storage().bucket();
+        // Use getBucket function which handles initialization
+        const bucket = getBucket();
         const firebasePath = `temp_uploads/${jobId}/${fileName}`;
         const firebaseFile = bucket.file(firebasePath);
         
