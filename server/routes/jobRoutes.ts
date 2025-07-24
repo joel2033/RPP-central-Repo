@@ -279,9 +279,47 @@ router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res)
       return res.status(400).json({ error: 'File name required' });
     }
     
-    // Parse Content-Range header: "bytes start-end/total"
+    // Handle missing Content-Range header with fallback to full file upload
     if (!contentRange) {
-      return res.status(400).json({ error: 'Missing Content-Range header' });
+      console.log('⚠️ No Content-Range header - performing full file upload');
+      try {
+        const { admin } = await import('../utils/firebaseAdmin');
+        
+        // Validate admin is properly initialized
+        if (!admin || typeof admin.storage !== 'function') {
+          console.error('Firebase Admin validation failed during fallback upload');
+          return res.status(500).json({ error: 'Firebase Admin not properly initialized' });
+        }
+        
+        const bucket = admin.storage().bucket();
+        const firebasePath = `temp_uploads/${jobId}/${fileName}`;
+        const firebaseFile = bucket.file(firebasePath);
+        
+        await firebaseFile.save(file.buffer, {
+          metadata: {
+            contentType: file.mimetype
+          }
+        });
+        
+        const [downloadUrl] = await firebaseFile.getSignedUrl({
+          action: 'read',
+          expires: '03-09-2491'
+        });
+        
+        console.log('✅ Full file upload completed');
+        return res.json({ 
+          success: true, 
+          downloadUrl, 
+          firebasePath,
+          isComplete: true 
+        });
+        
+      } catch (uploadError) {
+        console.error('❌ Full file upload error:', uploadError);
+        return res.status(500).json({ 
+          error: uploadError instanceof Error ? uploadError.message : 'Full file upload failed' 
+        });
+      }
     }
     
     const range = contentRange.match(/bytes (\d+)-(\d+)\/(\d+)/);
@@ -333,6 +371,7 @@ router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res)
         
         // Validate admin is properly initialized
         if (!admin || typeof admin.storage !== 'function') {
+          console.error('Firebase Admin validation failed:', { admin: !!admin, storage: admin ? typeof admin.storage : 'undefined' });
           throw new Error('Firebase Admin not properly initialized');
         }
         

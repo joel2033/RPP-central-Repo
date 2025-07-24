@@ -1,0 +1,47 @@
+Fix the 500 "Cannot read properties of undefined (reading 'length')" error in /upload-file-chunk route for RPP platform by adding checks for undefined headers and fallback to full file upload in server/routes/jobs.js.
+
+Steps to implement:
+1. In server/routes/jobs.js, update /upload-file-chunk to handle undefined range:
+router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  try {
+    const { jobId } = req.params;
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'No chunk' });
+    const rangeHeader = req.headers['content-range'];
+    if (!rangeHeader) {
+      // Fallback to full file upload if no range
+      const filePath = `temp_uploads/${jobId}/${req.body.fileName || file.originalname}`;
+      const bucket = admin.storage().bucket();
+      await bucket.upload(file.path, { destination: filePath, metadata: { contentType: file.mimetype } });
+      const [url] = await bucket.file(filePath).getSignedUrl({ action: 'read', expires: '03-09-2491' });
+      return res.json({ success: true, downloadUrl: url });
+    }
+    const range = rangeHeader.match(/bytes (\d+)-(\d+)\/(\d+)/);
+    if (!range) return res.status(400).json({ error: 'Invalid Content-Range' });
+    const [ , start, end, total ] = range;
+    const bucket = admin.storage().bucket();
+    const filePath = `temp_uploads/${jobId}/${req.body.fileName || file.originalname}`;
+    const fileRef = bucket.file(filePath);
+    const writeStream = fileRef.createWriteStream({ start: parseInt(start), signal: req.signal }); // Add signal for abort
+    writeStream.end(file.buffer);
+    if (parseInt(end) + 1 === parseInt(total)) {
+      const [url] = await fileRef.getSignedUrl({ action: 'read', expires: '03-09-2491' });
+      res.json({ success: true, downloadUrl: url });
+    } else {
+      res.json({ success: true });
+    }
+  } catch (err) {
+    console.error('Chunk error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+2. In client/src/lib/firebaseUpload.ts, add delay between chunk retries (2s) to avoid rate limiting:
+await new Promise(resolve => setTimeout(resolve, 2000));
+3. In client/src/lib/firebase.ts, add auth refresh:
+import { getAuth } from 'firebase/auth';
+export const auth = getAuth(app);
+auth.currentUser?.getIdToken(true); // Refresh token
+4. Manual: Disable Replit extension; test large .dng; check server logs for header values.
+
+This fixes header issues. Commit with message: "Handle undefined headers and add delay in chunk uploads to fix 500 error in Upload to Editor"

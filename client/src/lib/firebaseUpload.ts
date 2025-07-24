@@ -77,7 +77,7 @@ const uploadWithSignedUrl = async (
           }
           
           console.log(`Chunk ${i+1} failed, retrying... (${retries} attempts left)`);
-          await new Promise(resolve => setTimeout(resolve, 2000 * (3 - retries))); // Exponential backoff
+          await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay between retries
         }
       }
       
