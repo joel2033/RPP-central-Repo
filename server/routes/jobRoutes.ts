@@ -263,165 +263,155 @@ router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res)
   try {
     const { jobId } = req.params;
     const file = req.file;
-    
+
     if (!file) {
-      return res.status(400).json({ error: 'No chunk' });
+      return res.status(400).json({ error: 'No chunk provided in request' });
     }
-    
+
     const fileName = req.headers['x-file-name'] as string || req.body.fileName;
-    const contentRange = req.headers['content-range'] as string;
-    
-    console.log(`📦 Received chunk for ${fileName} (${file.size} bytes)`);
-    console.log('📋 Content-Range header:', contentRange);
-    console.log('📋 Request headers:', Object.keys(req.headers));
-    
     if (!fileName) {
-      return res.status(400).json({ error: 'File name required' });
+      return res.status(400).json({ error: 'File name is required' });
     }
-    
-    // Handle missing Content-Range header with fallback to full file upload
+
+    const contentRange = req.headers['content-range'] as string;
+    console.log(`📦 Chunk received for ${fileName}, size: ${file.size}, range: ${contentRange}`);
+
+    // If no Content-Range, treat as a single, complete file upload
     if (!contentRange) {
-      console.log('⚠️ No Content-Range header - performing full file upload');
+      console.log('⚠️ No Content-Range header. Treating as a whole file upload.');
       try {
         const { admin } = await import('../utils/firebaseAdmin');
-        
-        // Validate admin is properly initialized
-        if (!admin || typeof admin.storage !== 'function') {
-          console.error('Firebase Admin validation failed during fallback upload');
-          return res.status(500).json({ error: 'Firebase Admin not properly initialized' });
-        }
-        
         const bucket = admin.storage().bucket();
         const firebasePath = `temp_uploads/${jobId}/${fileName}`;
         const firebaseFile = bucket.file(firebasePath);
-        
+
         await firebaseFile.save(file.buffer, {
-          metadata: {
-            contentType: file.mimetype
-          }
+          metadata: { contentType: file.mimetype },
         });
-        
+
         const [downloadUrl] = await firebaseFile.getSignedUrl({
           action: 'read',
-          expires: '03-09-2491'
+          expires: '03-09-2491',
         });
-        
-        console.log('✅ Full file upload completed');
-        return res.json({ 
-          success: true, 
-          downloadUrl, 
+
+        console.log(`✅ Whole file uploaded successfully to ${firebasePath}`);
+        return res.json({
+          success: true,
+          downloadUrl,
           firebasePath,
-          isComplete: true 
+          isComplete: true,
         });
-        
       } catch (uploadError) {
-        console.error('❌ Full file upload error:', uploadError);
-        return res.status(500).json({ 
-          error: uploadError instanceof Error ? uploadError.message : 'Full file upload failed' 
+        console.error('❌ Whole file upload to Firebase failed:', uploadError);
+        return res.status(500).json({
+          error: uploadError instanceof Error ? uploadError.message : 'Server upload failed',
         });
       }
     }
-    
-    const range = contentRange.match(/bytes (\d+)-(\d+)\/(\d+)/);
-    if (!range) {
-      return res.status(400).json({ error: 'Invalid Content-Range format' });
+
+    const rangeMatch = contentRange.match(/bytes (\d+)-(\d+)\/(\d+)/);
+    if (!rangeMatch) {
+      return res.status(400).json({ error: 'Invalid Content-Range format.' });
     }
-    
-    const [, start, end, total] = range;
-    const startByte = parseInt(start);
-    const endByte = parseInt(end);
-    const totalBytes = parseInt(total);
-    
-    console.log(`📊 Chunk range: ${startByte}-${endByte}/${totalBytes}`);
-    
+
+    const [, startStr, endStr, totalStr] = rangeMatch;
+    const start = parseInt(startStr, 10);
+    const end = parseInt(endStr, 10);
+    const total = parseInt(totalStr, 10);
+
     const chunkKey = `${jobId}-${fileName}`;
-    
-    // Initialize storage for this file if not exists
     if (!chunkStorage.has(chunkKey)) {
-      const totalChunks = Math.ceil(totalBytes / (5 * 1024 * 1024)); // 5MB chunks
+      console.log(`🆕 Initializing chunk storage for ${fileName}`);
       chunkStorage.set(chunkKey, {
-        chunks: new Array(totalChunks),
+        chunks: [],
         metadata: {
           fileName,
           contentType: file.mimetype,
-          totalChunks,
-          totalBytes,
-          jobId
-        }
+          totalBytes: total,
+          jobId,
+          receivedBytes: 0,
+        },
       });
     }
-    
-    const storage_data = chunkStorage.get(chunkKey)!;
-    const chunkIndex = Math.floor(startByte / (5 * 1024 * 1024));
-    storage_data.chunks[chunkIndex] = file.buffer;
-    
-    console.log(`✅ Stored chunk ${chunkIndex + 1}/${storage_data.metadata.totalChunks} for ${fileName}`);
-    
-    // Check if this is the last chunk
-    if (endByte + 1 === totalBytes) {
-      console.log(`🎯 Last chunk received, finalizing upload for ${fileName}`);
-      
-      // Combine all chunks
-      const combinedBuffer = Buffer.concat(storage_data.chunks.filter(chunk => chunk));
-      console.log(`📊 Combined ${storage_data.chunks.length} chunks into ${combinedBuffer.length} bytes`);
-      
-      // Upload to Firebase
+
+    const storageEntry = chunkStorage.get(chunkKey)!;
+    storageEntry.chunks.push({ buffer: file.buffer, start });
+    storageEntry.metadata.receivedBytes += file.buffer.length;
+
+    console.log(
+      `✅ Stored chunk for ${fileName}. Total received: ${storageEntry.metadata.receivedBytes}/${total}`
+    );
+
+    // Check if all bytes have been received
+    if (storageEntry.metadata.receivedBytes === total) {
+      console.log(`🎯 All chunks received for ${fileName}. Finalizing...`);
+
+      // Sort chunks by their starting byte offset and concatenate
+      const sortedChunks = storageEntry.chunks
+        .sort((a, b) => a.start - b.start)
+        .map((c) => c.buffer);
+      const combinedBuffer = Buffer.concat(sortedChunks);
+
+      if (combinedBuffer.length !== total) {
+        chunkStorage.delete(chunkKey); // Clean up on error
+        return res.status(500).json({
+          error: `File assembly failed: expected ${total} bytes, got ${combinedBuffer.length}`,
+        });
+      }
+
+      console.log(`📊 Assembled file ${fileName} with size ${combinedBuffer.length}`);
+
       try {
         const { admin } = await import('../utils/firebaseAdmin');
-        
-        // Validate admin is properly initialized
-        if (!admin || typeof admin.storage !== 'function') {
-          console.error('Firebase Admin validation failed:', { admin: !!admin, storage: admin ? typeof admin.storage : 'undefined' });
-          throw new Error('Firebase Admin not properly initialized');
-        }
-        
         const bucket = admin.storage().bucket();
         const firebasePath = `temp_uploads/${jobId}/${fileName}`;
         const firebaseFile = bucket.file(firebasePath);
-        
+
         await firebaseFile.save(combinedBuffer, {
           metadata: {
-            contentType: storage_data.metadata.contentType,
-            metadata: {
-              jobId: jobId,
-              category: 'photography',
-              mediaType: 'raw'
-            }
-          }
+            contentType: storageEntry.metadata.contentType,
+            metadata: { jobId, category: 'photography', mediaType: 'raw' },
+          },
         });
-        
-        // Generate download URL
+
         const [downloadUrl] = await firebaseFile.getSignedUrl({
           action: 'read',
-          expires: '03-09-2491'
+          expires: '03-09-2491',
         });
-        
-        // Clean up chunk storage
-        chunkStorage.delete(chunkKey);
-        
-        console.log(`🎉 Successfully uploaded chunked file ${fileName} to Firebase`);
-        
-        res.json({ 
-          success: true, 
+
+        chunkStorage.delete(chunkKey); // Clean up after successful upload
+        console.log(`🎉 Successfully uploaded chunked file ${fileName} to Firebase.`);
+
+        return res.json({
+          success: true,
           downloadUrl,
           firebasePath,
           fileName,
           fileSize: combinedBuffer.length,
-          contentType: storage_data.metadata.contentType
+          contentType: storageEntry.metadata.contentType,
         });
       } catch (firebaseError) {
-        console.error('❌ Firebase upload error:', firebaseError);
-        chunkStorage.delete(chunkKey); // Clean up on error
-        return res.status(500).json({ 
-          error: `Firebase upload failed: ${firebaseError instanceof Error ? firebaseError.message : 'Unknown error'}` 
+        chunkStorage.delete(chunkKey); // Clean up on Firebase error
+        console.error('❌ Firebase upload from chunks failed:', firebaseError);
+        return res.status(500).json({
+          error: `Firebase upload failed: ${
+            firebaseError instanceof Error ? firebaseError.message : 'Unknown error'
+          }`,
         });
       }
     } else {
-      res.json({ success: true, chunkIndex, totalChunks: storage_data.metadata.totalChunks });
+      // Acknowledge receipt of the chunk
+      return res.json({
+        success: true,
+        received: storageEntry.metadata.receivedBytes,
+        total,
+      });
     }
   } catch (err) {
-    console.error('❌ Chunk upload error:', err);
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Chunk upload failed' });
+    console.error('❌ Unhandled error in chunk upload endpoint:', err);
+    return res.status(500).json({
+      error: err instanceof Error ? err.message : 'An unexpected error occurred',
+    });
   }
 });
 
