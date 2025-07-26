@@ -1,0 +1,49 @@
+Refine chunk assembly and fix 500 "Cannot read properties of undefined (reading 'length')" in server/routes/jobs.js for RPP platform by using buffer concatenation for chunks and adding SDK auth refresh in client/src/lib/firebaseUpload.ts.
+
+Steps to implement:
+1. In server/routes/jobs.js, update /upload-file-chunk to use buffer concatenation for chunk assembly:
+router.post('/:jobId/upload-file-chunk', upload.single('file'), async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  try {
+    const { jobId } = req.params;
+    const file = req.file;
+    if (!file || !file.buffer) return res.status(400).json({ error: 'No chunk data' });
+    const rangeHeader = req.headers['content-range'];
+    if (!rangeHeader) {
+      // Fallback to full upload
+      const bucket = admin.storage().bucket();
+      const filePath = `temp_uploads/${jobId}/${req.body.fileName || file.originalname}`;
+      await bucket.file(filePath).save(file.buffer, { metadata: { contentType: file.mimetype } });
+      const [url] = await bucket.file(filePath).getSignedUrl({ action: 'read', expires: '03-09-2491' });
+      return res.json({ success: true, downloadUrl: url });
+    }
+    const range = rangeHeader.match(/bytes (\d+)-(\d+)\/(\d+)/);
+    if (!range) return res.status(400).json({ error: 'Invalid Content-Range' });
+    const [ , start, end, total ] = range;
+    const bucket = admin.storage().bucket();
+    const filePath = `temp_uploads/${jobId}/${req.body.fileName || file.originalname}`;
+    const fileRef = bucket.file(filePath);
+    // Append chunk using buffer concatenation (simplified, use fs in production)
+    const [exists] = await fileRef.exists();
+    if (!exists) await fileRef.save(Buffer.alloc(0));
+    const [currentBuffer] = await fileRef.download();
+    const newBuffer = Buffer.concat([currentBuffer, file.buffer]);
+    await fileRef.save(newBuffer, { metadata: { contentType: file.mimetype } });
+    if (parseInt(end) + 1 === parseInt(total)) {
+      const [url] = await fileRef.getSignedUrl({ action: 'read', expires: '03-09-2491' });
+      res.json({ success: true, downloadUrl: url });
+    } else {
+      res.json({ success: true });
+    }
+  } catch (err) {
+    console.error('Chunk error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+3. In client/src/lib/firebaseUpload.ts, add auth refresh before SDK upload:
+import { getAuth } from 'firebase/auth';
+const auth = getAuth();
+await auth.currentUser?.getIdToken(true); // Refresh token
+4. Manual: Test with large .dng; disable Replit extension; check Firebase for complete files.
+
+This fixes chunk assembly. Commit with message: "Use buffer concatenation for chunks to fix 500 length error in Upload to Editor"

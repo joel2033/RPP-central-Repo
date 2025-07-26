@@ -1,5 +1,6 @@
 import { storage, auth } from './firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { getAuth } from 'firebase/auth';
 import { apiRequest } from "./queryClient";
 
 export interface UploadProgress {
@@ -24,6 +25,16 @@ const uploadWithSignedUrl = async (
   onProgress?: (progress: UploadProgress) => void
 ): Promise<FirebaseUploadResult> => {
   console.log('Using chunked upload via server for', file.name);
+  
+  // Refresh Firebase auth token before upload
+  try {
+    const auth = getAuth();
+    if (auth.currentUser) {
+      await auth.currentUser.getIdToken(true); // Refresh token
+    }
+  } catch (authError) {
+    console.warn('Firebase auth refresh failed:', authError);
+  }
   
   try {
     // Upload file in chunks to server endpoint

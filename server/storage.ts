@@ -62,8 +62,6 @@ import {
   jobActivityLog,
   editorServiceCategories,
   editorServiceOptions,
-  editorServicePricing,
-  editorServiceChangeLog,
   type EditorServiceCategory,
   type InsertEditorServiceCategory,
   type EditorServiceOption,
@@ -545,7 +543,10 @@ export class DatabaseStorage implements IStorage {
       contentType: file.fileType === 'dng' ? 'image/x-adobe-dng' : 'image/jpeg',
       s3Key: file.fileUrl, // fileUrl contains the S3 key directly
       licenseeId: licenseeId || '44695535',
-      uploadTimestamp: file.uploadedAt
+      uploadTimestamp: file.uploadedAt,
+      // Add missing required fields for Firebase compatibility
+      downloadUrl: file.downloadUrl || file.fileUrl,
+      firebasePath: file.firebasePath || `temp_uploads/${jobId}/${file.fileName}`
     }));
   }
 
